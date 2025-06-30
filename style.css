@@ -162,3 +162,16 @@ small{color:var(--text-muted);font-size:.75rem}
   border: none;
   cursor: pointer;
 }
+
+
+@media(max-width: 480px) {
+  #toggleCards {
+    position: static;
+    margin: 0 auto 8px auto;
+    display: block;
+  }
+  #cardPanel {
+    position: static;
+    margin-bottom: 16px;
+  }
+}
