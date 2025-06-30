@@ -7,14 +7,26 @@
 <title>Controle 365</title>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
-
 <link href="icons/icon-192x192.png" rel="icon" sizes="192x192" type="image/png"/>
 <link href="icons/icon-180x180.png" rel="apple-touch-icon" sizes="180x180"/>
 <link href="site.webmanifest" rel="manifest"/>
 <link href="style.css" rel="stylesheet"/></head>
 <body>
+
+<div class="card-panel-hidden" id="cardPanel">
+<div class="card-form">
+<input id="cardName" placeholder="Nome"/>
+<div class="card-dates">
+<input id="cardClose" max="31" min="1" placeholder="Fechamento" type="number"/>
+<input id="cardDue" max="31" min="1" placeholder="Vencimento" type="number"/>
+</div>
+<button id="addCardBtn">Adicionar</button>
+<ul class="card-list" id="cardList"></ul>
+</div>
+</div>
+<button class="floating-card-button" id="toggleCards">💳</button>
 <div class="wrapper">
-<div class="container">
+<div class="container operation-panel">
 <h2>Lançar operação</h2>
 <div class="form-grid">
 <input id="desc" placeholder="Descrição"/>
@@ -25,18 +37,7 @@
 </div>
 </div>
 <div class="container">
-<details><summary>Gerenciar cartões</summary>
-<div style="margin-top:10px">
-<div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:6px">
-<input id="cardName" placeholder="Nome"/>
-<input id="cardClose" max="31" min="1" placeholder="Fech" type="number"/>
-<input id="cardDue" max="31" min="1" placeholder="Venc" type="number"/>
-<button id="addCardBtn">Adicionar</button>
-</div>
-<small>Fechamento define a fatura.</small>
-<ul id="cardList" style="margin-top:8px"></ul>
-</div>
-</details>
+
 </div>
 <div class="container">
 <div id="startGroup" style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
@@ -50,6 +51,5 @@
 <button class="danger" id="resetData" style="margin-top:12px">Limpar TODOS</button>
 </div>
 </div>
-
 <script src="main.js" type="module"></script></body>
 </html>

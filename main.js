@@ -59,5 +59,5 @@ addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 
 // Botão que exibe/esconde os cartões
 document.getElementById("toggleCards").onclick = () => {
-  document.getElementById("cardPanel").toggleAttribute("open");
+  document.getElementById("cardPanel").classList.toggle("card-panel-hidden");
 };
