@@ -175,14 +175,38 @@ small{color:var(--text-muted);font-size:.75rem}
   }
 }
 
-@media(max-width: 480px) {
-  #toggleCards {
-    position: static;
-    margin: 0 auto 8px auto;
-    display: block;
-  }
+
   #cardPanel {
     position: static;
     margin-bottom: 16px;
+  }
+}
+
+
+@media(max-width: 480px) {
+  #toggleCards {
+    position: relative;
+    display: block;
+    margin-left: auto;
+    margin-right: 16px;
+    margin-bottom: 8px;
+    top: 0;
+    z-index: 10;
+  }
+
+  #cardPanel {
+    position: relative;
+    margin: 0 16px 12px auto;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+  }
+
+  #cardPanel.active {
+    max-height: 1000px;
+    opacity: 1;
+    transform: translateY(0);
   }
 }
