@@ -1,0 +1,64 @@
+
+:root{--bg:#f2f4f7;--panel:#fff;--panel-alt:#f7f9fc;--accent:#0066ff;--accent-hover:#0056d4;--danger:#d92d20;--text:#111827;--text-muted:#6b7280;--border:#d1d5db;--radius:8px}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif}
+body{background:var(--bg);color:var(--text);padding:20px;display:flex;justify-content:center;font-size:15px}
+.wrapper{width:100%;max-width:960px}
+.container{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+h2{font-size:1.3rem;font-weight:600;margin-bottom:14px}
+
+/* ---------- FORM ---------- */
+.form-grid{display:grid;gap:10px;grid-template-columns:2fr 1fr;grid-template-areas:
+  "desc value"
+  "method date"
+  ". button";}
+#desc{grid-area:desc}
+#value{grid-area:value}
+#method{grid-area:method}
+#opDate{grid-area:date}
+#addBtn{grid-area:button;padding:12px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.form-grid input,.form-grid select{padding:10px;border:1px solid var(--border);border-radius:var(--radius);font-size:.9rem;width:100%}
+#addBtn:hover{background:var(--accent-hover)}
+
+/* ---------- TABLE ---------- */
+.table-wrapper{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:10px}
+thead th{background:var(--panel-alt);padding:6px;font-weight:600;text-align:left}
+th,td{border:1px solid var(--border);padding:6px;vertical-align:top;word-wrap:anywhere}
+tr.month-header{background:var(--panel-alt);cursor:pointer}
+tr.month-header.closed{background:#e9ecf3}
+td.saldo-neg{background:#fdeaea}
+td.negative{color:#b42318;font-weight:600}
+td.positive{color:#027a48;font-weight:600}
+
+/* lines */
+.op-line{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.op-txt{display:flex;gap:6px;flex:1}
+button.icon{background:none;border:none;font-size:1rem;color:var(--text-muted);padding:0 2px;cursor:pointer}
+button.icon:hover{color:var(--accent-hover)}button.icon.danger:hover{color:var(--danger)}
+.op-ts{font-size:.68rem;color:var(--text-muted);margin-left:20px}
+
+/* mobile tweaks */
+@media(max-width:480px){
+  .container{padding:14px}
+  /* form single column */
+  .form-grid{grid-template-columns:1fr;grid-template-areas:
+    "desc" "value" "method" "date" "button"}
+  #addBtn{width:100%}
+  /* hide gastos col */
+  th:nth-child(3),td:nth-child(3){display:none}
+  th:nth-child(1),td:nth-child(1){width:68px}
+  th:nth-child(4),td:nth-child(4){width:88px}
+  th,td{padding:4px}
+  /* two-line text with icons aligned */
+  .op-line{align-items:flex-start}
+  .op-txt{flex-direction:column}
+  .op-txt .value{font-size:.8rem}
+}
+
+/* misc */
+button.danger{background:var(--danger);color:#fff}button.danger:hover{opacity:.9}
+details.invoice summary{cursor:pointer;list-style:none}
+details.invoice summary::before{content:'▸';margin-right:4px}
+details.invoice[open] summary::before{transform:rotate(90deg)}
+.invoice{background:var(--panel-alt);padding:6px;border-radius:var(--radius);margin-bottom:4px}
+small{color:var(--text-muted);font-size:.75rem}
