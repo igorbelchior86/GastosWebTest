@@ -62,3 +62,42 @@ details.invoice summary::before{content:'▸';margin-right:4px}
 details.invoice[open] summary::before{transform:rotate(90deg)}
 .invoice{background:var(--panel-alt);padding:6px;border-radius:var(--radius);margin-bottom:4px}
 small{color:var(--text-muted);font-size:.75rem}
+
+/* --- Botão flutuante cartão --- */
+.floating-card-button {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background-color: #007AFF;
+  color: white;
+  font-size: 24px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 999;
+  cursor: pointer;
+}
+.floating-card-button:hover {
+  background-color: #005FCC;
+}
+
+/* --- Estilização visual do bloco de Lançar Operação --- */
+.container.operation-panel {
+  border: 2px solid black;
+  border-radius: 20px;
+}
+.container.operation-panel .form-grid input,
+.container.operation-panel .form-grid select {
+  border: 2px solid black;
+  border-radius: 16px;
+  font-size: 1rem;
+}
+.container.operation-panel #addBtn {
+  border-radius: 20px;
+  background: #4CAF50;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+}
