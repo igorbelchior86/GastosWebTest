@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <title>Controle 365</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrapper">
+
+    <button id="toggleCards" class="floating-card-button">💳</button>
+
+    <div id="cardPanel" class="card-panel">
+      <div class="card-form">
+        <input id="cardName" placeholder="Nome">
+        <div class="card-dates">
+          <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
+          <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+        </div>
+        <button id="addCardBtn">Adicionar</button>
+        <ul id="cardList" class="card-list"></ul>
+      </div>
+    </div>
+
+    <div class="container operation-panel">
+      <h2>Lançar operação</h2>
+      <div class="form-grid">
+        <input id="desc" placeholder="Descrição">
+        <input id="value" type="number" placeholder="Valor (- despesa)">
+        <select id="method"></select>
+        <input id="opDate" type="date">
+        <button id="addBtn">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px" id="startGroup">
+        <label for="startInput">Saldo inicial:</label>
+        <input id="startInput" type="number" style="flex:1">
+        <button id="setStartBtn" style="flex:0 0 60px">OK</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="dailyTable"><thead><tr><th>Data</th><th>Descrição</th><th>Gasto</th><th>Saldo</th></tr></thead><tbody></tbody></table>
+      </div>
+      <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

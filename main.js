@@ -63,3 +63,13 @@ addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 document.getElementById("toggleCards").addEventListener("click", () => {
   document.getElementById("cardPanel").classList.toggle("active");
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggle = document.getElementById("toggleCards");
+  const panel = document.getElementById("cardPanel");
+  if (toggle && panel) {
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("active");
+    });
+  }
+});
