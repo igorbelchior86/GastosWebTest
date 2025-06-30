@@ -58,6 +58,8 @@ addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 (async()=>{transactions=await load('tx',[]);cards=await load('cards',[{name:'dinheiro',close:0,due:0}]);if(!cards.some(c=>c.name==='dinheiro'))cards.unshift({name:'dinheiro',close:0,due:0});startBalance=await load('startBal',null);refreshMethods();renderCardList();initStart();date.value=new Date().toISOString().slice(0,10);renderTable();})();
 
 // Botão que exibe/esconde os cartões
-document.getElementById("toggleCards").onclick = () => {
+
+
+document.getElementById("toggleCards").addEventListener("click", () => {
   document.getElementById("cardPanel").classList.toggle("active");
-};
+});
