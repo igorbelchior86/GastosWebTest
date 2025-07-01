@@ -40,3 +40,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
+  // Definir a data atual como valor padrão do campo #opDate
+  -${mm}-${dd}`;
+  }
+
+  // Definir a data atual como valor padrão visual em formato dd/mm/aaaa
+  const opDate = document.getElementById("opDate");
+  if (opDate) {
+    const hoje = new Date();
+    const yyyy = hoje.getFullYear();
+    const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoje.getDate()).padStart(2, '0');
+    const iso = `${yyyy}-${mm}-${dd}`;
+    opDate.value = iso;
+  }
