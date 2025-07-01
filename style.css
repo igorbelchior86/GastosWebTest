@@ -149,3 +149,49 @@ h2 {
   border-radius: var(--radius);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+
+
+/* Correções visuais */
+.container,
+#cardPanel {
+  box-sizing: border-box;
+  padding: 18px;
+  margin: 16px 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-form input,
+.card-dates input,
+#desc, #value, #method, #opDate {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.card-form input {
+  margin-bottom: 10px;
+}
+
+.card-dates {
+  margin-bottom: 10px;
+}
+
+#addCardBtn {
+  margin-top: 10px;
+}
+
+.form-grid input,
+.form-grid select {
+  margin-bottom: 10px;
+}
+
+#addBtn {
+  margin-top: 10px;
+}
+
+/* Garantir que tudo fique dentro do container */
+.form-grid,
+.card-form {
+  box-sizing: border-box;
+  width: 100%;
+}
