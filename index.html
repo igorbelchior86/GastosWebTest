@@ -58,5 +58,52 @@
     </div>
   </div>
   <script type="module" src="main.js"></script>
+  <script>
+    const tbody = document.querySelector("#dailyTable tbody");
+    const startGroup = document.getElementById("startGroup");
+    const setStartBtn = document.getElementById("setStartBtn");
+    const startInput = document.getElementById("startInput");
+    const addBtn = document.getElementById("addBtn");
+
+    let saldo = null;
+
+    setStartBtn.onclick = () => {
+      const val = parseFloat(startInput.value);
+      if (!isNaN(val)) {
+        saldo = val;
+        startGroup.style.display = "none";
+        renderTable();
+      }
+    };
+
+    addBtn.onclick = () => {
+      const desc = document.getElementById("desc").value.trim();
+      const value = parseFloat(document.getElementById("value").value.trim());
+      const date = document.getElementById("opDate").value;
+      const method = document.getElementById("method").value;
+
+      if (!desc || isNaN(value) || !date) return alert("Preencha todos os campos.");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${date.split("-").reverse().join("/")}</td>
+        <td>${desc}</td>
+        <td>${value.toFixed(2)}</td>
+        <td></td>`;
+      tbody.appendChild(tr);
+    };
+
+    function renderTable() {
+      const trs = tbody.querySelectorAll("tr");
+      let atual = saldo;
+      trs.forEach(tr => {
+        const td = tr.querySelectorAll("td");
+        const gasto = parseFloat(td[2]?.textContent);
+        if (!isNaN(gasto)) {
+          atual += gasto;
+          td[3].textContent = atual.toFixed(2);
+        }
+      });
+    }
+  </script>
 </body>
 </html>
