@@ -6,6 +6,37 @@ document.addEventListener("DOMContentLoaded", () => {
       panel.classList.toggle("active");
     });
   }
-});
 
-// ... mantenha aqui o restante do seu JS de transações (save/load, renderTable, etc.) ...
+  // Preencher método de pagamento com opção padrão
+  const method = document.getElementById("method");
+  if (method) {
+    const opt = document.createElement("option");
+    opt.value = "dinheiro";
+    opt.textContent = "Dinheiro";
+    method.appendChild(opt);
+  }
+
+  // Geração estática da tabela se estiver vazia
+  const tbody = document.querySelector('#dailyTable tbody');
+  if (tbody && tbody.children.length === 0) {
+    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const ano = new Date().getFullYear();
+    for (let m = 0; m < 12; m++) {
+      const hdr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 4;
+      td.textContent = meses[m];
+      hdr.appendChild(td);
+      tbody.appendChild(hdr);
+      for (let d = 1; d <= 31; d++) {
+        const data = new Date(ano, m, d);
+        if (data.getMonth() !== m) break;
+        const linha = document.createElement('tr');
+        linha.innerHTML = `
+          <td>${String(d).padStart(2, '0')}/${String(m + 1).padStart(2, '0')}</td>
+          <td></td><td></td><td></td>`;
+        tbody.appendChild(linha);
+      }
+    }
+  }
+});
