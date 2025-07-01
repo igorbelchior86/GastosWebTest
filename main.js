@@ -114,16 +114,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const addBtn = document.getElementById("addBtn");
   const descInput = document.getElementById("desc");
   const valueInput = document.getElementById("value");
-  // methodSelect já declarado acima
+  const tbody = document.querySelector("#dailyTable tbody");
 
   let saldoInicial = null;
+  const transacoes = [];
 
   setStartBtn.onclick = () => {
-    const val = parseFloat(startInput.value);
-    if (!isNaN(val)) {
-      saldoInicial = val;
+    const v = parseFloat(startInput.value);
+    if (!isNaN(v)) {
+      saldoInicial = v;
       startGroup.style.display = "none";
-      renderTable();
+      renderTabela();
     }
   };
 
@@ -132,29 +133,44 @@ document.addEventListener("DOMContentLoaded", () => {
     const val = parseFloat(valueInput.value.trim());
     const date = document.getElementById("opDate").value;
     if (!desc || isNaN(val) || !date) return alert("Preencha todos os campos.");
-
-    const tr = document.createElement("tr");
-    const [yyyy, mm, dd] = date.split("-");
-    tr.innerHTML = `
-      <td>${dd}/${mm}</td>
-      <td>${desc}</td>
-      <td>${val.toFixed(2)}</td>
-      <td></td>
-    `;
-    document.querySelector("#dailyTable tbody").appendChild(tr);
-    renderTable();
+    transacoes.push({ desc, val, date });
+    renderTabela();
   };
 
-  function renderTable() {
-    if (saldoInicial === null) return;
-    let atual = saldoInicial;
-    const linhas = document.querySelectorAll("#dailyTable tbody tr");
-    linhas.forEach(tr => {
+  function renderTabela() {
+    if (!tbody) return;
+    const map = {};
+    transacoes.forEach(t => {
+      if (!map[t.date]) map[t.date] = [];
+      map[t.date].push(t);
+    });
+    let saldo = saldoInicial ?? 0;
+    tbody.querySelectorAll("tr").forEach(tr => {
       const tds = tr.querySelectorAll("td");
-      const valor = parseFloat(tds[2]?.textContent);
-      if (!isNaN(valor)) {
-        atual += valor;
-        tds[3].textContent = atual.toFixed(2);
+      if (tds.length < 4) return;
+      const [dia, mes] = tds[0].textContent.split("/");
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const key = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+      const lancs = map[key] || [];
+      const div = document.createElement("div");
+      div.className = "op-group";
+      lancs.forEach(t => {
+        const linha = document.createElement("div");
+        linha.className = "op-line";
+        linha.innerHTML = `<div class="op-txt"><span>${t.desc}</span><span class="value">${t.val.toFixed(2)}</span></div>`;
+        div.appendChild(linha);
+        saldo += t.val;
+      });
+      tds[1].innerHTML = "";
+      tds[2].innerHTML = "";
+      tds[3].innerHTML = "";
+      if (div.children.length) {
+        tds[1].appendChild(div);
+        tds[2].textContent = lancs.reduce((s, t) => s + t.val, 0).toFixed(2);
+      }
+      if (saldoInicial !== null) {
+        tds[3].textContent = saldo.toFixed(2);
       }
     });
   }
