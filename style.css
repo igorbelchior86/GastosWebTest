@@ -1,3 +1,80 @@
+:root {
+  --bg: #f2f4f7;
+  --panel: #fff;
+  --border: #d1d5db;
+  --radius: 8px;
+}
+
+body {
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  padding: 20px;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.wrapper {
+  width: 100%;
+  max-width: 480px;
+  padding: 0 16px;
+}
+
+.container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.form-grid input,
+.form-grid select {
+  padding: 10px;
+  border: 2px solid black;
+  border-radius: 16px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#addBtn,
+#addCardBtn {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  width: 100%;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.card-dates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
 .card-list li {
   display: flex;
   justify-content: space-between;
@@ -29,33 +106,61 @@
   cursor: pointer;
 }
 
-.card-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-radius: 8px;
-  padding: 8px 0;
+.floating-card-button {
+  position: relative;
+  display: block;
+  margin-left: auto;
+  margin-right: 16px;
+  margin-bottom: 8px;
+  float: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #007AFF;
+  color: white;
+  font-size: 24px;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 10;
 }
 
-.card-list li .card-info {
+/* Modal bottom sheet */
+.bottom-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.bottom-modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  height: 60vh;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
-.card-list li .card-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-left: 12px;
-}
-
-.card-list li .card-actions button {
+.modal-drag {
   width: 40px;
-  height: 32px;
-  font-size: 1rem;
-  border-radius: 12px;
-  border: 2px solid black;
-  background: white;
-  cursor: pointer;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  margin: 0 auto 12px auto;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.hidden {
+  display: none;
 }
