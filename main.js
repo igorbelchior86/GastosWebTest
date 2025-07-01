@@ -136,6 +136,20 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTabela();
   };
 
+  const resetBtn = document.getElementById("resetData");
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      // Limpa todas as transações e reseta o saldo
+      transacoes.length = 0;
+      saldoInicial = null;
+      // Reexibe o painel de entrada de saldo inicial
+      startInput.value = '';
+      startGroup.style.display = "flex";
+      // Renderiza tabela limpa
+      renderTabela();
+    };
+  }
+
   function renderTabela() {
     if (!tbody) return;
     const map = {};
