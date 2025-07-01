@@ -106,4 +106,56 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
+
+  // --- Adicionado: Saldo inicial e operações dinâmicas ---
+  const startInput = document.getElementById("startInput");
+  const setStartBtn = document.getElementById("setStartBtn");
+  const startGroup = document.getElementById("startGroup");
+  const addBtn = document.getElementById("addBtn");
+  const descInput = document.getElementById("desc");
+  const valueInput = document.getElementById("value");
+  // methodSelect já declarado acima
+
+  let saldoInicial = null;
+
+  setStartBtn.onclick = () => {
+    const val = parseFloat(startInput.value);
+    if (!isNaN(val)) {
+      saldoInicial = val;
+      startGroup.style.display = "none";
+      renderTable();
+    }
+  };
+
+  addBtn.onclick = () => {
+    const desc = descInput.value.trim();
+    const val = parseFloat(valueInput.value.trim());
+    const date = document.getElementById("opDate").value;
+    if (!desc || isNaN(val) || !date) return alert("Preencha todos os campos.");
+
+    const tr = document.createElement("tr");
+    const [yyyy, mm, dd] = date.split("-");
+    tr.innerHTML = `
+      <td>${dd}/${mm}</td>
+      <td>${desc}</td>
+      <td>${val.toFixed(2)}</td>
+      <td></td>
+    `;
+    document.querySelector("#dailyTable tbody").appendChild(tr);
+    renderTable();
+  };
+
+  function renderTable() {
+    if (saldoInicial === null) return;
+    let atual = saldoInicial;
+    const linhas = document.querySelectorAll("#dailyTable tbody tr");
+    linhas.forEach(tr => {
+      const tds = tr.querySelectorAll("td");
+      const valor = parseFloat(tds[2]?.textContent);
+      if (!isNaN(valor)) {
+        atual += valor;
+        tds[3].textContent = atual.toFixed(2);
+      }
+    });
+  }
 });
