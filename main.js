@@ -52,3 +52,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
+  // Adicionar cartão à lista visual
+  const cardList = document.getElementById("cardList");
+  const btnAddCard = document.getElementById("addCardBtn");
+  if (btnAddCard && cardList) {
+    btnAddCard.addEventListener("click", () => {
+      const name = document.getElementById("cardName").value.trim();
+      const close = document.getElementById("cardClose").value.trim();
+      const due = document.getElementById("cardDue").value.trim();
+      if (!name || !close || !due) return alert("Preencha todos os campos do cartão.");
+      const li = document.createElement("li");
+      li.textContent = `${name} (${close}/${due})`;
+      cardList.appendChild(li);
+      document.getElementById("cardName").value = '';
+      document.getElementById("cardClose").value = '';
+      document.getElementById("cardDue").value = '';
+    });
+  }
