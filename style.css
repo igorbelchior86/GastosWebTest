@@ -76,9 +76,9 @@ h2 {
 }
 
 .card-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
   border-radius: 8px;
   padding: 8px 0;
 }
@@ -86,14 +86,15 @@ h2 {
 .card-list li .card-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
 }
 
 .card-list li .card-actions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-left: 12px;
+  gap: 6px;
+  justify-content: center;
 }
 
 .card-list li .card-actions button {
@@ -185,6 +186,18 @@ h2 {
   height: 48px;
   width: 100%;
   border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.bottom-modal-box #closeCardModal {
+  background: white;
+  color: black;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  width: 100%;
+  border: 2px solid black;
   border-radius: 20px;
   cursor: pointer;
 }
