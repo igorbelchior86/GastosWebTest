@@ -225,3 +225,44 @@ input[type="date"] {
   padding: 0 !important;
   border: none !important;
 }
+
+
+/* Modal de meia tela (bottom sheet) */
+.bottom-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.bottom-modal-box {
+  background: #fff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  height: 50vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+}
+
+.modal-drag {
+  width: 40px;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  margin: 0 auto 12px auto;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.hidden {
+  display: none;
+}

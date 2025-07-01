@@ -9,21 +9,27 @@
 </head>
 <body>
   <div class="wrapper">
-    <!-- Botão flutuante e painel de cartões -->
     <button id="toggleCards" class="floating-card-button">💳</button>
-    <div id="cardPanel" class="card-panel">
-      <div class="card-form">
-        <input id="cardName" placeholder="Nome">
-        <div class="card-dates">
-          <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
-          <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+
+    <!-- Modal de meia tela -->
+    <div id="cardModal" class="bottom-modal hidden">
+      <div class="bottom-modal-box">
+        <div class="modal-drag"></div>
+        <h3>Novo Cartão</h3>
+        <div class="modal-content">
+          <input id="cardName" placeholder="Nome">
+          <div class="card-dates">
+            <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
+            <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+          </div>
+          <button id="addCardBtn">Adicionar</button>
         </div>
-        <button id="addCardBtn">Adicionar</button>
-        <ul id="cardList" class="card-list"></ul>
+        <button id="closeCardModal">Fechar</button>
       </div>
     </div>
 
-    <!-- Container principal de operações -->
+    <ul id="cardList" class="card-list"></ul>
+
     <div class="container operation-panel">
       <h2>Lançar operação</h2>
       <div class="form-grid">
@@ -35,7 +41,6 @@
       </div>
     </div>
 
-    <!-- Demais containers (saldo inicial, tabela, etc.) -->
     <div class="container">
       <div id="startGroup" style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
         <label for="startInput">Saldo inicial:</label>

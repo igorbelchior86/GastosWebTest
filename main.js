@@ -83,3 +83,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
+  const cardModal = document.getElementById("cardModal");
+  const closeCardModal = document.getElementById("closeCardModal");
+  const toggleCards = document.getElementById("toggleCards");
+
+  toggleCards.addEventListener("click", () => {
+    cardModal.classList.remove("hidden");
+  });
+
+  closeCardModal.addEventListener("click", () => {
+    cardModal.classList.add("hidden");
+  });
