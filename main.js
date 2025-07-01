@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const cards = {};
 
-  // Método padrão
   if (methodSelect) {
     const dinheiro = document.createElement("option");
     dinheiro.value = "dinheiro";
@@ -17,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
     methodSelect.appendChild(dinheiro);
   }
 
-  // Data de hoje
   if (opDate) {
     const hoje = new Date();
     const yyyy = hoje.getFullYear();

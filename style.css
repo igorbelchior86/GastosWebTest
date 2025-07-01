@@ -41,8 +41,7 @@ h2 {
 }
 
 .form-grid input,
-.form-grid select,
-.card-form input {
+.form-grid select {
   padding: 10px;
   border: 2px solid black;
   border-radius: 16px;
@@ -65,7 +64,8 @@ h2 {
 
 .card-dates {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .card-list {
@@ -75,22 +75,12 @@ h2 {
 }
 
 .card-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
-.card-list li button {
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-/* Botão flutuante */
 .floating-card-button {
   float: right;
-  margin: 8px 0 0 0;
+  margin-bottom: 12px;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -102,132 +92,6 @@ h2 {
   z-index: 10;
 }
 
-/* Painel de cartões */
-#cardPanel {
-  clear: both;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin: 8px 0 16px 0;
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-8px);
-  transition: all 0.3s ease;
-}
-
-#cardPanel.active {
-  max-height: 500px;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Mobile-only */
-@media(max-width: 480px) {
-  /* já aplicado wrapper padding */
-}
-
-
-/* Correções finais de alinhamento */
-.floating-card-button {
-  float: none;
-  display: block;
-  margin-left: auto;
-  margin-right: 16px;
-  margin-top: 0;
-  margin-bottom: 0;
-  position: relative;
-}
-
-#cardPanel {
-  margin-top: 12px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-
-/* Correções visuais */
-.container,
-#cardPanel {
-  box-sizing: border-box;
-  padding: 18px;
-  margin: 16px 0;
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.card-form input,
-.card-dates input,
-#desc, #value, #method, #opDate {
-  box-sizing: border-box;
-  width: 100%;
-}
-
-.card-form input {
-  margin-bottom: 10px;
-}
-
-.card-dates {
-  margin-bottom: 10px;
-}
-
-#addCardBtn {
-  margin-top: 10px;
-}
-
-.form-grid input,
-.form-grid select {
-  margin-bottom: 10px;
-}
-
-#addBtn {
-  margin-top: 10px;
-}
-
-/* Garantir que tudo fique dentro do container */
-.form-grid,
-.card-form {
-  box-sizing: border-box;
-  width: 100%;
-}
-
-
-/* Corrigir aparência de Safari/WebKit para select e input[type=date] */
-select,
-input[type="date"] {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-color: #fff;
-  border: 2px solid black;
-  border-radius: 16px;
-  padding: 10px;
-  font-size: 1rem;
-  box-sizing: border-box;
-  width: 100%;
-  margin-bottom: 10px;
-}
-
-
-/* Espaçamento visual refinado para botão flutuante */
-.floating-card-button {
-  margin-bottom: 8px;
-}
-
-/* Remover margem residual do painel colapsado */
-#cardPanel:not(.active) {
-  margin-bottom: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-}
-
-
-/* Modal de meia tela (bottom sheet) */
 .bottom-modal {
   position: fixed;
   inset: 0;
@@ -240,14 +104,15 @@ input[type="date"] {
 
 .bottom-modal-box {
   background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  box-sizing: border-box;
   width: 100%;
   max-width: 480px;
-  border-radius: 20px 20px 0 0;
-  padding: 20px;
-  height: 50vh;
+  height: 60vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
 }
 
 .modal-drag {
@@ -265,40 +130,4 @@ input[type="date"] {
 
 .hidden {
   display: none;
-}
-
-
-/* Modal segue mesma linguagem visual do container principal */
-.bottom-modal-box {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 20px 20px 0 0;
-  padding: 18px;
-  box-sizing: border-box;
-}
-
-.bottom-modal-box input,
-.bottom-modal-box button {
-  font-size: 1rem;
-  border-radius: 16px;
-  padding: 10px;
-  border: 2px solid black;
-  margin-bottom: 10px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.bottom-modal-box #addCardBtn {
-  background: #4CAF50;
-  color: white;
-  font-weight: bold;
-  height: 48px;
-  border: none;
-  border-radius: 20px;
-}
-
-.bottom-modal-box .card-dates {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
 }
