@@ -102,3 +102,37 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("cardDue").value = '';
     });
   }
+
+  const cardList = document.getElementById("cardList");
+  const btnAddCard = document.getElementById("addCardBtn");
+  if (btnAddCard && cardList) {
+    btnAddCard.addEventListener("click", () => {
+      const name = document.getElementById("cardName").value.trim();
+      const close = document.getElementById("cardClose").value.trim();
+      const due = document.getElementById("cardDue").value.trim();
+      if (!name || !close || !due) return alert("Preencha todos os campos do cartão.");
+
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div><strong>💳 ${name}</strong></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <small>Fechamento: ${close} | Vencimento: ${due}</small>
+          <span>
+            <button class="icon">✏️</button>
+            <button class="icon danger">🗑️</button>
+          </span>
+        </div>
+        <hr style="margin-top: 8px;">`;
+
+      li.querySelector('.danger').onclick = () => {
+        if (confirm('Remover cartão da lista visual?')) {
+          li.remove();
+        }
+      };
+
+      cardList.appendChild(li);
+      document.getElementById("cardName").value = '';
+      document.getElementById("cardClose").value = '';
+      document.getElementById("cardDue").value = '';
+    });
+  }
