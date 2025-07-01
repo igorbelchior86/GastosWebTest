@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const cards = {};
 
-  if (methodSelect) {
+  if (methodSelect && !methodSelect.querySelector('option[value="dinheiro"]')) {
     const dinheiro = document.createElement("option");
     dinheiro.value = "dinheiro";
     dinheiro.textContent = "Dinheiro";
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tbody = document.querySelector('#dailyTable tbody');
   if (tbody && tbody.children.length === 0) {
-    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const ano = new Date().getFullYear();
     for (let m = 0; m < 12; m++) {
       const hdr = document.createElement('tr');
