@@ -140,6 +140,14 @@ h2 {
   justify-content: center;
   align-items: flex-end;
   z-index: 1000;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottom-modal:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .bottom-modal-box {
@@ -153,6 +161,12 @@ h2 {
   height: 60vh;
   display: flex;
   flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.bottom-modal:not(.hidden) .bottom-modal-box {
+  transform: translateY(0);
 }
 
 .modal-drag {
