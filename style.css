@@ -242,3 +242,16 @@ input[type="date"] {
   width: 100%;
   box-sizing: border-box;
 }
+/* Table layout and cell styling */
+.table-wrapper table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
