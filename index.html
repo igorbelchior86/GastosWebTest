@@ -2,159 +2,15 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8"/>
-  <title>Controle 365 - Mobile Test</title>
+  <title>Controle 365</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-:root {
-  --bg: #f2f4f7;
-  --panel: #fff;
-  --panel-alt: #f7f9fc;
-  --accent: #0066ff;
-  --accent-hover: #0056d4;
-  --danger: #d92d20;
-  --text: #111827;
-  --text-muted: #6b7280;
-  --border: #d1d5db;
-  --radius: 8px;
-}
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  padding: 20px;
-  display: flex;
-  justify-content: center;
-  font-family: 'Inter', sans-serif;
-}
-
-.wrapper {
-  width: 100%;
-  max-width: 480px;
-}
-
-.container {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 18px;
-}
-
-h2 {
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin-bottom: 14px;
-}
-
-.form-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr;
-}
-
-.form-grid input,
-.form-grid select {
-  padding: 10px;
-  border: 2px solid black;
-  border-radius: 16px;
-  font-size: 1rem;
-  width: 100%;
-}
-
-#addBtn {
-  border-radius: 20px;
-  background: #4CAF50;
-  font-weight: bold;
-  font-size: 1rem;
-  height: 48px;
-  color: white;
-  border: none;
-}
-
-#addCardBtn {
-  background: #4CAF50;
-  color: white;
-  font-weight: bold;
-  font-size: 1rem;
-  height: 44px;
-  border: none;
-  border-radius: 20px;
-  margin-top: 4px;
-  width: 100%;
-}
-
-.card-form input {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 2px solid black;
-  border-radius: 16px;
-}
-
-.card-dates {
-  display: flex;
-  gap: 8px;
-}
-
-.card-dates input {
-  flex: 1;
-}
-
-.card-list {
-  list-style: none;
-  padding: 0;
-  margin-top: 10px;
-}
-
-.card-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  margin-bottom: 6px;
-}
-
-.card-list li button {
-  font-size: 1rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-/* FLUTUANTE E PAINEL */
-.floating-card-button {
-  float: right;
-  margin: 8px 16px 0 auto;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #007AFF;
-  color: white;
-  font-size: 24px;
-  border: none;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  z-index: 10;
-}
-
-#cardPanel {
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(-8px);
-  transition: all 0.3s ease;
-  margin: 0 16px 16px 16px;
-}
-
-#cardPanel.active {
-  max-height: 1000px;
-  opacity: 1;
-  transform: translateY(0);
-}
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="wrapper">
+
+    <!-- Botão e painel de cartões fora do fluxo -->
     <button id="toggleCards" class="floating-card-button">💳</button>
     <div id="cardPanel" class="card-panel">
       <div class="card-form">
@@ -167,6 +23,8 @@ h2 {
         <ul id="cardList" class="card-list"></ul>
       </div>
     </div>
+
+    <!-- Container de operações -->
     <div class="container operation-panel">
       <h2>Lançar operação</h2>
       <div class="form-grid">
@@ -177,18 +35,9 @@ h2 {
         <button id="addBtn">Adicionar</button>
       </div>
     </div>
-    <!-- restante dos containers -->
+
+    <!-- Demais containers intactos -->
   </div>
-  <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const toggle = document.getElementById("toggleCards");
-  const panel = document.getElementById("cardPanel");
-  if (toggle && panel) {
-    toggle.addEventListener("click", () => {
-      panel.classList.toggle("active");
-    });
-  }
-});
-  </script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

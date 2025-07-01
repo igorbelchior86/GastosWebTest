@@ -7,3 +7,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+// ... (mantenha abaixo o restante do seu JS de transações) ...

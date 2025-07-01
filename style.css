@@ -1,23 +1,15 @@
 :root {
   --bg: #f2f4f7;
   --panel: #fff;
-  --panel-alt: #f7f9fc;
-  --accent: #0066ff;
-  --accent-hover: #0056d4;
-  --danger: #d92d20;
-  --text: #111827;
-  --text-muted: #6b7280;
   --border: #d1d5db;
-  --radius: 8px;
 }
 
 body {
   background: var(--bg);
-  color: var(--text);
+  font-family: 'Inter', sans-serif;
   padding: 20px;
   display: flex;
   justify-content: center;
-  font-family: 'Inter', sans-serif;
 }
 
 .wrapper {
@@ -28,7 +20,7 @@ body {
 .container {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   padding: 18px;
   margin-bottom: 18px;
 }
@@ -46,7 +38,8 @@ h2 {
 }
 
 .form-grid input,
-.form-grid select {
+.form-grid select,
+.card-form input {
   padding: 10px;
   border: 2px solid black;
   border-radius: 16px;
@@ -54,43 +47,21 @@ h2 {
   width: 100%;
 }
 
-#addBtn {
-  border-radius: 20px;
-  background: #4CAF50;
-  font-weight: bold;
-  font-size: 1rem;
-  height: 48px;
-  color: white;
-  border: none;
-}
-
+#addBtn,
 #addCardBtn {
   background: #4CAF50;
   color: white;
   font-weight: bold;
   font-size: 1rem;
-  height: 44px;
+  height: 48px;
   border: none;
   border-radius: 20px;
-  margin-top: 4px;
-  width: 100%;
-}
-
-.card-form input {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 2px solid black;
-  border-radius: 16px;
+  cursor: pointer;
 }
 
 .card-dates {
   display: flex;
   gap: 8px;
-}
-
-.card-dates input {
-  flex: 1;
 }
 
 .card-list {
@@ -103,18 +74,9 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.9rem;
   margin-bottom: 6px;
 }
 
-.card-list li button {
-  font-size: 1rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-/* FLUTUANTE E PAINEL */
 .floating-card-button {
   float: right;
   margin: 8px 16px 0 auto;
@@ -135,11 +97,25 @@ h2 {
   opacity: 0;
   transform: translateY(-8px);
   transition: all 0.3s ease;
-  margin: 0 16px 16px 16px;
 }
 
 #cardPanel.active {
   max-height: 1000px;
   opacity: 1;
   transform: translateY(0);
+}
+
+@media(max-width: 480px) {
+  /* Mobile-only adjustments */
+  #toggleCards {
+    float: right;
+    margin: 8px 16px 0 auto;
+    position: relative;
+    z-index: 10;
+  }
+  #cardPanel {
+    clear: both;
+    margin-top: 8px;
+    margin: 0 16px 16px 16px;
+  }
 }
