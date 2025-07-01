@@ -214,7 +214,7 @@ h2 {
   margin-bottom: 10px;
 }
 
-. Forçar aparência nativa consistente de select e input[type="date"] no Safari */
+/* Forçar aparência nativa consistente de select e input[type="date"] no Safari */
 select,
 input[type="date"] {
   -webkit-appearance: none;
