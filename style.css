@@ -1,3 +1,33 @@
+.card-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 8px;
+  padding: 8px 0;
+}
+
+.card-list li .card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-list li .card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 12px;
+}
+
+.card-list li .card-actions button {
+  width: 40px;
+  height: 32px;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 2px solid black;
+  background: white;
+  cursor: pointer;
+}
 
 .card-list li {
   display: flex;
