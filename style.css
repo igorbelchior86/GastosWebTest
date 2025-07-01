@@ -127,3 +127,25 @@ h2 {
 @media(max-width: 480px) {
   /* já aplicado wrapper padding */
 }
+
+
+/* Correções finais de alinhamento */
+.floating-card-button {
+  float: none;
+  display: block;
+  margin-left: auto;
+  margin-right: 16px;
+  margin-top: 0;
+  margin-bottom: 0;
+  position: relative;
+}
+
+#cardPanel {
+  margin-top: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
