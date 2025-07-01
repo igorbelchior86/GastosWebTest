@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const due = document.getElementById("cardDue").value.trim();
       if (!name || !close || !due) return alert("Preencha todos os campos do cartão.");
       const li = document.createElement("li");
-      li.textContent = `${name} (${close}/${due})`;
+      li.innerHTML = `💳 <strong>${name}</strong> - Fechamento: ${close} | Vencimento: ${due} <button class="icon">✏️</button> <button class="icon danger">🗑️</button>`;
       cardList.appendChild(li);
       document.getElementById("cardName").value = '';
       document.getElementById("cardClose").value = '';
