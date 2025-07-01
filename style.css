@@ -16,8 +16,8 @@ body {
 
 .wrapper {
   width: 100%;
-  max-width: 480px;
-  padding: 0 16px;
+  padding: 0 12px;
+  max-width: 540px;
 }
 
 .container {
