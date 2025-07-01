@@ -1,22 +1,33 @@
 document.addEventListener("DOMContentLoaded", () => {
   const toggle = document.getElementById("toggleCards");
   const panel = document.getElementById("cardPanel");
+
   if (toggle && panel) {
     toggle.addEventListener("click", () => {
       panel.classList.toggle("active");
     });
   }
 
-  // Preencher método de pagamento com opção padrão
+  // Adiciona a opção padrão "Dinheiro"
   const method = document.getElementById("method");
-  if (method) {
+  if (method && !method.querySelector('option[value="dinheiro"]')) {
     const opt = document.createElement("option");
     opt.value = "dinheiro";
     opt.textContent = "Dinheiro";
     method.appendChild(opt);
   }
 
-  // Geração estática da tabela se estiver vazia
+  // Define a data atual no input[type="date"]
+  const opDate = document.getElementById("opDate");
+  if (opDate) {
+    const hoje = new Date();
+    const yyyy = hoje.getFullYear();
+    const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoje.getDate()).padStart(2, '0');
+    opDate.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Gera a tabela estática de dias caso não exista
   const tbody = document.querySelector('#dailyTable tbody');
   if (tbody && tbody.children.length === 0) {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -40,18 +51,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
-
-  // Definir a data atual como valor padrão do campo #opDate
-  -${mm}-${dd}`;
-  }
-
-  // Definir a data atual como valor padrão visual em formato dd/mm/aaaa
-  const opDate = document.getElementById("opDate");
-  if (opDate) {
-    const hoje = new Date();
-    const yyyy = hoje.getFullYear();
-    const mm = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dd = String(hoje.getDate()).padStart(2, '0');
-    const iso = `${yyyy}-${mm}-${dd}`;
-    opDate.value = iso;
-  }
