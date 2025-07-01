@@ -213,3 +213,18 @@ h2 {
   gap: 10px;
   margin-bottom: 10px;
 }
+
+. Forçar aparência nativa consistente de select e input[type="date"] no Safari */
+select,
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: #fff;
+  border: 2px solid black;
+  border-radius: 16px;
+  padding: 10px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
