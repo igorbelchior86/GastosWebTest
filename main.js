@@ -1,23 +1,15 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const toggle = document.getElementById("toggleCards");
-  const panel = document.getElementById("cardPanel");
-
-  if (toggle && panel) {
-    toggle.addEventListener("click", () => {
-      panel.classList.toggle("active");
-    });
-  }
-
-  // Adiciona a opção padrão "Dinheiro"
+  // Método de pagamento
   const method = document.getElementById("method");
-  if (method && !method.querySelector('option[value="dinheiro"]')) {
+  if (method) {
+    method.innerHTML = ''; // limpar
     const opt = document.createElement("option");
     opt.value = "dinheiro";
     opt.textContent = "Dinheiro";
     method.appendChild(opt);
   }
 
-  // Define a data atual no input[type="date"]
+  // Data atual
   const opDate = document.getElementById("opDate");
   if (opDate) {
     const hoje = new Date();
@@ -27,7 +19,16 @@ document.addEventListener("DOMContentLoaded", () => {
     opDate.value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Gera a tabela estática de dias caso não exista
+  // Toggle do painel de cartões
+  const toggle = document.getElementById("toggleCards");
+  const panel = document.getElementById("cardPanel");
+  if (toggle && panel) {
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("active");
+    });
+  }
+
+  // Gerar tabela estática se vazia
   const tbody = document.querySelector('#dailyTable tbody');
   if (tbody && tbody.children.length === 0) {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
