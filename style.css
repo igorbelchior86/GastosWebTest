@@ -1,61 +1,244 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Document</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- Content of the page -->
+:root {
+  --bg: #f2f4f7;
+  --panel: #fff;
+  --border: #d1d5db;
+  --radius: 8px;
+}
 
-  <script type="module" src="main.js"></script>
-  <script>
-    const tbody = document.querySelector("#dailyTable tbody");
-    const startGroup = document.getElementById("startGroup");
-    const setStartBtn = document.getElementById("setStartBtn");
-    const startInput = document.getElementById("startInput");
-    const addBtn = document.getElementById("addBtn");
+body {
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  padding: 20px;
+  margin: 0;
+  display: block;
+}
 
-    let saldo = null;
+.wrapper {
+  width: 100%;
+  padding-left: env(safe-area-inset-left, 12px);
+  padding-right: env(safe-area-inset-right, 12px);
+  max-width: 100%;
+}
 
-    setStartBtn.onclick = () => {
-      const val = parseFloat(startInput.value);
-      if (!isNaN(val)) {
-        saldo = val;
-        startGroup.style.display = "none";
-        renderTable();
-      }
-    };
+.container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 18px;
+}
 
-    addBtn.onclick = () => {
-      const desc = document.getElementById("desc").value.trim();
-      const value = parseFloat(document.getElementById("value").value.trim());
-      const date = document.getElementById("opDate").value;
-      const method = document.getElementById("method").value;
+h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
 
-      if (!desc || isNaN(value) || !date) return alert("Preencha todos os campos.");
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${date.split("-").reverse().join("/")}</td>
-        <td>${desc}</td>
-        <td>${value.toFixed(2)}</td>
-        <td></td>`;
-      tbody.appendChild(tr);
-    };
+.form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
 
-    function renderTable() {
-      const trs = tbody.querySelectorAll("tr");
-      let atual = saldo;
-      trs.forEach(tr => {
-        const td = tr.querySelectorAll("td");
-        const gasto = parseFloat(td[2]?.textContent);
-        if (!isNaN(gasto)) {
-          atual += gasto;
-          td[3].textContent = atual.toFixed(2);
-        }
-      });
-    }
-  </script>
-</body>
-</html>
+.form-grid input,
+.form-grid select {
+  padding: 10px;
+  border: 2px solid black;
+  border-radius: 16px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#addBtn,
+#addCardBtn {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  width: 100%;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.card-dates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.card-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 8px 0;
+}
+
+.card-list li .card-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-list li .card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-list li .card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.card-list li .card-actions button {
+  width: 40px;
+  height: 32px;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 2px solid black;
+  background: white;
+  cursor: pointer;
+  flex: 1;
+}
+
+.floating-card-button {
+  position: relative;
+  display: block;
+  margin-left: auto;
+  margin-right: 16px;
+  margin-bottom: 8px;
+  float: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #007AFF;
+  color: white;
+  font-size: 24px;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+/* Modal bottom sheet */
+.bottom-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottom-modal:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bottom-modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.bottom-modal:not(.hidden) .bottom-modal-box {
+  transform: translateY(0);
+}
+
+.modal-drag {
+  width: 40px;
+  height: 4px;
+  background: #ccc;
+  border-radius: 2px;
+  margin: 0 auto 12px auto;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Campos do modal "Novo Cartão" */
+.bottom-modal-box input,
+.bottom-modal-box select {
+  font-size: 1rem;
+  border-radius: 16px;
+  padding: 10px;
+  border: 2px solid black;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bottom-modal-box #addCardBtn {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  width: 100%;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.bottom-modal-box #closeCardModal {
+  background: white;
+  color: black;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  width: 100%;
+  border: 2px solid black;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.bottom-modal-box .card-dates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Forçar aparência nativa consistente de select e input[type="date"] no Safari */
+select,
+input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: #fff;
+  border: 2px solid black;
+  border-radius: 16px;
+  padding: 10px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
