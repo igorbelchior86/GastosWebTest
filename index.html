@@ -9,8 +9,7 @@
 </head>
 <body>
   <div class="wrapper">
-
-    <!-- Botão e painel de cartões fora do fluxo -->
+    <!-- Botão flutuante e painel de cartões -->
     <button id="toggleCards" class="floating-card-button">💳</button>
     <div id="cardPanel" class="card-panel">
       <div class="card-form">
@@ -24,7 +23,7 @@
       </div>
     </div>
 
-    <!-- Container de operações -->
+    <!-- Container principal de operações -->
     <div class="container operation-panel">
       <h2>Lançar operação</h2>
       <div class="form-grid">
@@ -36,7 +35,23 @@
       </div>
     </div>
 
-    <!-- Demais containers intactos -->
+    <!-- Demais containers (saldo inicial, tabela, etc.) -->
+    <div class="container">
+      <div id="startGroup" style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <label for="startInput">Saldo inicial:</label>
+        <input id="startInput" type="number" style="flex:1">
+        <button id="setStartBtn" style="flex:0 0 60px">OK</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="dailyTable">
+          <thead>
+            <tr><th>Data</th><th>Descrição</th><th>Gasto</th><th>Saldo</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
+    </div>
   </div>
   <script type="module" src="main.js"></script>
 </body>

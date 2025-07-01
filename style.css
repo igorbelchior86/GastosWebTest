@@ -2,12 +2,14 @@
   --bg: #f2f4f7;
   --panel: #fff;
   --border: #d1d5db;
+  --radius: 8px;
 }
 
 body {
   background: var(--bg);
   font-family: 'Inter', sans-serif;
   padding: 20px;
+  margin: 0;
   display: flex;
   justify-content: center;
 }
@@ -15,12 +17,13 @@ body {
 .wrapper {
   width: 100%;
   max-width: 480px;
+  padding: 0 16px;
 }
 
 .container {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 18px;
   margin-bottom: 18px;
 }
@@ -54,6 +57,7 @@ h2 {
   font-weight: bold;
   font-size: 1rem;
   height: 48px;
+  width: 100%;
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -77,9 +81,16 @@ h2 {
   margin-bottom: 6px;
 }
 
+.card-list li button {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Botão flutuante */
 .floating-card-button {
   float: right;
-  margin: 8px 16px 0 auto;
+  margin: 8px 0 0 0;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -91,7 +102,14 @@ h2 {
   z-index: 10;
 }
 
+/* Painel de cartões */
 #cardPanel {
+  clear: both;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin: 8px 0 16px 0;
   overflow: hidden;
   max-height: 0;
   opacity: 0;
@@ -100,22 +118,12 @@ h2 {
 }
 
 #cardPanel.active {
-  max-height: 1000px;
+  max-height: 500px;
   opacity: 1;
   transform: translateY(0);
 }
 
+/* Mobile-only */
 @media(max-width: 480px) {
-  /* Mobile-only adjustments */
-  #toggleCards {
-    float: right;
-    margin: 8px 16px 0 auto;
-    position: relative;
-    z-index: 10;
-  }
-  #cardPanel {
-    clear: both;
-    margin-top: 8px;
-    margin: 0 16px 16px 16px;
-  }
+  /* já aplicado wrapper padding */
 }
