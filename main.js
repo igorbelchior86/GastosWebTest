@@ -1,16 +1,23 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Método de pagamento
-  const method = document.getElementById("method");
-  if (method) {
-    method.innerHTML = '';
-    const opt = document.createElement("option");
-    opt.value = "dinheiro";
-    opt.textContent = "Dinheiro";
-    method.appendChild(opt);
+  const methodSelect = document.getElementById("method");
+  const opDate = document.getElementById("opDate");
+  const cardModal = document.getElementById("cardModal");
+  const closeCardModal = document.getElementById("closeCardModal");
+  const toggleCards = document.getElementById("toggleCards");
+  const cardList = document.getElementById("cardList");
+  const btnAddCard = document.getElementById("addCardBtn");
+
+  const cards = {};
+
+  // Método padrão
+  if (methodSelect) {
+    const dinheiro = document.createElement("option");
+    dinheiro.value = "dinheiro";
+    dinheiro.textContent = "Dinheiro";
+    methodSelect.appendChild(dinheiro);
   }
 
-  // Data atual
-  const opDate = document.getElementById("opDate");
+  // Data de hoje
   if (opDate) {
     const hoje = new Date();
     const yyyy = hoje.getFullYear();
@@ -19,59 +26,66 @@ document.addEventListener("DOMContentLoaded", () => {
     opDate.value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Abrir/Fechar modal
-  const cardModal = document.getElementById("cardModal");
-  const closeCardModal = document.getElementById("closeCardModal");
-  const toggleCards = document.getElementById("toggleCards");
+  toggleCards.addEventListener("click", () => {
+    cardModal.classList.remove("hidden");
+  });
 
-  if (toggleCards && cardModal) {
-    toggleCards.addEventListener("click", () => {
-      cardModal.classList.remove("hidden");
-    });
-  }
+  closeCardModal.addEventListener("click", () => {
+    cardModal.classList.add("hidden");
+  });
 
-  if (closeCardModal && cardModal) {
-    closeCardModal.addEventListener("click", () => {
-      cardModal.classList.add("hidden");
-    });
-  }
-
-  // Adicionar cartão visual
-  const cardList = document.getElementById("cardList");
-  const btnAddCard = document.getElementById("addCardBtn");
-  if (btnAddCard && cardList) {
-    btnAddCard.addEventListener("click", () => {
-      const name = document.getElementById("cardName").value.trim();
-      const close = document.getElementById("cardClose").value.trim();
-      const due = document.getElementById("cardDue").value.trim();
-      if (!name || !close || !due) return alert("Preencha todos os campos do cartão.");
-
+  function renderCards() {
+    cardList.innerHTML = "";
+    for (const key in cards) {
+      const { name, close, due } = cards[key];
       const li = document.createElement("li");
       li.innerHTML = `
         <div><strong>💳 ${name}</strong></div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <small>Fechamento: ${close} | Vencimento: ${due}</small>
           <span>
-            <button class="icon">✏️</button>
-            <button class="icon danger">🗑️</button>
+            <button class="icon" data-edit="${key}">✏️</button>
+            <button class="icon danger" data-delete="${key}">🗑️</button>
           </span>
         </div>
         <hr style="margin-top: 8px;">`;
-
-      li.querySelector('.danger').onclick = () => {
-        if (confirm('Remover cartão da lista visual?')) {
-          li.remove();
-        }
-      };
-
       cardList.appendChild(li);
-      document.getElementById("cardName").value = '';
-      document.getElementById("cardClose").value = '';
-      document.getElementById("cardDue").value = '';
-    });
+
+      li.querySelector('[data-delete]').onclick = () => {
+        delete cards[key];
+        const opt = methodSelect.querySelector(`option[value="${key}"]`);
+        if (opt) opt.remove();
+        renderCards();
+      };
+    }
   }
 
-  // Tabela anual fallback
+  btnAddCard.addEventListener("click", () => {
+    const name = document.getElementById("cardName").value.trim();
+    const close = parseInt(document.getElementById("cardClose").value.trim(), 10);
+    const due = parseInt(document.getElementById("cardDue").value.trim(), 10);
+
+    if (!name || isNaN(close) || isNaN(due)) return alert("Preencha todos os campos.");
+    if (close < 1 || close > 31 || due < 1 || due > 31) return alert("Fechamento e vencimento devem ser entre 1 e 31.");
+
+    const key = name.toLowerCase().replace(/\s+/g, '-');
+
+    if (cards[key]) return alert("Esse cartão já existe.");
+
+    cards[key] = { name, close, due };
+
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = name;
+    methodSelect.appendChild(opt);
+
+    document.getElementById("cardName").value = '';
+    document.getElementById("cardClose").value = '';
+    document.getElementById("cardDue").value = '';
+
+    renderCards();
+  });
+
   const tbody = document.querySelector('#dailyTable tbody');
   if (tbody && tbody.children.length === 0) {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
