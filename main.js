@@ -99,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderAccordion() {
     const acc = document.getElementById("accordion");
+    let runningSaldo = saldoInicial || 0;
     acc.innerHTML = "";
     const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     const hoje = new Date();
@@ -116,13 +117,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const daySummary = document.createElement("summary");
         const weekday = dataObj.toLocaleDateString('pt-BR', { weekday: 'long' });
         const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-        const daySaldo = (() => {
-          const ops = transacoes.filter(t => t.date === key);
-          let saldo = saldoInicial || 0;
-          ops.forEach(t => saldo += t.val);
-          return saldo.toFixed(2);
-        })();
-        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} ${weekday}</span><span>R$ ${daySaldo}</span>`;
+        // Replace saldo calculation with runningSaldo logic
+        const ops = transacoes.filter(t => t.date === key);
+        const totalOps = ops.reduce((sum, t) => sum + t.val, 0);
+        const daySaldo = runningSaldo + totalOps;
+        runningSaldo = daySaldo;
+        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} ${weekday}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
         const opsContainer = document.createElement("div");
