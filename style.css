@@ -10,14 +10,13 @@ body {
   font-family: 'Inter', sans-serif;
   padding: 20px;
   margin: 0;
-  display: flex;
-  justify-content: center;
+  display: block;
 }
 
 .wrapper {
   width: 100%;
-  padding: 0 12px;
-  max-width: 540px;
+  padding: 0 8px;
+  max-width: 95vw;
 }
 
 .container {
