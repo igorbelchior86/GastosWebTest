@@ -114,7 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const addBtn = document.getElementById("addBtn");
   const descInput = document.getElementById("desc");
   const valueInput = document.getElementById("value");
-  const tbody = document.querySelector("#dailyTable tbody");
 
   let saldoInicial = null;
   const transacoes = [];
