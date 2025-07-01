@@ -266,3 +266,39 @@ input[type="date"] {
 .hidden {
   display: none;
 }
+
+
+/* Modal segue mesma linguagem visual do container principal */
+.bottom-modal-box {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.bottom-modal-box input,
+.bottom-modal-box button {
+  font-size: 1rem;
+  border-radius: 16px;
+  padding: 10px;
+  border: 2px solid black;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bottom-modal-box #addCardBtn {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+  height: 48px;
+  border: none;
+  border-radius: 20px;
+}
+
+.bottom-modal-box .card-dates {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
