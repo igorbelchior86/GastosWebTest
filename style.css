@@ -255,3 +255,53 @@ input[type="date"] {
   padding: 8px;
   text-align: left;
 }
+
+/* Accordion styles */
+#accordion details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  padding: 0 8px;
+}
+#accordion summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 8px 0;
+  list-style: none;
+}
+#accordion summary::-webkit-details-marker {
+  display: none;
+}
+#accordion .month-summary::before {
+  content: "▶ ";
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+#accordion details[open] .month-summary::before {
+  transform: rotate(90deg);
+}
+#accordion .day-summary {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+#accordion .operations {
+  padding-left: 16px;
+  margin-bottom: 8px;
+}
+.op-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+.op-item .actions {
+  margin-left: 8px;
+}
+.op-item .actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 4px;
+}

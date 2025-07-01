@@ -84,28 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCards();
   });
 
-  const tbody = document.querySelector('#dailyTable tbody');
-  if (tbody && tbody.children.length === 0) {
-    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const ano = new Date().getFullYear();
-    for (let m = 0; m < 12; m++) {
-      const hdr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 4;
-      td.textContent = meses[m];
-      hdr.appendChild(td);
-      tbody.appendChild(hdr);
-      for (let d = 1; d <= 31; d++) {
-        const data = new Date(ano, m, d);
-        if (data.getMonth() !== m) break;
-        const linha = document.createElement("tr");
-        linha.innerHTML = `
-          <td>${String(d).padStart(2,'0')}/${String(m+1).padStart(2,'0')}</td>
-          <td></td><td></td><td></td>`;
-        tbody.appendChild(linha);
-      }
-    }
-  }
+  // --- Removido: tbody initialization and month/day rows generation ---
 
   // --- Adicionado: Saldo inicial e operações dinâmicas ---
   const startInput = document.getElementById("startInput");
@@ -118,12 +97,62 @@ document.addEventListener("DOMContentLoaded", () => {
   let saldoInicial = null;
   const transacoes = [];
 
+  function renderAccordion() {
+    const acc = document.getElementById("accordion");
+    acc.innerHTML = "";
+    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    meses.forEach((mesNome, m) => {
+      const monthDetail = document.createElement("details");
+      const monthSummary = document.createElement("summary");
+      monthSummary.textContent = mesNome;
+      monthSummary.className = "month-summary";
+      monthDetail.appendChild(monthSummary);
+      for (let d = 1; d <= 31; d++) {
+        const dataObj = new Date(ano, m, d);
+        if (dataObj.getMonth() !== m) break;
+        const dayDetail = document.createElement("details");
+        const daySummary = document.createElement("summary");
+        const weekday = dataObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+        const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const daySaldo = (() => {
+          const ops = transacoes.filter(t => t.date === key);
+          let saldo = saldoInicial || 0;
+          ops.forEach(t => saldo += t.val);
+          return saldo.toFixed(2);
+        })();
+        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} ${weekday}</span><span>R$ ${daySaldo}</span>`;
+        daySummary.className = "day-summary";
+        dayDetail.appendChild(daySummary);
+        const opsContainer = document.createElement("div");
+        opsContainer.className = "operations";
+        transacoes.filter(t => t.date === key).forEach((t, idx) => {
+          const op = document.createElement("div");
+          op.className = "op-item";
+          op.innerHTML = `
+            <span>${t.desc} <small>${new Date(t.date).toLocaleTimeString('pt-BR')}</small></span>
+            <span>
+              <button class="edit" data-index="${idx}">✏️</button>
+              <button class="delete" data-index="${idx}">🗑️</button>
+            </span>
+            <span>R$ ${t.val.toFixed(2)}</span>
+          `;
+          opsContainer.appendChild(op);
+        });
+        dayDetail.appendChild(opsContainer);
+        monthDetail.appendChild(dayDetail);
+      }
+      acc.appendChild(monthDetail);
+    });
+  }
+
   setStartBtn.onclick = () => {
     const v = parseFloat(startInput.value);
     if (!isNaN(v)) {
       saldoInicial = v;
       startGroup.style.display = "none";
-      renderTabela();
+      renderAccordion();
     }
   };
 
@@ -133,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const date = document.getElementById("opDate").value;
     if (!desc || isNaN(val) || !date) return alert("Preencha todos os campos.");
     transacoes.push({ desc, val, date });
-    renderTabela();
+    renderAccordion();
   };
 
   const resetBtn = document.getElementById("resetData");
@@ -146,45 +175,11 @@ document.addEventListener("DOMContentLoaded", () => {
       startInput.value = '';
       startGroup.style.display = "flex";
       // Renderiza tabela limpa
-      renderTabela();
+      renderAccordion();
     };
   }
 
-  function renderTabela() {
-    if (!tbody) return;
-    const map = {};
-    transacoes.forEach(t => {
-      if (!map[t.date]) map[t.date] = [];
-      map[t.date].push(t);
-    });
-    let saldo = saldoInicial || 0;
-    tbody.querySelectorAll("tr").forEach(tr => {
-      const tds = tr.querySelectorAll("td");
-      if (tds.length < 4) return;
-      const [dia, mes] = tds[0].textContent.split("/");
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
-      const key = `${ano}-${String(mes).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
-      const lancs = map[key] || [];
-      const div = document.createElement("div");
-      div.className = "op-group";
-      lancs.forEach(t => {
-        const linha = document.createElement("div");
-        linha.className = "op-line";
-        linha.innerHTML = `<div class="op-txt"><span>${t.desc}</span><span class="value">${t.val.toFixed(2)}</span></div>`;
-        div.appendChild(linha);
-        saldo += t.val;
-      });
-      tds[1].innerHTML = "";
-      tds[2].innerHTML = "";
-      tds[3].innerHTML = "";
-      if (div.children.length) {
-        tds[1].appendChild(div);
-        tds[2].textContent = lancs.reduce((s, t) => s + t.val,0).toFixed(2);
-      }
-      if (saldoInicial !== null) {
-        tds[3].textContent = saldo.toFixed(2);
-      }
-    });
-  }
+  // Initial render (optional)
+  // renderTabela();
+  renderAccordion();
 });
