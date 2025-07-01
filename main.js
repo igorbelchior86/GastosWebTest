@@ -89,8 +89,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const ano = new Date().getFullYear();
     for (let m = 0; m < 12; m++) {
-      const hdr = document.createElement('tr');
-      const td = document.createElement('td');
+      const hdr = document.createElement("tr");
+      const td = document.createElement("td");
       td.colSpan = 4;
       td.textContent = meses[m];
       hdr.appendChild(td);
@@ -98,9 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let d = 1; d <= 31; d++) {
         const data = new Date(ano, m, d);
         if (data.getMonth() !== m) break;
-        const linha = document.createElement('tr');
+        const linha = document.createElement("tr");
         linha.innerHTML = `
-          <td>${String(d).padStart(2, '0')}/${String(m + 1).padStart(2, '0')}</td>
+          <td>${String(d).padStart(2,'0')}/${String(m+1).padStart(2,'0')}</td>
           <td></td><td></td><td></td>`;
         tbody.appendChild(linha);
       }
@@ -143,14 +143,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!map[t.date]) map[t.date] = [];
       map[t.date].push(t);
     });
-    let saldo = saldoInicial ?? 0;
+    let saldo = saldoInicial || 0;
     tbody.querySelectorAll("tr").forEach(tr => {
       const tds = tr.querySelectorAll("td");
       if (tds.length < 4) return;
       const [dia, mes] = tds[0].textContent.split("/");
       const hoje = new Date();
       const ano = hoje.getFullYear();
-      const key = `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+      const key = `${ano}-${String(mes).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
       const lancs = map[key] || [];
       const div = document.createElement("div");
       div.className = "op-group";
@@ -166,7 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tds[3].innerHTML = "";
       if (div.children.length) {
         tds[1].appendChild(div);
-        tds[2].textContent = lancs.reduce((s, t) => s + t.val, 0).toFixed(2);
+        tds[2].textContent = lancs.reduce((s, t) => s + t.val,0).toFixed(2);
       }
       if (saldoInicial !== null) {
         tds[3].textContent = saldo.toFixed(2);
