@@ -148,24 +148,56 @@ document.addEventListener("DOMContentLoaded", () => {
         daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
+        // --- Begin invoice grouping logic ---
+        // Group by method
+        const moneyOps = ops.filter(t => t.method === 'dinheiro');
+        const cardGroups = {};
+        ops.filter(t => t.method !== 'dinheiro')
+           .forEach(t => {
+             cardGroups[t.method] = cardGroups[t.method] || [];
+             cardGroups[t.method].push(t);
+           });
+
         const opsContainer = document.createElement("div");
         opsContainer.className = "operations";
-        transacoes.filter(t => t.date === key).forEach((t, idx) => {
+
+        // Render money operations directly
+        moneyOps.forEach((t, idx) => {
           const op = document.createElement("div");
           op.className = "op-item";
           op.innerHTML = `
             <div class="op-content">
               <span>${t.desc}</span>
-              <small class="timestamp">${new Date(t.date).toLocaleTimeString('pt-BR')}</small>
-            </div>
-            <div class="actions">
-              <button class="edit" data-index="${idx}">✏️</button>
-              <button class="delete" data-index="${idx}">🗑️</button>
+              <small class="timestamp">${new Date(t.opDate || t.date).toLocaleTimeString('pt-BR')}</small>
             </div>
             <span>R$ ${t.val.toFixed(2)}</span>
           `;
           opsContainer.appendChild(op);
         });
+
+        // Render card invoices
+        Object.keys(cardGroups).forEach(cardKey => {
+          const group = cardGroups[cardKey];
+          const invoiceDetail = document.createElement("details");
+          invoiceDetail.className = "invoice";
+          const invoiceSummary = document.createElement("summary");
+          invoiceSummary.textContent = `Fatura ${cards[cardKey] ? cards[cardKey].name : cardKey}`;
+          invoiceDetail.appendChild(invoiceSummary);
+          group.forEach((t, idx) => {
+            const op = document.createElement("div");
+            op.className = "op-item";
+            op.innerHTML = `
+              <div class="op-content">
+                <span>${t.desc}</span>
+                <small class="timestamp">${new Date(t.opDate || t.date).toLocaleTimeString('pt-BR')}</small>
+              </div>
+              <span>R$ ${t.val.toFixed(2)}</span>
+            `;
+            invoiceDetail.appendChild(op);
+          });
+          opsContainer.appendChild(invoiceDetail);
+        });
+        // --- End invoice grouping logic ---
         dayDetail.appendChild(opsContainer);
         monthDetail.appendChild(dayDetail);
       }
