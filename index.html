@@ -13,6 +13,7 @@
 
 </head>
 <body>
+<button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
 <div class="wrapper">
   <div class="container">
     <h2>Lançar operação</h2>
@@ -26,21 +27,6 @@
   </div>
 
   <div class="container">
-    <details><summary>Gerenciar cartões</summary>
-      <div style="margin-top:10px">
-        <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:6px">
-          <input id="cardName" placeholder="Nome">
-          <input id="cardClose" type="number" min="1" max="31" placeholder="Fech">
-          <input id="cardDue" type="number" min="1" max="31" placeholder="Venc">
-          <button id="addCardBtn">Adicionar</button>
-        </div>
-        <small>Fechamento define a fatura.</small>
-        <ul id="cardList" style="margin-top:8px"></ul>
-      </div>
-    </details>
-  </div>
-
-  <div class="container">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px" id="startGroup">
       <label for="startInput">Saldo inicial:</label>
       <input id="startInput" type="number" style="flex:1">
@@ -50,6 +36,25 @@
       <table id="dailyTable"><thead><tr><th>Data</th><th>Descrição</th><th>Gasto</th><th>Saldo</th></tr></thead><tbody></tbody></table>
     </div>
     <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
+  </div>
+</div>
+
+<div id="cardModal" class="bottom-modal hidden">
+  <div class="bottom-modal-box">
+    <div class="modal-drag"></div>
+    <h2>Novo Cartão</h2>
+
+    <input id="cardName" placeholder="Nome">
+    <div class="card-dates">
+      <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
+      <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+    </div>
+    <button id="addCardBtn">Adicionar</button>
+    <small>Fechamento define a fatura.</small>
+
+    <ul id="cardList" class="card-list"></ul>
+
+    <button id="closeCardModal">Fechar</button>
   </div>
 </div>
 

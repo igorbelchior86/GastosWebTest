@@ -35,6 +35,9 @@ const post=(iso,m)=>{if(m==='dinheiro')return iso;const c=cards.find(x=>x.name==
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
+const openCardBtn=document.getElementById('openCardModal');
+const cardModal=document.getElementById('cardModal');
+const closeCardModal=document.getElementById('closeCardModal');
 
 function refreshMethods(){met.innerHTML='';cards.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});}
 function renderCardList(){cardList.innerHTML='';cards.filter(c=>c.name!=='dinheiro').forEach(c=>{const li=document.createElement('li');li.textContent=`${c.name} (${c.close}/${c.due})`;const del=document.createElement('button');del.className='icon danger';del.textContent='🗑';del.onclick=()=>{if(confirm('Excluir cartão?')){cards=cards.filter(x=>x.name!==c.name);save('cards',cards);refreshMethods();renderCardList();renderTable();}};li.appendChild(del);cardList.appendChild(li);});}
@@ -72,5 +75,8 @@ function initStart(){startGroup.style.display=startBalance===null?'flex':'none';
 setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;save('startBal',v);initStart();renderTable();};
 resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'dinheiro',close:0,due:0}];startBalance=null;save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
+openCardBtn.onclick = () => cardModal.classList.remove('hidden');
+closeCardModal.onclick = () => cardModal.classList.add('hidden');
+cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
 (async()=>{transactions=await load('tx',[]);cards=await load('cards',[{name:'dinheiro',close:0,due:0}]);if(!cards.some(c=>c.name==='dinheiro'))cards.unshift({name:'dinheiro',close:0,due:0});startBalance=await load('startBal',null);refreshMethods();renderCardList();initStart();date.value=new Date().toISOString().slice(0,10);renderTable();})();
