@@ -98,6 +98,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const transacoes = [];
 
   function renderAccordion() {
+    // Preserve expanded days
+    const oldDayDetails = document.querySelectorAll('#accordion details details');
+    const openDayKeys = new Set();
+    oldDayDetails.forEach(d => {
+      if (d.open && d.dataset.key) openDayKeys.add(d.dataset.key);
+    });
+
     const acc = document.getElementById("accordion");
     let runningSaldo = saldoInicial || 0;
     acc.innerHTML = "";
@@ -116,6 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const dataObj = new Date(ano, m, d);
         if (dataObj.getMonth() !== m) break;
         const dayDetail = document.createElement("details");
+        dayDetail.dataset.key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        if (openDayKeys.has(dayDetail.dataset.key)) dayDetail.open = true;
         const daySummary = document.createElement("summary");
         const weekday = dataObj.toLocaleDateString('pt-BR', { weekday: 'long' });
         const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
