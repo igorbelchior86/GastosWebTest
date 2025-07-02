@@ -118,6 +118,7 @@ function renderAccordion() {
   // Helper to get all transactions of a specific ISO date
   const txByDate = iso => transactions.filter(t => t.postDate === iso);
 
+  let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
     // Build month container
     const mDet = document.createElement('details');
@@ -141,11 +142,12 @@ function renderAccordion() {
       if (new Date(iso).getMonth() !== mIdx) continue;
 
       const dayTotal = dayTx.reduce((s,t)=>s + t.val,0);
+      runningBalance += dayTotal;                           // atualiza saldo acumulado
       const dow = new Date(iso).toLocaleDateString('pt-BR',{weekday:'long'});
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
-      dSum.textContent = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(dayTotal)}`;
+      dSum.textContent = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(runningBalance)}`;
       dDet.appendChild(dSum);
 
       // Group card operations by method
