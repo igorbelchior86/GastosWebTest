@@ -416,3 +416,8 @@ input[type="date"] {
 #accordion details details[open] > summary.day-summary::before {
   transform: rotate(90deg);
 }
+
+/* Hide legacy table; accordion becomes the primary view */
+.table-wrapper table {
+  display: none;
+}

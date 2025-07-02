@@ -163,20 +163,14 @@ function renderAccordion() {
         invDet.appendChild(invSum);
 
         list.forEach(t => {
-          const line = document.createElement('div');
-          line.className = 'op-line';
-          line.textContent = `${t.desc}  ${currency(t.val)}`;
-          invDet.appendChild(line);
+          invDet.appendChild(makeLine(t));
         });
         dDet.appendChild(invDet);
       });
 
       // Operações em dinheiro
       cashOps.forEach(t => {
-        const line = document.createElement('div');
-        line.className = 'op-line';
-        line.textContent = `${t.desc}  ${currency(t.val)}`;
-        dDet.appendChild(line);
+        dDet.appendChild(makeLine(t));
       });
 
       mDet.appendChild(dDet);
