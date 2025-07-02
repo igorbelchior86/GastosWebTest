@@ -9,12 +9,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const cards = {};
 
-  if (methodSelect && !methodSelect.querySelector('option[value="dinheiro"]')) {
-    const dinheiro = document.createElement("option");
-    dinheiro.value = "dinheiro";
-    dinheiro.textContent = "Dinheiro";
-    methodSelect.appendChild(dinheiro);
+  function refreshMethods() {
+    methodSelect.innerHTML = "";
+    if (!cards["dinheiro"]) {
+      cards["dinheiro"] = { name: "Dinheiro", close: null, due: null };
+    }
+    Object.keys(cards).forEach(key => {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = cards[key].name;
+      methodSelect.appendChild(opt);
+    });
   }
+
+  // Initial sync of methods after DOMContentLoaded setup (before any render calls)
+  refreshMethods();
 
   if (opDate) {
     const hoje = new Date();
@@ -54,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const opt = methodSelect.querySelector(`option[value="${key}"]`);
         if (opt) opt.remove();
         renderCards();
+        refreshMethods();
       };
     }
   }
@@ -82,6 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("cardDue").value = '';
 
     renderCards();
+    refreshMethods();
   });
 
   // --- Removido: tbody initialization and month/day rows generation ---
@@ -199,5 +210,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial render (optional)
   // renderTabela();
+  refreshMethods();
   renderAccordion();
 });
