@@ -374,3 +374,39 @@ input[type="date"] {
 #accordion details details[open] > summary.day-summary::before {
   transform: rotate(90deg);
 }
+
+.start-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.start-box label {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.start-controls {
+  display: flex;
+  gap: 10px;
+}
+
+#startInput {
+  flex: 1;
+  font-size: 1rem;
+  border-radius: 16px;
+  padding: 10px;
+  border: 2px solid black;
+  box-sizing: border-box;
+}
+
+#setStartBtn {
+  background: white;
+  color: black;
+  font-weight: bold;
+  font-size: 1rem;
+  border: 2px solid black;
+  border-radius: 16px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
