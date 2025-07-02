@@ -132,11 +132,14 @@ document.addEventListener("DOMContentLoaded", () => {
           const op = document.createElement("div");
           op.className = "op-item";
           op.innerHTML = `
-            <span>${t.desc} <small>${new Date(t.date).toLocaleTimeString('pt-BR')}</small></span>
-            <span>
+            <div class="op-content">
+              <span>${t.desc}</span>
+              <small class="timestamp">${new Date(t.date).toLocaleTimeString('pt-BR')}</small>
+            </div>
+            <div class="actions">
               <button class="edit" data-index="${idx}">✏️</button>
               <button class="delete" data-index="${idx}">🗑️</button>
-            </span>
+            </div>
             <span>R$ ${t.val.toFixed(2)}</span>
           `;
           opsContainer.appendChild(op);
