@@ -9,21 +9,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const cards = {};
 
-  function refreshMethods() {
-    methodSelect.innerHTML = "";
-    if (!cards["dinheiro"]) {
-      cards["dinheiro"] = { name: "Dinheiro", close: null, due: null };
-    }
-    Object.keys(cards).forEach(key => {
-      const opt = document.createElement("option");
-      opt.value = key;
-      opt.textContent = cards[key].name;
-      methodSelect.appendChild(opt);
-    });
+  if (methodSelect && !methodSelect.querySelector('option[value="dinheiro"]')) {
+    const dinheiro = document.createElement("option");
+    dinheiro.value = "dinheiro";
+    dinheiro.textContent = "Dinheiro";
+    methodSelect.appendChild(dinheiro);
   }
-
-  // Initial sync of methods after DOMContentLoaded setup (before any render calls)
-  refreshMethods();
 
   if (opDate) {
     const hoje = new Date();
@@ -63,7 +54,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const opt = methodSelect.querySelector(`option[value="${key}"]`);
         if (opt) opt.remove();
         renderCards();
-        refreshMethods();
       };
     }
   }
@@ -92,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("cardDue").value = '';
 
     renderCards();
-    refreshMethods();
   });
 
   // --- Removido: tbody initialization and month/day rows generation ---
@@ -141,64 +130,31 @@ document.addEventListener("DOMContentLoaded", () => {
         const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
         const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
         // Replace saldo calculation with runningSaldo logic
-        const ops = transacoes.filter(t => t.postDate === key);
+        const ops = transacoes.filter(t => t.date === key);
         const totalOps = ops.reduce((sum, t) => sum + t.val, 0);
         const daySaldo = runningSaldo + totalOps;
         runningSaldo = daySaldo;
         daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
-        // --- Begin invoice grouping logic ---
-        // Group by method
-        const moneyOps = ops.filter(t => t.method === 'dinheiro');
-        const cardGroups = {};
-        ops.filter(t => t.method && t.method !== 'dinheiro')
-           .forEach(t => {
-             if (t.method === undefined) return;
-             cardGroups[t.method] = cardGroups[t.method] || [];
-             cardGroups[t.method].push(t);
-           });
-
         const opsContainer = document.createElement("div");
         opsContainer.className = "operations";
-
-        // Render money operations directly
-        moneyOps.forEach((t, idx) => {
+        transacoes.filter(t => t.date === key).forEach((t, idx) => {
           const op = document.createElement("div");
           op.className = "op-item";
           op.innerHTML = `
             <div class="op-content">
               <span>${t.desc}</span>
-              <small class="timestamp">${new Date(t.opDate || t.date).toLocaleTimeString('pt-BR')}</small>
+              <small class="timestamp">${new Date(t.date).toLocaleTimeString('pt-BR')}</small>
+            </div>
+            <div class="actions">
+              <button class="edit" data-index="${idx}">✏️</button>
+              <button class="delete" data-index="${idx}">🗑️</button>
             </div>
             <span>R$ ${t.val.toFixed(2)}</span>
           `;
           opsContainer.appendChild(op);
         });
-
-        // Render card invoices
-        Object.keys(cardGroups).forEach(cardKey => {
-          const group = cardGroups[cardKey];
-          const invoiceDetail = document.createElement("details");
-          invoiceDetail.className = "invoice";
-          const invoiceSummary = document.createElement("summary");
-          invoiceSummary.textContent = `Fatura ${cards[cardKey] ? cards[cardKey].name : cardKey}`;
-          invoiceDetail.appendChild(invoiceSummary);
-          group.forEach((t, idx) => {
-            const op = document.createElement("div");
-            op.className = "op-item";
-            op.innerHTML = `
-              <div class="op-content">
-                <span>${t.desc}</span>
-                <small class="timestamp">${new Date(t.opDate || t.date).toLocaleTimeString('pt-BR')}</small>
-              </div>
-              <span>R$ ${t.val.toFixed(2)}</span>
-            `;
-            invoiceDetail.appendChild(op);
-          });
-          opsContainer.appendChild(invoiceDetail);
-        });
-        // --- End invoice grouping logic ---
         dayDetail.appendChild(opsContainer);
         monthDetail.appendChild(dayDetail);
       }
@@ -243,6 +199,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initial render (optional)
   // renderTabela();
-  refreshMethods();
   renderAccordion();
 });
