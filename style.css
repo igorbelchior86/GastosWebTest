@@ -13,6 +13,7 @@
 }
 
 #startInput {
+  min-width: 0;
   width: 100%;
   padding: 10px;
   border: 2px solid black;
