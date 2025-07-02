@@ -178,6 +178,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!desc || isNaN(val) || !date) return alert("Preencha todos os campos.");
     transacoes.push({ desc, val, date });
     renderAccordion();
+    // Clear input fields after adding
+    descInput.value = '';
+    valueInput.value = '';
   };
 
   const resetBtn = document.getElementById("resetData");
