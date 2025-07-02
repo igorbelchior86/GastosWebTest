@@ -116,13 +116,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const dayDetail = document.createElement("details");
         const daySummary = document.createElement("summary");
         const weekday = dataObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+        const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
         const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
         // Replace saldo calculation with runningSaldo logic
         const ops = transacoes.filter(t => t.date === key);
         const totalOps = ops.reduce((sum, t) => sum + t.val, 0);
         const daySaldo = runningSaldo + totalOps;
         runningSaldo = daySaldo;
-        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} ${weekday}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
+        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
         const opsContainer = document.createElement("div");
