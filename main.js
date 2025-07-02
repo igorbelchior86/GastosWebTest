@@ -97,6 +97,25 @@ document.addEventListener("DOMContentLoaded", () => {
   let saldoInicial = null;
   const transacoes = [];
 
+  function computePostDate(iso, close, due) {
+    const date = new Date(iso);
+    let year = date.getFullYear();
+    let month = date.getMonth();
+    const day = date.getDate();
+    if (day > close) {
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+    }
+    const dueDate = new Date(year, month, due);
+    const yyyy = dueDate.getFullYear();
+    const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(dueDate.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   function renderAccordion() {
     // Preserve expanded days
     const oldDayDetails = document.querySelectorAll('#accordion details details');
@@ -137,6 +156,22 @@ document.addEventListener("DOMContentLoaded", () => {
         daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
+        Object.keys(cards).forEach(cardKey => {
+          if (cardKey === 'dinheiro') return;
+          const card = cards[cardKey];
+          const invoiceTransactions = transacoes.filter(
+            t => t.method === cardKey && computePostDate(t.date, card.close, card.due) === key
+          );
+          if (invoiceTransactions.length) {
+            const totalInvoice = invoiceTransactions.reduce((sum, t) => sum + t.val, 0);
+            const invoiceDetail = document.createElement("details");
+            invoiceDetail.className = "invoice";
+            const summary = document.createElement("summary");
+            summary.textContent = `Fatura - ${card.name} R$ ${totalInvoice.toFixed(2)}`;
+            invoiceDetail.appendChild(summary);
+            dayDetail.appendChild(invoiceDetail);
+          }
+        });
         const opsContainer = document.createElement("div");
         opsContainer.className = "operations";
         transacoes.filter(t => t.date === key).forEach((t, idx) => {
@@ -176,7 +211,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const val = parseFloat(valueInput.value.trim());
     const date = document.getElementById("opDate").value;
     if (!desc || isNaN(val) || !date) return alert("Preencha todos os campos.");
-    transacoes.push({ desc, val, date });
+    const method = methodSelect.value;
+    transacoes.push({ desc, val, date, method });
     renderAccordion();
     // Clear input fields after adding
     descInput.value = '';
