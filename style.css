@@ -305,7 +305,9 @@ input[type="date"] {
 #accordion .day-summary {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 4px 0;
+  text-align: left;
 }
 #accordion .operations {
   padding-left: 16px;
