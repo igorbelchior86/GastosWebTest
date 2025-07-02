@@ -12,14 +12,30 @@
   margin-bottom: 12px;
 }
 
-/* Saldo Inicial input styling (replicates .form-grid input and .bottom-modal-box input) */
+.start-controls {
+  display: flex;
+  gap: 10px;
+}
+
 #startInput {
+  flex: 1;
   padding: 10px;
   border: 2px solid black;
   border-radius: 16px;
   font-size: 1rem;
-  width: 100%;
   box-sizing: border-box;
+}
+
+#setStartBtn {
+  background: #4CAF50;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  height: 48px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
 }
 .timestamp {
   display: block;
