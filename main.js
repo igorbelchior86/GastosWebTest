@@ -169,12 +169,32 @@ document.addEventListener("DOMContentLoaded", () => {
             const summary = document.createElement("summary");
             summary.textContent = `Fatura - ${card.name} R$ ${totalInvoice.toFixed(2)}`;
             invoiceDetail.appendChild(summary);
+            // Add invoice operations list
+            const invContainer = document.createElement('div');
+            invContainer.className = 'operations';
+            invoiceTransactions.forEach((t, idx) => {
+              const op = document.createElement('div');
+              op.className = 'op-item';
+              op.innerHTML = `
+                <div class="op-content">
+                  <span>${t.desc}</span>
+                  <small class="timestamp">${new Date(t.date).toLocaleTimeString('pt-BR')}</small>
+                </div>
+                <div class="actions">
+                  <button class="edit" data-index="${idx}">✏️</button>
+                  <button class="delete" data-index="${idx}">🗑️</button>
+                </div>
+                <span>R$ ${t.val.toFixed(2)}</span>
+              `;
+              invContainer.appendChild(op);
+            });
+            invoiceDetail.appendChild(invContainer);
             dayDetail.appendChild(invoiceDetail);
           }
         });
         const opsContainer = document.createElement("div");
         opsContainer.className = "operations";
-        transacoes.filter(t => t.date === key).forEach((t, idx) => {
+        transacoes.filter(t => t.date === key && t.method === 'dinheiro').forEach((t, idx) => {
           const op = document.createElement("div");
           op.className = "op-item";
           op.innerHTML = `
