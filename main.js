@@ -101,6 +101,11 @@ function renderTable(){
 // -----------------------------------------------------------------------------
 // Acordeão: mês → dia → fatura
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Accordion: month ▶ day ▶ invoice
+// Shows every month (Jan–Dec) and every day (01–31),
+// past months collapsed by default, current & future months open.
+// -----------------------------------------------------------------------------
 function renderAccordion() {
   const acc = document.getElementById('accordion');
   if (!acc) return;
@@ -108,52 +113,48 @@ function renderAccordion() {
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const currency = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const curMonth = new Date().getMonth();   // 0‑based
 
-  // Agrupa transações por ano/mês/dia
-  const byMonth = {};
-  transactions.forEach(t => {
-    const d = new Date(t.postDate);
-    const m = d.getMonth();
-    if (!byMonth[m]) byMonth[m] = [];
-    byMonth[m].push(t);
-  });
+  // Helper to get all transactions of a specific ISO date
+  const txByDate = iso => transactions.filter(t => t.postDate === iso);
 
-  Object.keys(byMonth).sort((a,b)=>a-b).forEach(mIdx => {
-    const monthTx = byMonth[mIdx];
-    const monthTotal = monthTx.reduce((s,t)=>s + t.val,0);
-
+  for (let mIdx = 0; mIdx < 12; mIdx++) {
+    // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
+    if (mIdx >= curMonth) mDet.open = true;          // past months collapsed
+
+    // Month total = sum of all tx in that month
+    const monthTotal = transactions
+      .filter(t => new Date(t.postDate).getMonth() === mIdx)
+      .reduce((s,t) => s + t.val, 0);
+
     const mSum = document.createElement('summary');
     mSum.textContent = `${meses[mIdx]}  ${currency(monthTotal)}`;
     mDet.appendChild(mSum);
 
-    // Agrupa por dia
-    const byDay = {};
-    monthTx.forEach(t => {
-      if (!byDay[t.postDate]) byDay[t.postDate] = [];
-      byDay[t.postDate].push(t);
-    });
+    // Iterate through all possible days (1‑31)
+    for (let d = 1; d <= 31; d++) {
+      const iso = `2025-${String(mIdx + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dayTx = txByDate(iso);
+      // Skip invalid day numbers (e.g., 31/04)
+      if (new Date(iso).getMonth() !== mIdx) continue;
 
-    Object.keys(byDay).sort().forEach(iso => {
-      const dayTx = byDay[iso];
-      const dateObj = new Date(iso);
-      const dow = dateObj.toLocaleDateString('pt-BR',{weekday:'long'});
       const dayTotal = dayTx.reduce((s,t)=>s + t.val,0);
-
+      const dow = new Date(iso).toLocaleDateString('pt-BR',{weekday:'long'});
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
-      dSum.textContent = `${iso.slice(8,10)} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(dayTotal)}`;
+      dSum.textContent = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(dayTotal)}`;
       dDet.appendChild(dSum);
 
-      // Separa Dinheiro vs Cartões
+      // Group card operations by method
       const cashOps = dayTx.filter(t => t.method === 'Dinheiro');
       const cardGroups = {};
       dayTx.filter(t => t.method !== 'Dinheiro')
            .forEach(t => (cardGroups[t.method] = cardGroups[t.method] || []).push(t));
 
-      // Faturas (cartões)
+      // Build invoices
       Object.entries(cardGroups).forEach(([card, list]) => {
         const invDet = document.createElement('details');
         invDet.className = 'invoice';
@@ -161,23 +162,18 @@ function renderAccordion() {
         const invTotal = list.reduce((s,t)=>s + t.val,0);
         invSum.textContent = `Fatura - ${card}  ${currency(invTotal)}`;
         invDet.appendChild(invSum);
-
-        list.forEach(t => {
-          invDet.appendChild(makeLine(t));
-        });
+        list.forEach(t => invDet.appendChild(makeLine(t)));
         dDet.appendChild(invDet);
       });
 
-      // Operações em dinheiro
-      cashOps.forEach(t => {
-        dDet.appendChild(makeLine(t));
-      });
+      // Cash operations
+      cashOps.forEach(t => dDet.appendChild(makeLine(t)));
 
       mDet.appendChild(dDet);
-    });
+    }
 
     acc.appendChild(mDet);
-  });
+  }
 }
 
 function initStart(){startGroup.style.display=startBalance===null?'flex':'none';}
