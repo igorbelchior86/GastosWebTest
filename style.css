@@ -342,7 +342,7 @@ input[type="date"] {
   width: 1px;
   background: #9ca3af; /* cinza ligeiramente mais claro que timestamp */
 }
-. /* Day header expand indicator */
+/* Day header expand indicator */
 #accordion details details summary.day-summary::before {
   content: "▸";
   display: inline-block;
