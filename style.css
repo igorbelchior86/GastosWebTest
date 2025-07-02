@@ -1,8 +1,8 @@
 .timestamp {
   display: block;
-  font-size: 0.85em;
+  font-size: 0.75em;
   color: #6b7280;
-  margin-top: 2px;
+  margin: 2px 0 0 12px;
 }
 .op-item {
   display: flex;
@@ -15,7 +15,7 @@
 .op-item .actions {
   margin-left: 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
 }
 :root {
