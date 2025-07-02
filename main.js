@@ -94,6 +94,96 @@ function renderTable(){
       tbody.appendChild(row);
     }
   }
+  // constrói o acordeão de 3 níveis
+  renderAccordion();
+}
+
+// -----------------------------------------------------------------------------
+// Acordeão: mês → dia → fatura
+// -----------------------------------------------------------------------------
+function renderAccordion() {
+  const acc = document.getElementById('accordion');
+  if (!acc) return;
+  acc.innerHTML = '';
+
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const currency = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+  // Agrupa transações por ano/mês/dia
+  const byMonth = {};
+  transactions.forEach(t => {
+    const d = new Date(t.postDate);
+    const m = d.getMonth();
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(t);
+  });
+
+  Object.keys(byMonth).sort((a,b)=>a-b).forEach(mIdx => {
+    const monthTx = byMonth[mIdx];
+    const monthTotal = monthTx.reduce((s,t)=>s + t.val,0);
+
+    const mDet = document.createElement('details');
+    mDet.className = 'month';
+    const mSum = document.createElement('summary');
+    mSum.textContent = `${meses[mIdx]}  ${currency(monthTotal)}`;
+    mDet.appendChild(mSum);
+
+    // Agrupa por dia
+    const byDay = {};
+    monthTx.forEach(t => {
+      if (!byDay[t.postDate]) byDay[t.postDate] = [];
+      byDay[t.postDate].push(t);
+    });
+
+    Object.keys(byDay).sort().forEach(iso => {
+      const dayTx = byDay[iso];
+      const dateObj = new Date(iso);
+      const dow = dateObj.toLocaleDateString('pt-BR',{weekday:'long'});
+      const dayTotal = dayTx.reduce((s,t)=>s + t.val,0);
+
+      const dDet = document.createElement('details');
+      dDet.className = 'day';
+      const dSum = document.createElement('summary');
+      dSum.textContent = `${iso.slice(8,10)} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(dayTotal)}`;
+      dDet.appendChild(dSum);
+
+      // Separa Dinheiro vs Cartões
+      const cashOps = dayTx.filter(t => t.method === 'Dinheiro');
+      const cardGroups = {};
+      dayTx.filter(t => t.method !== 'Dinheiro')
+           .forEach(t => (cardGroups[t.method] = cardGroups[t.method] || []).push(t));
+
+      // Faturas (cartões)
+      Object.entries(cardGroups).forEach(([card, list]) => {
+        const invDet = document.createElement('details');
+        invDet.className = 'invoice';
+        const invSum = document.createElement('summary');
+        const invTotal = list.reduce((s,t)=>s + t.val,0);
+        invSum.textContent = `Fatura - ${card}  ${currency(invTotal)}`;
+        invDet.appendChild(invSum);
+
+        list.forEach(t => {
+          const line = document.createElement('div');
+          line.className = 'op-line';
+          line.textContent = `${t.desc}  ${currency(t.val)}`;
+          invDet.appendChild(line);
+        });
+        dDet.appendChild(invDet);
+      });
+
+      // Operações em dinheiro
+      cashOps.forEach(t => {
+        const line = document.createElement('div');
+        line.className = 'op-line';
+        line.textContent = `${t.desc}  ${currency(t.val)}`;
+        dDet.appendChild(line);
+      });
+
+      mDet.appendChild(dDet);
+    });
+
+    acc.appendChild(mDet);
+  });
 }
 
 function initStart(){startGroup.style.display=startBalance===null?'flex':'none';}
