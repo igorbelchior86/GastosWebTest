@@ -148,14 +148,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const weekday = dataObj.toLocaleDateString('pt-BR', { weekday: 'long' });
         const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
         const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-        // Replace saldo calculation with runningSaldo logic
-        const ops = transacoes.filter(t => t.date === key);
-        const totalOps = ops.reduce((sum, t) => sum + t.val, 0);
-        const daySaldo = runningSaldo + totalOps;
-        runningSaldo = daySaldo;
-        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span>R$ ${daySaldo.toFixed(2)}</span>`;
+        // Total de operações em dinheiro neste dia
+        const dailyMoneyTotal = transacoes
+          .filter(t => t.date === key && t.method === 'dinheiro')
+          .reduce((sum, t) => sum + t.val, 0);
+
+        // Cria o summary; saldo será preenchido depois que as faturas forem calculadas
+        daySummary.innerHTML = `<span>${String(d).padStart(2,'0')} - ${weekdayCapitalized}</span><span></span>`;
         daySummary.className = "day-summary";
         dayDetail.appendChild(daySummary);
+
+        // Inicializa deduções de fatura do dia
+        let invoiceDeductions = 0;
+
         Object.keys(cards).forEach(cardKey => {
           if (cardKey === 'dinheiro') return;
           const card = cards[cardKey];
@@ -164,6 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
           );
           if (invoiceTransactions.length) {
             const totalInvoice = invoiceTransactions.reduce((sum, t) => sum + t.val, 0);
+            invoiceDeductions += totalInvoice;
             const invoiceDetail = document.createElement("details");
             invoiceDetail.className = "invoice";
             const summary = document.createElement("summary");
@@ -192,6 +198,11 @@ document.addEventListener("DOMContentLoaded", () => {
             dayDetail.appendChild(invoiceDetail);
           }
         });
+        // Agora que sabemos o total de deduções, calculamos o saldo do dia
+        const daySaldo = runningSaldo + dailyMoneyTotal - invoiceDeductions;
+        runningSaldo = daySaldo;
+        daySummary.querySelector('span:last-child').textContent = `R$ ${daySaldo.toFixed(2)}`;
+
         const opsContainer = document.createElement("div");
         opsContainer.className = "operations";
         transacoes.filter(t => t.date === key && t.method === 'dinheiro').forEach((t, idx) => {
