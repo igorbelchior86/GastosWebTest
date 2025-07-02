@@ -161,8 +161,6 @@ h2 {
   align-items: flex-end;
   z-index: 1000;
   transition: opacity 0.3s ease;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .bottom-modal:not(.hidden) {
@@ -203,7 +201,8 @@ h2 {
 }
 
 .hidden {
-  display: none;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Campos do modal "Novo Cartão" */
