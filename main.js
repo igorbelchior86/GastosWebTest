@@ -40,7 +40,32 @@ const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
 
 function refreshMethods(){met.innerHTML='';cards.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});}
-function renderCardList(){cardList.innerHTML='';cards.filter(c=>c.name!=='dinheiro').forEach(c=>{const li=document.createElement('li');li.textContent=`${c.name} (${c.close}/${c.due})`;const del=document.createElement('button');del.className='icon danger';del.textContent='🗑';del.onclick=()=>{if(confirm('Excluir cartão?')){cards=cards.filter(x=>x.name!==c.name);save('cards',cards);refreshMethods();renderCardList();renderTable();}};li.appendChild(del);cardList.appendChild(li);});}
+function renderCardList() {
+  cardList.innerHTML = '';
+  cards.filter(c => c.name !== 'dinheiro').forEach(c => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="card-line">
+      <div>
+        <div class="card-name">${c.name}</div>
+        <div class="card-dates">Fechamento: ${c.close} | Vencimento: ${c.due}</div>
+      </div>
+    </div>`;
+    const del = document.createElement('button');
+    del.className = 'icon danger';
+    del.textContent = '🗑';
+    del.onclick = () => {
+      if (confirm('Excluir cartão?')) {
+        cards = cards.filter(x => x.name !== c.name);
+        save('cards', cards);
+        refreshMethods();
+        renderCardList();
+        renderTable();
+      }
+    };
+    li.querySelector('.card-line').appendChild(del);
+    cardList.appendChild(li);
+  });
+}
 const makeLine=t=>{const d=document.createElement('div');d.className='op-line';const txt=document.createElement('div');txt.className='op-txt';txt.innerHTML=`<span>${t.desc}</span><span class="value">${currency(t.val)}</span>`;d.appendChild(txt);const e=document.createElement('button');e.className='icon';e.textContent='✏️';e.onclick=()=>editTx(t.id);const del=document.createElement('button');del.className='icon danger';del.textContent='🗑';del.onclick=()=>delTx(t.id);d.appendChild(e);d.appendChild(del);return d;};
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}

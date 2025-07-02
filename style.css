@@ -103,6 +103,21 @@ h2 {
   padding: 8px 0;
 }
 
+.card-list li .card-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.card-line .card-name {
+  font-weight: bold;
+  font-size: 1rem;
+}
+.card-line .card-dates {
+  font-size: 0.875rem;
+  color: #444;
+}
+
 .card-list li .card-info {
   display: flex;
   justify-content: space-between;
