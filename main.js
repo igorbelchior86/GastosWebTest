@@ -119,7 +119,6 @@ function renderAccordion() {
   const txByDate = iso => transactions.filter(t => t.postDate === iso);
 
   let runningBalance = startBalance || 0;          // saldo acumulado
-
   for (let mIdx = 0; mIdx < 12; mIdx++) {
     // Build month container
     const mDet = document.createElement('details');
@@ -143,7 +142,7 @@ function renderAccordion() {
       if (new Date(iso).getMonth() !== mIdx) continue;
 
       const dayTotal = dayTx.reduce((s,t)=>s + t.val,0);
-      runningBalance += dayTotal;  // saldo acumulado real
+      runningBalance += dayTotal;                           // atualiza saldo acumulado
       const dow = new Date(iso).toLocaleDateString('pt-BR',{weekday:'long'});
       const dDet = document.createElement('details');
       dDet.className = 'day';
