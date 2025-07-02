@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
         // Agora que sabemos o total de deduções, calculamos o saldo do dia
-        const daySaldo = runningSaldo + dailyMoneyTotal - invoiceDeductions;
+        const daySaldo = runningSaldo + dailyMoneyTotal + invoiceDeductions;
         runningSaldo = daySaldo;
         daySummary.querySelector('span:last-child').textContent = `R$ ${daySaldo.toFixed(2)}`;
 
