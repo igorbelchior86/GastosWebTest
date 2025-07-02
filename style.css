@@ -421,3 +421,16 @@ input[type="date"] {
 .table-wrapper table {
   display: none;
 }
+
+#accordion summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+#accordion details.month > summary {
+  font-size: 1.1rem;
+  font-weight: bold;
+  padding-left: 0;
+}

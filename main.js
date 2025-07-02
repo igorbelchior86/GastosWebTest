@@ -131,7 +131,7 @@ function renderAccordion() {
       .reduce((s,t) => s + t.val, 0);
 
     const mSum = document.createElement('summary');
-    mSum.textContent = `${meses[mIdx]}  ${currency(monthTotal)}`;
+    mSum.textContent = `📅 ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()}`;
     mDet.appendChild(mSum);
 
     // Iterate through all possible days (1‑31)
@@ -147,7 +147,7 @@ function renderAccordion() {
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
-      dSum.textContent = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase()+dow.slice(1)}  ${currency(runningBalance)}`;
+      dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span style="margin-left:auto">${currency(runningBalance)}</span>`;
       dDet.appendChild(dSum);
 
       // Group card operations by method
