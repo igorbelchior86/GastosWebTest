@@ -26,6 +26,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+  width: 100%;
 }
 
 #setStartBtn {
