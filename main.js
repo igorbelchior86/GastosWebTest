@@ -103,9 +103,11 @@ document.addEventListener("DOMContentLoaded", () => {
     acc.innerHTML = "";
     const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     const hoje = new Date();
+    const currentMonthIndex = hoje.getMonth();
     const ano = hoje.getFullYear();
     meses.forEach((mesNome, m) => {
       const monthDetail = document.createElement("details");
+      if (m >= currentMonthIndex) monthDetail.open = true;
       const monthSummary = document.createElement("summary");
       monthSummary.textContent = mesNome;
       monthSummary.className = "month-summary";
