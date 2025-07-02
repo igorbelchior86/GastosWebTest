@@ -326,3 +326,19 @@ input[type="date"] {
   cursor: pointer;
   margin-left: 4px;
 }
+.operations {
+  position: relative;
+}
+.op-item {
+  position: relative;
+  padding-left: 8px;
+}
+.op-item + .op-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: #9ca3af; /* cinza ligeiramente mais claro que timestamp */
+}
