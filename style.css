@@ -304,11 +304,15 @@ input[type="date"] {
 }
 #accordion .day-summary {
   display: flex;
-  width: 100%;
-  justify-content: space-between;
   align-items: center;
   padding: 4px 0;
   text-align: left;
+  width: 100%;
+}
+
+/* Balance badge pushed to right */
+#accordion .day-summary > span:last-child {
+  margin-left: auto;
 }
 #accordion .operations {
   padding-left: 16px;
