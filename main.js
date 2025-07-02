@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const weekdayCapitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
         const key = `${ano}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
         // Replace saldo calculation with runningSaldo logic
-        const ops = transacoes.filter(t => t.date === key);
+        const ops = transacoes.filter(t => t.postDate === key);
         const totalOps = ops.reduce((sum, t) => sum + t.val, 0);
         const daySaldo = runningSaldo + totalOps;
         runningSaldo = daySaldo;
@@ -152,8 +152,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Group by method
         const moneyOps = ops.filter(t => t.method === 'dinheiro');
         const cardGroups = {};
-        ops.filter(t => t.method !== 'dinheiro')
+        ops.filter(t => t.method && t.method !== 'dinheiro')
            .forEach(t => {
+             if (t.method === undefined) return;
              cardGroups[t.method] = cardGroups[t.method] || [];
              cardGroups[t.method].push(t);
            });
