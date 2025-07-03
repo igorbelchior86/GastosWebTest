@@ -230,6 +230,10 @@ function renderAccordion() {
 
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
+    const mDivider = document.createElement('div');
+    mDivider.className = 'month-divider';
+    mDivider.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
+    acc.appendChild(mDivider);
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
@@ -334,6 +338,20 @@ function renderAccordion() {
 
       mDet.appendChild(dDet);
     }
+    // --- Adiciona saldo/meta do mês ---
+    const isPast = mIdx < curMonth;
+    const isNow  = mIdx === curMonth;
+    const metaText = isNow
+      ? 'Saldo atual:'
+      : isPast
+        ? 'Saldo final:'
+        : 'Saldo projetado:';
+
+    const meta = document.createElement('div');
+    meta.className = 'month-meta';
+    meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
+    mDet.appendChild(meta);
+    // -----------------------------------
 
     acc.appendChild(mDet);
   }
