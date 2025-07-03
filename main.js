@@ -230,10 +230,6 @@ function renderAccordion() {
 
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
-    const mDivider = document.createElement('div');
-    mDivider.className = 'month-divider';
-    mDivider.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
-    acc.appendChild(mDivider);
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
