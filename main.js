@@ -44,6 +44,7 @@ const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('a
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
 const startContainer = document.querySelector('.start-container');
+const dividerSaldo = document.getElementById('dividerSaldo');
 
 const showToast = msg => {
   const t = document.getElementById('toast');
@@ -343,6 +344,7 @@ function initStart() {
   const showStart = startBalance === null && transactions.length === 0;
   // exibe ou oculta todo o container de saldo inicial
   startContainer.style.display = showStart ? 'block' : 'none';
+  dividerSaldo.style.display = showStart ? 'block' : 'none';
   // (mantém linha antiga para compatibilidade)
   startGroup.style.display = showStart ? 'flex' : 'none';
   // mantém o botão habilitado; a função addTx impede lançamentos
