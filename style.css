@@ -619,7 +619,7 @@ details.day {
 details.day.today summary.day-summary {
   display: flex !important;
   width: calc(100% - 24px) !important;
-  margin: 4px 12px !important;
+  margin: 4px 12px 4px 0 !important;
   padding: 8px 12px !important;
   background-color: #b5b5b5cc !important;
   border-radius: 6px !important;
@@ -628,7 +628,7 @@ details.day.today summary.day-summary {
 details.day.negative summary.day-summary {
   display: flex !important;
   width: calc(100% - 24px) !important;
-  margin: 4px 12px !important;
+  margin: 4px 12px 4px 0 !important;
   padding: 8px 12px !important;
   background-color: #ff8484 !important;
   border-radius: 6px !important;
