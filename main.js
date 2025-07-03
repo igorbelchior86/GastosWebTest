@@ -245,7 +245,7 @@ function renderAccordion() {
     // Cria summary estilizado como linha do mês
     const mSum = document.createElement('summary');
     mSum.className = 'month-divider';
-    mSum.innerHTML = `▶️ ${nomeMes.toUpperCase()} <hr>`;
+    mSum.innerHTML = `${nomeMes.toUpperCase()} <hr>`;
     mDet.appendChild(mSum);
 
     // Garante o número correto de dias em cada mês

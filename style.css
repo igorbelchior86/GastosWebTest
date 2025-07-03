@@ -565,15 +565,16 @@ summary.month-divider hr {
   margin: 0;
 }
 
-details.month[open] > summary.month-divider::before {
-  content: "▼";
+summary.month-divider::before {
+  content: "▶";
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
   margin-right: 6px;
 }
 
-summary.month-divider::before {
-  content: "▶";
-  margin-right: 6px;
-  transition: transform 0.2s ease;
+details.month[open] > summary.month-divider::before {
+  transform: rotate(90deg);
 }
 
 summary.month-divider hr {
