@@ -128,3 +128,84 @@ function renderAccordion() {
 
   // ... other code ...
 }
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <title>Gastos+</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
+  <link rel="manifest" href="site.webmanifest">
+</head>
+<body>
+  <button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
+
+  <div class="wrapper">
+    <!-- Lançar operação -->
+    <div class="container">
+      <h2>Lançar operação</h2>
+      <div class="form-grid">
+        <input id="desc" placeholder="Descrição">
+        <input id="value" type="number" placeholder="Valor (- despesa)">
+        <select id="method"></select>
+        <input id="opDate" type="date">
+        <button id="addBtn">Adicionar</button>
+      </div>
+    </div>
+
+    <!-- Saldo inicial -->
+    <div class="container start-container">
+      <h2>Saldo inicial</h2>
+      <div id="startGroup" class="start-box">
+        <div class="start-controls">
+          <input id="startInput" type="number">
+          <button id="setStartBtn">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela & Acordeão -->
+    <div class="container">
+      <div class="table-wrapper">
+        <table id="dailyTable">
+          <thead>
+            <tr><th>Data</th><th>Descrição</th><th>Gasto</th><th>Saldo</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="accordion"></div>
+      <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
+    </div>
+  </div>
+
+  <!-- Modal Cartões -->
+  <div id="cardModal" class="bottom-modal hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Novo Cartão</h2>
+
+      <input id="cardName" placeholder="Nome">
+      <div class="card-dates">
+        <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
+        <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+      </div>
+      <button id="addCardBtn">Adicionar</button>
+      <small>Fechamento define a fatura.</small>
+
+      <ul id="cardList" class="card-list"></ul>
+
+      <button id="closeCardModal">Fechar</button>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+
+  <!-- Toast de erro -->
+  <div id="toast" class="toast"></div>
+</body>
+</html>
