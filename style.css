@@ -617,11 +617,11 @@ details.day {
   background: transparent !important;
 }
 details.day.today summary.day-summary {
-  background-color: #f0f0f0cc;
+  background-color: #b5b5b5cc;
   border-radius: 6px;
 }
 
 details.day.negative summary.day-summary {
-  background-color: #ffe5e5;
+  background-color: #ff8484;
   border-radius: 6px;
 }
