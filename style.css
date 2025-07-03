@@ -477,3 +477,19 @@ details.day[open] > summary.day-summary::before {
   margin-top: 2px;
   margin-left: 4px;
 }
+.op-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.op-left {
+  font-weight: 500;
+}
+
+.op-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

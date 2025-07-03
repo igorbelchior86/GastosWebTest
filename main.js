@@ -70,31 +70,42 @@ const makeLine = t => {
   const d = document.createElement('div');
   d.className = 'op-line';
 
-  const txt = document.createElement('div');
-  txt.className = 'op-txt';
-  txt.innerHTML = `
-    <span>${t.desc}</span>
-    <span class="value">R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-  `;
-  d.appendChild(txt);
+  const topRow = document.createElement('div');
+  topRow.className = 'op-main';
+
+  const left = document.createElement('div');
+  left.className = 'op-left';
+  left.textContent = t.desc;
+
+  const right = document.createElement('div');
+  right.className = 'op-right';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon';
+  editBtn.textContent = '✏️';
+  editBtn.onclick = () => editTx(t.id);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon danger';
+  delBtn.textContent = '🗑';
+  delBtn.onclick = () => delTx(t.id);
+
+  const value = document.createElement('span');
+  value.className = 'value';
+  value.textContent = `R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+  right.appendChild(editBtn);
+  right.appendChild(delBtn);
+  right.appendChild(value);
+
+  topRow.appendChild(left);
+  topRow.appendChild(right);
+  d.appendChild(topRow);
 
   const ts = document.createElement('div');
   ts.className = 'timestamp';
   ts.textContent = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
   d.appendChild(ts);
-
-  const e = document.createElement('button');
-  e.className = 'icon';
-  e.textContent = '✏️';
-  e.onclick = () => editTx(t.id);
-
-  const del = document.createElement('button');
-  del.className = 'icon danger';
-  del.textContent = '🗑';
-  del.onclick = () => delTx(t.id);
-
-  d.appendChild(e);
-  d.appendChild(del);
 
   return d;
 };
