@@ -341,7 +341,7 @@ input[type="date"] {
 #accordion details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   padding: 0 8px;
 }
 #accordion summary {
@@ -535,4 +535,10 @@ details.day[open] > summary.day-summary::before {
 /* checkbox alinhado */
 .plan-check {
   margin-right: 6px;
+}
+
+#accordion details.month > summary {
+  background: rgba(0,122,255,0.05); /* azul claro translúcido */
+  padding: 6px 10px;
+  border-radius: 6px;
 }
