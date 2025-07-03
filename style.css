@@ -77,17 +77,22 @@ body {
 
 .wrapper {
   width: 100%;
-  padding-left: env(safe-area-inset-left, 12px);
-  padding-right: env(safe-area-inset-right, 12px);
+  padding-left: env(safe-area-inset-left, 6px);
+  padding-right: env(safe-area-inset-right, 6px);
   max-width: 100%;
 }
 
 .container {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 18px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+.divider {
+  height: 1px;
+  background: #d1d5db;
+  margin: 16px 0;
 }
 
 h2 {
