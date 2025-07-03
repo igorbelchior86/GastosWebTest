@@ -43,7 +43,7 @@ const post=(iso,m)=>{if(m==='Dinheiro')return iso;const c=cards.find(x=>x.name==
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
-const startContainer = document.querySelector('.start-container');
+const startContainer = document.getElementById('saldoContainer');
 
 const showToast = msg => {
   const t = document.getElementById('toast');
