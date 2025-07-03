@@ -618,7 +618,7 @@ details.day {
 }
 details.day.today summary.day-summary {
   display: flex !important;
-  width: auto !important;
+  width: calc(100% - 24px) !important;
   margin: 4px 12px !important;
   padding: 8px 12px !important;
   background-color: #b5b5b5cc !important;
@@ -627,7 +627,7 @@ details.day.today summary.day-summary {
 
 details.day.negative summary.day-summary {
   display: flex !important;
-  width: auto !important;
+  width: calc(100% - 24px) !important;
   margin: 4px 12px !important;
   padding: 8px 12px !important;
   background-color: #ff8484 !important;
