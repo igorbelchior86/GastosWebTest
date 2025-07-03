@@ -43,7 +43,7 @@ const post=(iso,m)=>{if(m==='Dinheiro')return iso;const c=cards.find(x=>x.name==
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
-const startContainer = document.getElementById('saldoContainer');
+const startContainer = document.querySelector('.start-container');
 
 const showToast = msg => {
   const t = document.getElementById('toast');
@@ -240,10 +240,21 @@ function renderAccordion() {
     const monthTotal = transactions
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
-    const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
     const mSum = document.createElement('summary');
-    mSum.className = 'month-summary';
-    mSum.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    // New: separate arrow and label spans
+    const spanIcon = document.createElement('span');
+    spanIcon.className = 'month-arrow';
+    spanIcon.textContent = '▶️';
+
+    const spanText = document.createElement('span');
+    spanText.className = 'month-label';
+    const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
+    spanText.textContent = `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
+
+    mSum.appendChild(spanText);
+    mSum.insertBefore(spanIcon, spanText);
+
+    // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
 
     // Garante o número correto de dias em cada mês
@@ -322,22 +333,6 @@ function renderAccordion() {
       }
 
       mDet.appendChild(dDet);
-    }
-
-    // Adiciona linha de saldo dinâmica quando o mês está colapsado
-    if (!mDet.open) {
-      const isPast = mIdx < curMonth;
-      const isNow  = mIdx === curMonth;
-      const metaText = isNow
-        ? 'Saldo atual:'
-        : isPast
-          ? 'Saldo final:'
-          : 'Saldo projetado:';
-
-      const meta = document.createElement('div');
-      meta.className = 'month-meta';
-      meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
-      mDet.appendChild(meta);
     }
 
     acc.appendChild(mDet);
