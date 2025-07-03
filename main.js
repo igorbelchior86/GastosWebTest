@@ -281,7 +281,8 @@ function initStart() {
   startContainer.style.display = showStart ? 'block' : 'none';
   // (mantém linha antiga para compatibilidade)
   startGroup.style.display = showStart ? 'flex' : 'none';
-  addBtn.disabled = showStart; // bloqueia novos lançamentos até definir saldo
+  // mantém o botão habilitado; a função addTx impede lançamentos
+  addBtn.classList.toggle('disabled', showStart);
 }
 setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;save('startBal',v);initStart();renderTable();};
 resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};

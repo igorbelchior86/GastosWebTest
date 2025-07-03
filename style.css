@@ -514,3 +514,8 @@ details.day[open] > summary.day-summary::before {
 .toast.show {
   opacity: 1;
 }
+
+/* Aparência de "desabilitado" sem realmente desabilitar */
+#addBtn.disabled {
+  opacity: 0.5;
+}
