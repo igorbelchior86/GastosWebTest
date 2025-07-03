@@ -567,14 +567,13 @@ details.day[open] > summary.day-summary::before {
 .plan-check {
   margin-right: 6px;
 }
-
-.month-meta {
-  font-size: 0.8rem;
-  color: #444;
-  margin-left: 16px;
-  margin-top: -4px;
-  margin-bottom: 8px;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
+ .month-meta {
+   font-size: 0.8rem;
+   color: #444;
+   margin-left: 16px;
+   margin-top: -4px;
+   margin-bottom: 12px;
+   display: flex;
+   gap: 6px;
+   align-items: center;
+ }
