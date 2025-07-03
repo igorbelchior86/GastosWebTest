@@ -208,10 +208,10 @@ function renderAccordion() {
       dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span style="margin-left:auto">${saldoFormatado}</span>`;
       dDet.appendChild(dSum);
 
-      // Group card operations by method
-      const cashOps = dayTx.filter(t => t.method === 'Dinheiro');
+      // Group card operations by method (case-insensitive for 'Dinheiro')
+      const cashOps = dayTx.filter(t => t.method.toLowerCase() === 'dinheiro');
       const cardGroups = {};
-      dayTx.filter(t => t.method !== 'Dinheiro')
+      dayTx.filter(t => t.method.toLowerCase() !== 'dinheiro')
            .forEach(t => (cardGroups[t.method] = cardGroups[t.method] || []).push(t));
 
       // Build invoices
