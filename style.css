@@ -610,7 +610,7 @@ html, body {
 
 details.day {
   border: none !important;
-  border-left: 2px solid #3e3e40 !important;
+  border-left: 1px solid #ccc !important;
   border-radius: 0 !important;
   padding-left: 8px !important;
   margin: 12px 0 !important;
@@ -640,4 +640,16 @@ details.day:not(.today):not(.negative) summary.day-summary {
   width: calc(100% - 24px) !important;
   margin: 4px 12px 4px 0 !important;
   padding: 8px 12px !important;
+}
+
+/* 1. Fonte e cor mais suaves para os dias */
+summary.day-summary {
+  font-weight: 500 !important;
+  color: #333 !important;
+}
+
+/* 3. Indicador de dia (seta) menor e mais suave */
+summary.day-summary::before {
+  font-size: 0.9em !important;
+  color: #666 !important;
 }
