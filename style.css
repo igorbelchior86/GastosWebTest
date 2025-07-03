@@ -596,3 +596,13 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+.month-meta {
+  font-size: 0.8rem;
+  color: #444;
+  margin-left: 16px;
+  margin-bottom: 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}

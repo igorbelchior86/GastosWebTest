@@ -325,6 +325,17 @@ function renderAccordion() {
 
       mDet.appendChild(dDet);
     }
+    // Inserir linha meta do mês após o loop de dias
+    const metaLine = document.createElement('div');
+    metaLine.className = 'month-meta';
+
+    let label;
+    if (mIdx < curMonth) label = 'Saldo final:';
+    else if (mIdx === curMonth) label = 'Saldo atual:';
+    else label = 'Saldo projetado:';
+
+    metaLine.innerHTML = `<span>| ${label}</span><strong>${currency(runningBalance)}</strong>`;
+    mDet.appendChild(metaLine);
 
     acc.appendChild(mDet);
   }
