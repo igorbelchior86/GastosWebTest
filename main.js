@@ -245,6 +245,17 @@ function renderAccordion() {
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     const mSum = document.createElement('summary');
+    const isPast = mIdx < curMonth;
+    const isNow  = mIdx === curMonth;
+    const metaText = isNow
+      ? 'Saldo atual:'
+      : isPast
+        ? 'Saldo final:'
+        : 'Saldo projetado:';
+
+    const meta = document.createElement('div');
+    meta.className = 'month-meta';
+    meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
     // New: separate arrow and label spans
     const spanIcon = document.createElement('span');
     spanIcon.className = 'month-arrow';
@@ -260,6 +271,7 @@ function renderAccordion() {
 
     // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
+    if (!mDet.open) mDet.appendChild(meta);
 
     // Garante o número correto de dias em cada mês
     const daysInMonth = new Date(2025, mIdx + 1, 0).getDate();
@@ -338,20 +350,6 @@ function renderAccordion() {
 
       mDet.appendChild(dDet);
     }
-    // --- Adiciona saldo/meta do mês ---
-    const isPast = mIdx < curMonth;
-    const isNow  = mIdx === curMonth;
-    const metaText = isNow
-      ? 'Saldo atual:'
-      : isPast
-        ? 'Saldo final:'
-        : 'Saldo projetado:';
-
-    const meta = document.createElement('div');
-    meta.className = 'month-meta';
-    meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
-    mDet.appendChild(meta);
-    // -----------------------------------
 
     acc.appendChild(mDet);
   }

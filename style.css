@@ -572,7 +572,8 @@ details.day[open] > summary.day-summary::before {
   font-size: 0.8rem;
   color: #444;
   margin-left: 16px;
-  margin-bottom: 4px;
+  margin-top: -4px;
+  margin-bottom: 8px;
   display: flex;
   gap: 6px;
   align-items: center;
