@@ -637,6 +637,5 @@ details.day.negative summary.day-summary {
 /* Dias padrão (não .today e não .negative): reduz largura e alinha com highlights */
 details.day:not(.today):not(.negative) summary.day-summary {
   display: flex;
-  width: calc(100% - 24px);
-  margin: 4px 12px;
+  padding: 8px 12px;
 }
