@@ -5,7 +5,7 @@ import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/1
 
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
-const USE_MOCK = false;
+const USE_MOCK = true;
 let save, load;
 
 if (!USE_MOCK) {
