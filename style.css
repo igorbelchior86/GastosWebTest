@@ -621,6 +621,7 @@ details.day.today summary.day-summary {
   border-radius: 6px;
   margin-left: 6px;
   margin-right: 6px;
+  padding: 6px 12px;
 }
 
 details.day.negative summary.day-summary {
@@ -628,4 +629,5 @@ details.day.negative summary.day-summary {
   border-radius: 6px;
   margin-left: 6px;
   margin-right: 6px;
+  padding: 6px 12px;
 }
