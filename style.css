@@ -610,9 +610,9 @@ html, body {
 
 details.day {
   border: none !important;
-  border-left: 2px solid #3e3e40 !important;  /* cinza neutro escuro */
+  border-left: 2px solid #3e3e40 !important;
   border-radius: 0 !important;
   padding-left: 8px !important;
-  margin: 2px 0 !important;
+  margin: 12px 0 !important;
   background: transparent !important;
 }
