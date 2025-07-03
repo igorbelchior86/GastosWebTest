@@ -132,7 +132,8 @@ function renderAccordion() {
     const mSum = document.createElement('summary');
     const spanText = document.createElement('span');
     spanText.className = 'month-label';
-    spanText.textContent = `▶️ ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' })}`;
+    const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
+    spanText.textContent = `▶️ ${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
 
     mSum.appendChild(spanText);
 
