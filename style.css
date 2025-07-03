@@ -445,3 +445,16 @@ input[type="date"] {
 details.month[open] > summary .month-arrow {
   transform: rotate(90deg);
 }
+
+/* Indicador colapsável para dias */
+.day-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+}
+
+/* Gira o indicador quando o dia está expandido */
+details.day[open] > summary.day-summary::before {
+  transform: rotate(90deg);
+}

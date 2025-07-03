@@ -159,6 +159,7 @@ function renderAccordion() {
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
+      dSum.className = 'day-summary';
       const saldoFormatado = runningBalance < 0
         ? `R$ -${Math.abs(runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
