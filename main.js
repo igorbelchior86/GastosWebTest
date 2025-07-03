@@ -230,10 +230,6 @@ function renderAccordion() {
 
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
-    const mDivider = document.createElement('div');
-    mDivider.className = 'month-divider';
-    mDivider.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
-    acc.appendChild(mDivider);
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
@@ -247,10 +243,10 @@ function renderAccordion() {
     const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
     const mSum = document.createElement('summary');
     mSum.className = 'month-summary';
-    mSum.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    mSum.textContent = ` ${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)}`;
     mDet.appendChild(mSum);
 
-    // Adiciona a linha de saldo abaixo do summary, apenas se colapsado
+    // Linha de saldo exibida apenas se colapsado
     if (!mDet.open) {
       const isPast = mIdx < curMonth;
       const isNow  = mIdx === curMonth;
