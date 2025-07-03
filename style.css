@@ -599,13 +599,13 @@ html, body {
 
 .month-meta {
   display: flex;
-  width: 100%;
   justify-content: space-between;
   align-items: center;
   font-size: 0.8rem;
   color: #444;
-  padding: 0 8px;
+  padding: 0 16px;
   margin-bottom: 4px;
+  box-sizing: border-box;
 }
 
 details.day {
@@ -619,9 +619,13 @@ details.day {
 details.day.today summary.day-summary {
   background-color: #b5b5b5cc;
   border-radius: 6px;
+  margin-left: 6px;
+  margin-right: 6px;
 }
 
 details.day.negative summary.day-summary {
   background-color: #ff8484;
   border-radius: 6px;
+  margin-left: 6px;
+  margin-right: 6px;
 }
