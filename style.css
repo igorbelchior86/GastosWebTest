@@ -546,6 +546,7 @@ hr.divider {
   margin: 12px 0;
 }
 
+/* Opcional: margem inferior reduzida para menos espaçamento vertical */
 .month-divider {
   display: flex;
   align-items: center;
@@ -553,7 +554,7 @@ hr.divider {
   font-weight: bold;
   font-size: 0.85rem;
   color: #444;
-  margin: 16px 0 4px;
+  margin: 12px 0 0;
 }
 
 .month-divider::before,
@@ -563,4 +564,10 @@ hr.divider {
   height: 1px;
   background: #ccc;
   margin: 0 8px;
+}
+.month-label-with-arrow {
+  font-weight: bold;
+  font-size: 1rem;
+  display: inline-block;
+  padding: 2px 0;
 }

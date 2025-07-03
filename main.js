@@ -235,7 +235,7 @@ function renderAccordion() {
     // Adiciona divisor de mês antes do details do mês
     const divider = document.createElement('div');
     divider.className = 'month-divider';
-    divider.textContent = nomeMes.toUpperCase();
+    divider.innerHTML = `<span class="month-label-with-arrow">▶️ ${nomeMes.toUpperCase()}</span>`;
     acc.appendChild(divider);
 
     // Build month container
@@ -249,18 +249,17 @@ function renderAccordion() {
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     const mSum = document.createElement('summary');
-    // New: separate arrow and label spans
+    // Removido: não imprime mais o nome do mês no summary, pois já está no divider
     const spanIcon = document.createElement('span');
     spanIcon.className = 'month-arrow';
     spanIcon.textContent = '▶️';
-
     const spanText = document.createElement('span');
     spanText.className = 'month-label';
-    spanText.textContent = `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
-
+    // spanText.textContent = `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
+    // Removido texto do mês:
+    spanText.textContent = '';
     mSum.appendChild(spanText);
     mSum.insertBefore(spanIcon, spanText);
-
     // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
 
