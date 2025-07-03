@@ -77,8 +77,8 @@ body {
 
 .wrapper {
   width: 100%;
-  padding-left: env(safe-area-inset-left, 12px);
-  padding-right: env(safe-area-inset-right, 12px);
+  padding-left: env(safe-area-inset-left, 6px);
+  padding-right: env(safe-area-inset-right, 6px);
   max-width: 100%;
 }
 
@@ -530,4 +530,11 @@ details.day[open] > summary.day-summary::before {
 /* checkbox alinhado */
 .plan-check {
   margin-right: 6px;
+}
+
+hr.divider {
+  border: none;
+  height: 1px;
+  background-color: #3e3e40;
+  margin: 12px 0;
 }
