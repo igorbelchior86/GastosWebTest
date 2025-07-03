@@ -123,15 +123,15 @@ function renderAccordion() {
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
-    if (mIdx >= curMonth) mDet.open = true;          // past months collapsed
-
+    const isOpen = mIdx >= curMonth;
+    mDet.open = isOpen;
     // Month total = sum of all tx in that month
     const monthTotal = transactions
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
-
     const mSum = document.createElement('summary');
-    mSum.textContent = `📅 ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()}`;
+    const emoji = isOpen ? '🔽' : '▶️';
+    mSum.textContent = `${emoji} ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()}`;
     mDet.appendChild(mSum);
 
     // Iterate through all possible days (1‑31)
