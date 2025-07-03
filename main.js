@@ -243,24 +243,8 @@ function renderAccordion() {
     const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
     const mSum = document.createElement('summary');
     mSum.className = 'month-summary';
-    mSum.textContent = ` ${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)}`;
+    mSum.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
     mDet.appendChild(mSum);
-
-    // Linha de saldo exibida apenas se colapsado
-    if (!mDet.open) {
-      const isPast = mIdx < curMonth;
-      const isNow  = mIdx === curMonth;
-      const metaText = isNow
-        ? 'Saldo atual:'
-        : isPast
-          ? 'Saldo final:'
-          : 'Saldo projetado:';
-
-      const meta = document.createElement('div');
-      meta.className = 'month-meta';
-      meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
-      mDet.appendChild(meta);
-    }
 
     // Garante o número correto de dias em cada mês
     const daysInMonth = new Date(2025, mIdx + 1, 0).getDate();
@@ -338,6 +322,22 @@ function renderAccordion() {
       }
 
       mDet.appendChild(dDet);
+    }
+
+    // Adiciona linha de saldo dinâmica quando o mês está colapsado
+    if (!mDet.open) {
+      const isPast = mIdx < curMonth;
+      const isNow  = mIdx === curMonth;
+      const metaText = isNow
+        ? 'Saldo atual:'
+        : isPast
+          ? 'Saldo final:'
+          : 'Saldo projetado:';
+
+      const meta = document.createElement('div');
+      meta.className = 'month-meta';
+      meta.innerHTML = `<span>| ${metaText}</span><strong>${currency(runningBalance)}</strong>`;
+      mDet.appendChild(meta);
     }
 
     acc.appendChild(mDet);

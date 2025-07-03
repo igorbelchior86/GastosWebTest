@@ -577,3 +577,19 @@ details.day[open] > summary.day-summary::before {
    gap: 6px;
    align-items: center;
  }
+
+#accordion .month-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+#accordion .month-summary::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ccc;
+  margin-left: 8px;
+}
