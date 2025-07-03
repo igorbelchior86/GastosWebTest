@@ -633,3 +633,10 @@ details.day.negative summary.day-summary {
   background-color: #ff8484 !important;
   border-radius: 6px !important;
 }
+
+/* Dias padrão (não .today e não .negative): reduz largura e alinha com highlights */
+details.day:not(.today):not(.negative) summary.day-summary {
+  display: flex;
+  width: calc(100% - 12px);
+  margin-left: 12px;
+}
