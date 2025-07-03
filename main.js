@@ -231,6 +231,13 @@ function renderAccordion() {
 
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
+    const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
+    // Adiciona divisor de mês antes do details do mês
+    const divider = document.createElement('div');
+    divider.className = 'month-divider';
+    divider.textContent = nomeMes.toUpperCase();
+    acc.appendChild(divider);
+
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
@@ -249,7 +256,6 @@ function renderAccordion() {
 
     const spanText = document.createElement('span');
     spanText.className = 'month-label';
-    const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
     spanText.textContent = `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
 
     mSum.appendChild(spanText);
@@ -336,7 +342,8 @@ function renderAccordion() {
       mDet.appendChild(dDet);
     }
 
-    acc.appendChild(mDet);
+    // acc.appendChild(mDet); // linha original
+    acc.appendChild(mDet); // Confirma que está abaixo do append do divider
   }
 }
 

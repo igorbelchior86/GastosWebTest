@@ -333,6 +333,13 @@ input[type="date"] {
 }
 
 /* Accordion styles */
+#accordion details.month {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 6px;
+}
+
 #accordion details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -537,4 +544,23 @@ hr.divider {
   height: 1px;
   background-color: #3e3e40;
   margin: 12px 0;
+}
+
+.month-divider {
+  display: flex;
+  align-items: center;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #444;
+  margin: 16px 0 4px;
+}
+
+.month-divider::before,
+.month-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ccc;
+  margin: 0 8px;
 }
