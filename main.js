@@ -339,20 +339,17 @@ function renderAccordion() {
     else label = 'Saldo projetado:';
 
     metaLine.innerHTML = `<span>| ${label}</span><strong>${currency(runningBalance)}</strong>`;
-    if (!mDet.open) mDet.appendChild(metaLine);
+    mDet.appendChild(metaLine);
+
+    // Oculta inicialmente se o mês estiver aberto
+    if (mDet.open) metaLine.style.display = 'none';
 
     acc.appendChild(mDet);
 
-    // Opcional: remove/adiciona a linha meta ao expandir/fechar o mês
     mDet.addEventListener('toggle', () => {
-      const existing = mDet.querySelector('.month-meta');
-      if (mDet.open) {
-        if (existing) existing.remove();
-      } else {
-        const newMeta = document.createElement('div');
-        newMeta.className = 'month-meta';
-        newMeta.innerHTML = `<span>| ${label}</span><strong>${currency(runningBalance)}</strong>`;
-        mDet.appendChild(newMeta);
+      const meta = mDet.querySelector('.month-meta');
+      if (meta) {
+        meta.style.display = mDet.open ? 'none' : 'flex';
       }
     });
   }
