@@ -132,7 +132,7 @@ function renderAccordion() {
     const mSum = document.createElement('summary');
     const spanIcon = document.createElement('span');
     spanIcon.className = 'month-arrow';
-    spanIcon.textContent = isOpen ? '🔽' : '▶️';
+    spanIcon.textContent = '▶️'; // ícone fixo
 
     const spanText = document.createElement('span');
     spanText.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
@@ -140,10 +140,7 @@ function renderAccordion() {
     mSum.appendChild(spanIcon);
     mSum.appendChild(spanText);
 
-    // Atualiza o ícone ao expandir/colapsar
-    mDet.addEventListener('toggle', () => {
-      spanIcon.textContent = mDet.open ? '🔽' : '▶️';
-    });
+    // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
 
     // Iterate through all possible days (1‑31)
