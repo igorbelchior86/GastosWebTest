@@ -609,10 +609,10 @@ html, body {
 }
 
 details.day {
-  border: none;
-  border-left: 3px solid #007AFF;
-  padding-left: 8px;
-  margin: 4px 0;
-  background: transparent;
-  border-radius: 0;
+  border: none !important;
+  border-left: 3px solid #007AFF !important;
+  border-radius: 0 !important;
+  padding-left: 8px !important;
+  margin: 4px 0 !important;
+  background: transparent !important;
 }
