@@ -155,7 +155,7 @@ function renderAccordion() {
 
       const dayTotal = dayTx.reduce((s,t)=>s + t.val,0);
       runningBalance += dayTotal;                           // atualiza saldo acumulado
-      const dow = new Date(iso).toLocaleDateString('pt-BR',{weekday:'long'});
+      const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
