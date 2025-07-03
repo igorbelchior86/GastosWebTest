@@ -584,3 +584,15 @@ summary.month-divider hr {
   background: #ccc;
   margin: 0;
 }
+/* Garantia de bloqueio de zoom no iOS */
+input,
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* Previne zoom por overflow lateral no Safari */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
