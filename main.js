@@ -130,14 +130,10 @@ function renderAccordion() {
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     const mSum = document.createElement('summary');
-    const spanIcon = document.createElement('span');
-    spanIcon.className = 'month-arrow';
-    spanIcon.textContent = '▶️'; // ícone fixo
-
     const spanText = document.createElement('span');
-    spanText.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+    spanText.className = 'month-label';
+    spanText.textContent = `▶️ ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' })}`;
 
-    mSum.appendChild(spanIcon);
     mSum.appendChild(spanText);
 
     // Não troca o emoji, apenas anima via CSS
