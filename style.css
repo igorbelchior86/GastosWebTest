@@ -61,14 +61,14 @@
   align-items: center;
 }
 :root {
-  --bg: #fff;
+  --bg: #f2f4f7;
   --panel: #fff;
   --border: #d1d5db;
   --radius: 8px;
 }
 
 body {
-  background: #fff;
+  background: var(--bg);
   font-family: 'Inter', sans-serif;
   padding: 20px;
   margin: 0;
@@ -345,8 +345,6 @@ input[type="date"] {
   border-radius: var(--radius);
   margin-bottom: 8px;
   padding: 0 8px;
-  box-shadow: 0 1px 0 #ccc;
-  border-left: 3px solid #007AFF;
 }
 #accordion summary {
   cursor: pointer;
@@ -609,11 +607,12 @@ html, body {
   padding: 0 8px;
   margin-bottom: 4px;
 }
+
 details.day {
-  box-shadow: 0 1px 0 #ccc;
+  border: none;
   border-left: 3px solid #007AFF;
-  margin: 0;
-  border-radius: 0;
   padding-left: 8px;
-  background: white;
+  margin: 4px 0;
+  background: transparent;
+  border-radius: 0;
 }
