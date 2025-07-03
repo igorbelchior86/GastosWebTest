@@ -434,3 +434,10 @@ input[type="date"] {
   font-weight: bold;
   padding-left: 0;
 }
+# Accordion month arrow animation
+.month-arrow {
+  width: 1.5em;
+  display: inline-block;
+  text-align: center;
+  transition: transform 0.3s ease;
+}

@@ -130,8 +130,20 @@ function renderAccordion() {
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     const mSum = document.createElement('summary');
-    const emoji = isOpen ? '🔽' : '▶️';
-    mSum.textContent = `${emoji} ${new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()}`;
+    const spanIcon = document.createElement('span');
+    spanIcon.className = 'month-arrow';
+    spanIcon.textContent = isOpen ? '🔽' : '▶️';
+
+    const spanText = document.createElement('span');
+    spanText.textContent = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase();
+
+    mSum.appendChild(spanIcon);
+    mSum.appendChild(spanText);
+
+    // Atualiza o ícone ao expandir/colapsar
+    mDet.addEventListener('toggle', () => {
+      spanIcon.textContent = mDet.open ? '🔽' : '▶️';
+    });
     mDet.appendChild(mSum);
 
     // Iterate through all possible days (1‑31)
