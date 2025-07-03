@@ -617,17 +617,19 @@ details.day {
   background: transparent !important;
 }
 details.day.today summary.day-summary {
-  background-color: #b5b5b5cc;
-  border-radius: 6px;
-  margin-left: 6px;
-  margin-right: 6px;
-  padding: 6px 12px;
+  display: flex !important;
+  width: auto !important;
+  margin: 4px 12px !important;
+  padding: 8px 12px !important;
+  background-color: #b5b5b5cc !important;
+  border-radius: 6px !important;
 }
 
 details.day.negative summary.day-summary {
-  background-color: #ff8484;
-  border-radius: 6px;
-  margin-left: 6px;
-  margin-right: 6px;
-  padding: 6px 12px;
+  display: flex !important;
+  width: auto !important;
+  margin: 4px 12px !important;
+  padding: 8px 12px !important;
+  background-color: #ff8484 !important;
+  border-radius: 6px !important;
 }
