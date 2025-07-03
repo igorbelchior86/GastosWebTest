@@ -617,6 +617,11 @@ details.day {
   background: transparent !important;
 }
 details.day.today summary.day-summary {
-  background-color: #f0f0f0;
+  background-color: #f0f0f0cc;
+  border-radius: 6px;
+}
+
+details.day.negative summary.day-summary {
+  background-color: #ffe5e5;
   border-radius: 6px;
 }

@@ -269,7 +269,8 @@ function renderAccordion() {
       const saldoFormatado = runningBalance < 0
         ? `R$ -${Math.abs(runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-      dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span style="margin-left:auto">${saldoFormatado}</span>`;
+      dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
+      if (runningBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
 
       // Group card operations by method (case-insensitive for 'Dinheiro')
