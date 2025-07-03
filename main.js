@@ -66,7 +66,38 @@ function renderCardList() {
     cardList.appendChild(li);
   });
 }
-const makeLine=t=>{const d=document.createElement('div');d.className='op-line';const txt=document.createElement('div');txt.className='op-txt';txt.innerHTML=`<span>${t.desc}</span><span class="value">${currency(t.val)}</span>`;d.appendChild(txt);const e=document.createElement('button');e.className='icon';e.textContent='✏️';e.onclick=()=>editTx(t.id);const del=document.createElement('button');del.className='icon danger';del.textContent='🗑';del.onclick=()=>delTx(t.id);d.appendChild(e);d.appendChild(del);return d;};
+const makeLine = t => {
+  const d = document.createElement('div');
+  d.className = 'op-line';
+
+  const txt = document.createElement('div');
+  txt.className = 'op-txt';
+  txt.innerHTML = `
+    <span>${t.desc}</span>
+    <span class="value">R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+  `;
+  d.appendChild(txt);
+
+  const ts = document.createElement('div');
+  ts.className = 'timestamp';
+  ts.textContent = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
+  d.appendChild(ts);
+
+  const e = document.createElement('button');
+  e.className = 'icon';
+  e.textContent = '✏️';
+  e.onclick = () => editTx(t.id);
+
+  const del = document.createElement('button');
+  del.className = 'icon danger';
+  del.textContent = '🗑';
+  del.onclick = () => delTx(t.id);
+
+  d.appendChild(e);
+  d.appendChild(del);
+
+  return d;
+};
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 function addTx(){const d=desc.value.trim(),v=parseFloat(val.value),m=met.value,iso=date.value;if(!d||isNaN(v)||!iso){alert('Complete os campos');return;}transactions.push({id:Date.now(),desc:d,val:v,method:m,opDate:iso,postDate:post(iso,m),ts:new Date().toISOString()});save('tx',transactions);desc.value='';val.value='';date.value=new Date().toISOString().slice(0,10);renderTable();}

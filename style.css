@@ -458,3 +458,22 @@ details.month[open] > summary .month-arrow {
 details.day[open] > summary.day-summary::before {
   transform: rotate(90deg);
 }
+
+.op-line {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+.op-txt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.op-line .timestamp {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 2px;
+  margin-left: 4px;
+}
