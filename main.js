@@ -325,13 +325,13 @@ function renderAccordion() {
 
       mDet.appendChild(dDet);
     }
-    // Cria e adiciona a linha meta ANTES do mDet.appendChild(mSum), como irmão do summary,
-    // visível apenas se o <details> estiver fechado
+    // Adiciona summary do mês normalmente
     mDet.appendChild(mSum);
+    acc.appendChild(mDet);
 
+    // Cria linha meta como elemento independente
     const metaLine = document.createElement('div');
     metaLine.className = 'month-meta';
-    metaLine.dataset.key = `m-${mIdx}`;
 
     let label;
     if (mIdx < curMonth) label = 'Saldo final:';
@@ -339,17 +339,20 @@ function renderAccordion() {
     else label = 'Saldo projetado:';
 
     metaLine.innerHTML = `<span>| ${label}</span><strong>${currency(runningBalance)}</strong>`;
-    mDet.appendChild(metaLine);
 
-    // Oculta inicialmente se o mês estiver aberto
-    if (mDet.open) metaLine.style.display = 'none';
+    // Se o mês estiver fechado (collapsed), exibe metaLine abaixo de mDet
+    if (!mDet.open) {
+      acc.appendChild(metaLine);
+    }
 
-    acc.appendChild(mDet);
-
+    // Atualiza visibilidade ao expandir/fechar
     mDet.addEventListener('toggle', () => {
-      const meta = mDet.querySelector('.month-meta');
-      if (meta) {
-        meta.style.display = mDet.open ? 'none' : 'flex';
+      if (mDet.open) {
+        if (metaLine.parentElement === acc) {
+          acc.removeChild(metaLine);
+        }
+      } else {
+        acc.insertBefore(metaLine, mDet.nextSibling);
       }
     });
   }
