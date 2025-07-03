@@ -619,19 +619,15 @@ details.day {
 details.day.today summary.day-summary {
   background-color: #b5b5b5cc;
   border-radius: 6px;
-  margin-left: 12px;
-  margin-right: 12px;
+  margin-left: 6px;
+  margin-right: 6px;
   padding: 6px 12px;
-  display: inline-flex !important;
-  width: auto !important;
 }
 
 details.day.negative summary.day-summary {
   background-color: #ff8484;
   border-radius: 6px;
-  margin-left: 12px;
-  margin-right: 12px;
+  margin-left: 6px;
+  margin-right: 6px;
   padding: 6px 12px;
-  display: inline-flex !important;
-  width: auto !important;
 }
