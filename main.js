@@ -159,7 +159,10 @@ function renderAccordion() {
       const dDet = document.createElement('details');
       dDet.className = 'day';
       const dSum = document.createElement('summary');
-      dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span style="margin-left:auto">${currency(runningBalance)}</span>`;
+      const saldoFormatado = runningBalance < 0
+        ? `R$ -${Math.abs(runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      dSum.innerHTML = `<span>${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}</span><span style="margin-left:auto">${saldoFormatado}</span>`;
       dDet.appendChild(dSum);
 
       // Group card operations by method
