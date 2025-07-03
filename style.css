@@ -519,3 +519,15 @@ details.day[open] > summary.day-summary::before {
 #addBtn.disabled {
   opacity: 0.5;
 }
+
+/* mini‑cabeçalhos para Planejados / Gastos do dia */
+.subheader {
+  font-weight: 600;
+  margin: 6px 0 2px 0;
+  font-size: 0.9rem;
+}
+
+/* checkbox alinhado */
+.plan-check {
+  margin-right: 6px;
+}

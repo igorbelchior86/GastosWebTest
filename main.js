@@ -53,6 +53,14 @@ const showToast = msg => {
   setTimeout(() => t.classList.remove('show'), 3000);
 };
 
+const togglePlanned = id => {
+  const t = transactions.find(x => x.id === id);
+  if (!t) return;
+  t.planned = !t.planned;
+  save('tx', transactions);
+  renderTable();
+};
+
 const openCardBtn=document.getElementById('openCardModal');
 const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
@@ -103,6 +111,16 @@ const makeLine = t => {
   editBtn.textContent = '✏️';
   editBtn.onclick = () => editTx(t.id);
 
+  if (t.planned) {
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'plan-check';
+    chk.onchange = () => togglePlanned(t.id);
+    right.appendChild(chk);
+  }
+
+  right.appendChild(editBtn);
+
   const delBtn = document.createElement('button');
   delBtn.className = 'icon danger';
   delBtn.textContent = '🗑';
@@ -112,7 +130,6 @@ const makeLine = t => {
   value.className = 'value';
   value.textContent = `R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-  right.appendChild(editBtn);
   right.appendChild(delBtn);
   right.appendChild(value);
 
@@ -150,6 +167,7 @@ function addTx() {
     method: m,
     opDate: iso,
     postDate: post(iso, m),
+    planned: iso > todayISO(),
     ts: new Date().toISOString()
   });
   save('tx', transactions);
@@ -269,12 +287,44 @@ function renderAccordion() {
         const invTotal = list.reduce((s,t)=>s + t.val,0);
         invSum.textContent = `Fatura - ${card}  ${currency(invTotal)}`;
         invDet.appendChild(invSum);
-        list.forEach(t => invDet.appendChild(makeLine(t)));
+        const invPlanned = list.filter(t => t.planned);
+        const invExec    = list.filter(t => !t.planned);
+
+        if (invPlanned.length) {
+          const sub = document.createElement('div');
+          sub.className = 'subheader';
+          sub.textContent = 'Planejados';
+          invDet.appendChild(sub);
+          invPlanned.forEach(t => invDet.appendChild(makeLine(t)));
+        }
+        if (invExec.length) {
+          const sub = document.createElement('div');
+          sub.className = 'subheader';
+          sub.textContent = 'Gastos do dia';
+          invDet.appendChild(sub);
+          invExec.forEach(t => invDet.appendChild(makeLine(t)));
+        }
         dDet.appendChild(invDet);
       });
 
-      // Cash operations
-      cashOps.forEach(t => dDet.appendChild(makeLine(t)));
+      // Cash: Planejados primeiro, depois executados
+      const cashPlanned = cashOps.filter(t => t.planned);
+      const cashExec    = cashOps.filter(t => !t.planned);
+
+      if (cashPlanned.length) {
+        const sub = document.createElement('div');
+        sub.className = 'subheader';
+        sub.textContent = 'Planejados';
+        dDet.appendChild(sub);
+        cashPlanned.forEach(t => dDet.appendChild(makeLine(t)));
+      }
+      if (cashExec.length) {
+        const sub = document.createElement('div');
+        sub.className = 'subheader';
+        sub.textContent = 'Gastos do dia';
+        dDet.appendChild(sub);
+        cashExec.forEach(t => dDet.appendChild(makeLine(t)));
+      }
 
       mDet.appendChild(dDet);
     }

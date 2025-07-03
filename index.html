@@ -1,74 +1,130 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8"/>
-<title>Gastos+</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+const togglePlanned = id => {
+  const t = transactions.find(x => x.id === id);
+  if (!t) return;
+  t.planned = !t.planned;
+  save('tx', transactions);
+  renderTable();
+};
 
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
-<link rel="manifest" href="site.webmanifest">
-</head>
-<body>
-<button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
-<div class="wrapper">
-  <div class="container">
-    <h2>Lançar operação</h2>
-    <div class="form-grid">
-      <input id="desc" placeholder="Descrição">
-      <input id="value" type="number" placeholder="Valor (- despesa)">
-      <select id="method"></select>
-      <input id="opDate" type="date">
-      <button id="addBtn">Adicionar</button>
-    </div>
-  </div>
+function addTx() {
+  const d = desc.value.trim();
+  const v = +value.value;
+  const m = method.value;
+  const iso = opDate.value;
 
-  <div class="container start-container">
-    <h2>Saldo inicial</h2>
-    <div id="startGroup" class="start-box">
-      <div class="start-controls">
-        <input id="startInput" type="number">
-        <button id="setStartBtn">OK</button>
-      </div>
-    </div>
-  </div>
+  if (!d) {
+    showToast('Descrição é obrigatória');
+    return;
+  }
+  if (!v) {
+    showToast('Valor é obrigatório');
+    return;
+  }
+  if (!m) {
+    showToast('Método é obrigatório');
+    return;
+  }
+  if (!iso) {
+    showToast('Data é obrigatória');
+    return;
+  }
 
-  <div class="container">
-    <div class="table-wrapper">
-      <table id="dailyTable">
-        <thead>
-          <tr><th>Data</th><th>Descrição</th><th>Gasto</th><th>Saldo</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div id="accordion"></div>
-    <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
-  </div>
-</div>
+  transactions.push({
+    id: Date.now(),
+    desc: d,
+    val: v,
+    method: m,
+    opDate: iso,
+    postDate: post(iso, m),
+    planned: iso > todayISO(),
+    ts: new Date().toISOString()
+  });
 
-<div id="cardModal" class="bottom-modal hidden">
-  <div class="bottom-modal-box">
-    <div class="modal-drag"></div>
-    <h2>Novo Cartão</h2>
+  save('tx', transactions);
+  renderTable();
+  desc.value = '';
+  value.value = '';
+  opDate.value = '';
+}
 
-    <input id="cardName" placeholder="Nome">
-    <div class="card-dates">
-      <input id="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
-      <input id="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
-    </div>
-    <button id="addCardBtn">Adicionar</button>
-    <small>Fechamento define a fatura.</small>
+const makeLine = t => {
+  const tr = document.createElement('tr');
+  tr.dataset.id = t.id;
 
-    <ul id="cardList" class="card-list"></ul>
+  const left = document.createElement('td');
+  left.textContent = t.desc;
+  tr.appendChild(left);
 
-    <button id="closeCardModal">Fechar</button>
-  </div>
-</div>
+  const val = document.createElement('td');
+  val.textContent = t.val.toFixed(2);
+  tr.appendChild(val);
 
-<script type="module" src="main.js"></script>
-<div id="toast" class="toast"></div>
-</body>
-</html>
+  const right = document.createElement('td');
+
+  if (t.planned) {
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'plan-check';
+    chk.onchange = () => togglePlanned(t.id);
+    right.appendChild(chk);
+  }
+
+  const editBtn = document.createElement('button');
+  editBtn.textContent = '✏️';
+  editBtn.onclick = () => editTx(t.id);
+  right.appendChild(editBtn);
+
+  tr.appendChild(right);
+
+  return tr;
+};
+
+function renderAccordion() {
+  // ... other code ...
+
+  // Cash: Planejados primeiro, depois executados
+  const cashPlanned = cashOps.filter(t => t.planned);
+  const cashExec    = cashOps.filter(t => !t.planned);
+
+  if (cashPlanned.length) {
+    const sub = document.createElement('div');
+    sub.className = 'subheader';
+    sub.textContent = 'Planejados';
+    dDet.appendChild(sub);
+    cashPlanned.forEach(t => dDet.appendChild(makeLine(t)));
+  }
+  if (cashExec.length) {
+    const sub = document.createElement('div');
+    sub.className = 'subheader';
+    sub.textContent = 'Gastos do dia';
+    dDet.appendChild(sub);
+    cashExec.forEach(t => dDet.appendChild(makeLine(t)));
+  }
+
+  // ... other code ...
+
+  cardInvoices.forEach(inv => {
+    // ... other code ...
+    const list = inv.list;
+
+    const invPlanned = list.filter(t => t.planned);
+    const invExec    = list.filter(t => !t.planned);
+
+    if (invPlanned.length) {
+      const sub = document.createElement('div');
+      sub.className = 'subheader';
+      sub.textContent = 'Planejados';
+      invDet.appendChild(sub);
+      invPlanned.forEach(t => invDet.appendChild(makeLine(t)));
+    }
+    if (invExec.length) {
+      const sub = document.createElement('div');
+      sub.className = 'subheader';
+      sub.textContent = 'Gastos do dia';
+      invDet.appendChild(sub);
+      invExec.forEach(t => invDet.appendChild(makeLine(t)));
+    }
+  });
+
+  // ... other code ...
+}
