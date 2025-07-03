@@ -146,8 +146,9 @@ function renderAccordion() {
     // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
 
-    // Iterate through all possible days (1‑31)
-    for (let d = 1; d <= 31; d++) {
+    // Garante o número correto de dias em cada mês
+    const daysInMonth = new Date(2025, mIdx + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
       const iso = `2025-${String(mIdx + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const dayTx = txByDate(iso);
       // Skip invalid day numbers (e.g., 31/04)
