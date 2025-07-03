@@ -111,7 +111,36 @@ const makeLine = t => {
 };
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
-function addTx(){const d=desc.value.trim(),v=parseFloat(val.value),m=met.value,iso=date.value;if(!d||isNaN(v)||!iso){alert('Complete os campos');return;}transactions.push({id:Date.now(),desc:d,val:v,method:m,opDate:iso,postDate:post(iso,m),ts:new Date().toISOString()});save('tx',transactions);desc.value='';val.value='';date.value=new Date().toISOString().slice(0,10);renderTable();}
+
+function addTx() {
+  if (startBalance === null) {
+    alert('Defina o saldo inicial primeiro (pode ser 0).');
+    return;
+  }
+  const d = desc.value.trim(),
+        v = parseFloat(val.value),
+        m = met.value,
+        iso = date.value;
+  if (!d || isNaN(v) || !iso) {
+    alert('Complete os campos');
+    return;
+  }
+  transactions.push({
+    id: Date.now(),
+    desc: d,
+    val: v,
+    method: m,
+    opDate: iso,
+    postDate: post(iso, m),
+    ts: new Date().toISOString()
+  });
+  save('tx', transactions);
+  desc.value = '';
+  val.value = '';
+  date.value = new Date().toISOString().slice(0, 10);
+  renderTable();
+}
+
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
 const editTx=id=>{const t=transactions.find(x=>x.id===id);if(!t)return;const nd=prompt('Descrição',t.desc);if(nd===null)return;const nv=parseFloat(prompt('Valor',t.val));if(isNaN(nv))return;t.desc=nd.trim();t.val=nv;save('tx',transactions);renderTable();};
 
@@ -236,7 +265,11 @@ function renderAccordion() {
   }
 }
 
-function initStart(){startGroup.style.display=startBalance===null?'flex':'none';}
+function initStart() {
+  const showStart = startBalance === null && transactions.length === 0;
+  startGroup.style.display = showStart ? 'flex' : 'none';
+  addBtn.disabled = showStart; // bloqueia novos lançamentos até definir saldo
+}
 setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;save('startBal',v);initStart();renderTable();};
 resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
