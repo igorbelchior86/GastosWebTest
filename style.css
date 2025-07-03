@@ -341,8 +341,39 @@ input[type="date"] {
 #accordion details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   padding: 0 8px;
+}
+
+#accordion details.month {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+.month-divider {
+  display: flex;
+  align-items: center;
+  text-transform: uppercase;
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #444;
+  margin: 16px 0 4px;
+  gap: 8px;
+}
+.month-divider::before,
+.month-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ccc;
+}
+
+#accordion details.month > summary {
+  background: transparent;
+  padding: 0;
+  border-left: none;
 }
 #accordion summary {
   cursor: pointer;
@@ -535,10 +566,4 @@ details.day[open] > summary.day-summary::before {
 /* checkbox alinhado */
 .plan-check {
   margin-right: 6px;
-}
-
-#accordion details.month > summary {
-  background: rgba(0,122,255,0.05); /* azul claro translúcido */
-  padding: 6px 10px;
-  border-radius: 6px;
 }
