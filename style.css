@@ -616,3 +616,7 @@ details.day {
   margin: 12px 0 !important;
   background: transparent !important;
 }
+details.day.today summary.day-summary {
+  background-color: #f0f0f0;
+  border-radius: 6px;
+}
