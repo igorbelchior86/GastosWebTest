@@ -257,6 +257,24 @@ function renderAccordion() {
     // Não troca o emoji, apenas anima via CSS
     mDet.appendChild(mSum);
 
+    // Adiciona a exibição contextual de saldo por mês logo abaixo do <summary>
+    const monthMeta = document.createElement('div');
+    monthMeta.className = 'month-meta';
+    const spanLabel = document.createElement('span');
+    const spanVal = document.createElement('strong');
+    const lastSaldo = runningBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (mIdx < curMonth) {
+      spanLabel.textContent = '| Saldo final:';
+    } else if (mIdx === curMonth) {
+      spanLabel.textContent = '| Saldo atual:';
+    } else {
+      spanLabel.textContent = '| Saldo projetado:';
+    }
+    spanVal.textContent = lastSaldo;
+    monthMeta.appendChild(spanLabel);
+    monthMeta.appendChild(spanVal);
+    mDet.appendChild(monthMeta);
+
     // Garante o número correto de dias em cada mês
     const daysInMonth = new Date(2025, mIdx + 1, 0).getDate();
     for (let d = 1; d <= daysInMonth; d++) {
