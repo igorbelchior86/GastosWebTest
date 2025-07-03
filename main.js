@@ -35,6 +35,16 @@ const post=(iso,m)=>{if(m==='Dinheiro')return iso;const c=cards.find(x=>x.name==
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
+const startContainer = document.querySelector('.start-container');
+
+const showToast = msg => {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+};
+
 const openCardBtn=document.getElementById('openCardModal');
 const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
@@ -114,7 +124,7 @@ function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue
 
 function addTx() {
   if (startBalance === null) {
-    alert('Defina o saldo inicial primeiro (pode ser 0).');
+    showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
   }
   const d = desc.value.trim(),
@@ -267,6 +277,9 @@ function renderAccordion() {
 
 function initStart() {
   const showStart = startBalance === null && transactions.length === 0;
+  // exibe ou oculta todo o container de saldo inicial
+  startContainer.style.display = showStart ? 'block' : 'none';
+  // (mantém linha antiga para compatibilidade)
   startGroup.style.display = showStart ? 'flex' : 'none';
   addBtn.disabled = showStart; // bloqueia novos lançamentos até definir saldo
 }
