@@ -30,6 +30,14 @@ const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const mobile=()=>window.innerWidth<=480;
 const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit'}:{day:'2-digit',month:'2-digit',year:'numeric'});
+
+// Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
+const todayISO = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+};
+
 const post=(iso,m)=>{if(m==='Dinheiro')return iso;const c=cards.find(x=>x.name===m);if(!c)return iso;const [y,mo,d]=iso.split('-').map(Number);let mm=mo,yy=y;if(d>c.close){mm++;if(mm===13){mm=1;yy++;}}return yy+'-'+String(mm).padStart(2,'0')+'-'+String(c.due).padStart(2,'0');};
 
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
@@ -147,7 +155,7 @@ function addTx() {
   save('tx', transactions);
   desc.value = '';
   val.value = '';
-  date.value = new Date().toISOString().slice(0, 10);
+  date.value = todayISO();
   renderTable();
 }
 
@@ -291,4 +299,4 @@ openCardBtn.onclick = () => cardModal.classList.remove('hidden');
 closeCardModal.onclick = () => cardModal.classList.add('hidden');
 cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
-(async()=>{transactions=await load('tx',[]);cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});startBalance=await load('startBal',null);refreshMethods();renderCardList();initStart();date.value=new Date().toISOString().slice(0,10);renderTable();})();
+(async()=>{transactions=await load('tx',[]);cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});startBalance=await load('startBal',null);refreshMethods();renderCardList();initStart();date.value=todayISO();renderTable();})();
