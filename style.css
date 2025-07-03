@@ -550,24 +550,17 @@ hr.divider {
 .month-divider {
   display: flex;
   align-items: center;
-  text-transform: uppercase;
-  font-weight: bold;
-  font-size: 0.85rem;
-  color: #444;
-  margin: 12px 0 0;
-}
-
-.month-divider::before,
-.month-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #ccc;
-  margin: 0 8px;
-}
-.month-label-with-arrow {
   font-weight: bold;
   font-size: 1rem;
-  display: inline-block;
-  padding: 2px 0;
+  color: #3e3e40;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+
+.month-divider hr {
+  flex-grow: 1;
+  height: 1px;
+  border: none;
+  background: #ccc;
+  margin: 0;
 }

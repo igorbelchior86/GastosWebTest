@@ -235,7 +235,7 @@ function renderAccordion() {
     // Adiciona divisor de mês antes do details do mês
     const divider = document.createElement('div');
     divider.className = 'month-divider';
-    divider.innerHTML = `<span class="month-label-with-arrow">▶️ ${nomeMes.toUpperCase()}</span>`;
+    divider.innerHTML = `▶️ ${nomeMes.toUpperCase()} <hr>`;
     acc.appendChild(divider);
 
     // Build month container
