@@ -232,12 +232,6 @@ function renderAccordion() {
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
     const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
-    // Adiciona divisor de mês antes do details do mês
-    const divider = document.createElement('div');
-    divider.className = 'month-divider';
-    divider.innerHTML = `▶️ ${nomeMes.toUpperCase()} <hr>`;
-    acc.appendChild(divider);
-
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
@@ -248,19 +242,10 @@ function renderAccordion() {
     const monthTotal = transactions
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
+    // Cria summary estilizado como linha do mês
     const mSum = document.createElement('summary');
-    // Removido: não imprime mais o nome do mês no summary, pois já está no divider
-    const spanIcon = document.createElement('span');
-    spanIcon.className = 'month-arrow';
-    spanIcon.textContent = '▶️';
-    const spanText = document.createElement('span');
-    spanText.className = 'month-label';
-    // spanText.textContent = `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)}`;
-    // Removido texto do mês:
-    spanText.textContent = '';
-    mSum.appendChild(spanText);
-    mSum.insertBefore(spanIcon, spanText);
-    // Não troca o emoji, apenas anima via CSS
+    mSum.className = 'month-divider';
+    mSum.innerHTML = `▶️ ${nomeMes.toUpperCase()} <hr>`;
     mDet.appendChild(mSum);
 
     // Garante o número correto de dias em cada mês
@@ -341,8 +326,7 @@ function renderAccordion() {
       mDet.appendChild(dDet);
     }
 
-    // acc.appendChild(mDet); // linha original
-    acc.appendChild(mDet); // Confirma que está abaixo do append do divider
+    acc.appendChild(mDet);
   }
 }
 

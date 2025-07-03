@@ -547,7 +547,7 @@ hr.divider {
 }
 
 /* Opcional: margem inferior reduzida para menos espaçamento vertical */
-.month-divider {
+summary.month-divider {
   display: flex;
   align-items: center;
   font-weight: bold;
@@ -557,7 +557,26 @@ hr.divider {
   margin: 16px 0 4px;
 }
 
-.month-divider hr {
+summary.month-divider hr {
+  flex-grow: 1;
+  height: 1px;
+  border: none;
+  background: #ccc;
+  margin: 0;
+}
+
+details.month[open] > summary.month-divider::before {
+  content: "▼";
+  margin-right: 6px;
+}
+
+summary.month-divider::before {
+  content: "▶";
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+}
+
+summary.month-divider hr {
   flex-grow: 1;
   height: 1px;
   border: none;
