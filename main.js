@@ -216,6 +216,9 @@ function renderTable(){
 function renderAccordion() {
   const acc = document.getElementById('accordion');
   if (!acc) return;
+  // Salva quais <details> estão abertos antes de recriar
+  const openKeys = Array.from(acc.querySelectorAll('details[open]'))
+                        .map(d => d.dataset.key || '');
   acc.innerHTML = '';
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -230,8 +233,9 @@ function renderAccordion() {
     // Build month container
     const mDet = document.createElement('details');
     mDet.className = 'month';
+    mDet.dataset.key = `m-${mIdx}`;   // identifica o mês
     const isOpen = mIdx >= curMonth;
-    mDet.open = isOpen;
+    mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
     // Month total = sum of all tx in that month
     const monthTotal = transactions
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
@@ -265,6 +269,8 @@ function renderAccordion() {
       const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
       const dDet = document.createElement('details');
       dDet.className = 'day';
+      dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
+      dDet.open = openKeys.includes(dDet.dataset.key);
       const dSum = document.createElement('summary');
       dSum.className = 'day-summary';
       const saldoFormatado = runningBalance < 0
