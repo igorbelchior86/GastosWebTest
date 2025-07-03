@@ -273,7 +273,7 @@ function renderAccordion() {
       // Indica vencimento de cartão
       const hasCardDue = cards.some(card => card.due === d);
       if (hasCardDue) {
-        dSum.innerHTML = `💳 ${dSum.innerHTML}`;
+        dSum.innerHTML = `${dSum.innerHTML} | 💳`;
       }
       if (runningBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
