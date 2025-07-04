@@ -84,7 +84,6 @@
         <input id="opDate" type="date">
         <button id="addBtn">Adicionar</button>
       </div>
-      <button id="closeTxModal">Fechar</button>
     </div>
   </div>
 
@@ -98,7 +97,6 @@
   <script>
     const openTxBtn = document.getElementById('openTxModal');
     const txModal = document.getElementById('txModal');
-    const closeTxModal = document.getElementById('closeTxModal');
 
     function toggleTxModal() {
       const isOpen = !txModal.classList.contains('hidden');
@@ -107,7 +105,6 @@
     }
 
     openTxBtn.onclick = toggleTxModal;
-    closeTxModal.onclick = toggleTxModal;
     txModal.onclick = e => { if (e.target === txModal) toggleTxModal(); };
   </script>
 </body>
