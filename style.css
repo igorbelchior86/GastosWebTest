@@ -80,7 +80,7 @@ body {
   padding-left: env(safe-area-inset-left, 6px);
   padding-right: env(safe-area-inset-right, 6px);
   max-width: 100%;
-  margin-top: 260px;
+  margin-top: 100px;
 }
 
 .app-header {
