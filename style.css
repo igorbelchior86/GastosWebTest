@@ -699,8 +699,6 @@ summary.day-summary::before {
   margin: 0;
 }
 .planned-list li, .executed-list li {
-  display: flex;
-  justify-content: space-between;
   padding: 4px 0;
 }
 .invoice {

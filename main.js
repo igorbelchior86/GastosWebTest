@@ -294,30 +294,11 @@ function renderAccordion() {
       plannedSection.appendChild(plannedList);
       dDet.appendChild(plannedSection);
 
-      // Cash: Planejados
-      const cashPlanned = cashOps.filter(t => t.planned);
-      const cashExec    = cashOps.filter(t => !t.planned);
-      cashPlanned.forEach(t => {
+      // Planejados em dinheiro e cartão
+      dayTx.filter(t => t.planned).forEach(t => {
         const li = document.createElement('li');
         li.appendChild(makeLine(t));
         plannedList.appendChild(li);
-      });
-
-      // Cartão: Planejados
-      Object.entries(cardGroups).forEach(([card, list]) => {
-        const invPlanned = list.filter(t => t.planned);
-        if (invPlanned.length) {
-          invPlanned.forEach(t => {
-            const li = document.createElement('li');
-            // Adiciona label do cartão antes da linha
-            const label = document.createElement('span');
-            label.textContent = `💳 ${card}: `;
-            label.style.marginRight = '6px';
-            li.appendChild(label);
-            li.appendChild(makeLine(t));
-            plannedList.appendChild(li);
-          });
-        }
       });
 
       // Fatura (executados no cartão)
@@ -330,11 +311,6 @@ function renderAccordion() {
         invDet.appendChild(invSum);
         const invExec    = list.filter(t => !t.planned);
         if (invExec.length) {
-          const sub = document.createElement('div');
-          sub.className = 'subheader';
-          sub.textContent = 'Gastos do dia';
-          invDet.appendChild(sub);
-          // Lista as operações executadas no cartão
           const execList = document.createElement('ul');
           execList.className = 'executed-list';
           invExec.forEach(t => {
@@ -356,9 +332,10 @@ function renderAccordion() {
       executedCash.appendChild(execHeader);
       const execList = document.createElement('ul');
       execList.className = 'executed-list';
+      const cashExec = cashOps.filter(t => !t.planned);
       cashExec.forEach(t => {
         const li = document.createElement('li');
-        li.textContent = `• ${t.desc} – ${currency(t.val)}`;
+        li.appendChild(makeLine(t));
         execList.appendChild(li);
       });
       executedCash.appendChild(execList);
