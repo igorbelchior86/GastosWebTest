@@ -276,49 +276,51 @@ function renderAccordion() {
       if (runningBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
 
-      // Abas Planejados / Executados
-      const tabNav = document.createElement('div');
-      tabNav.className = 'day-tabs';
-      const tabPlanned = document.createElement('button');
-      tabPlanned.className = 'tab active';
-      tabPlanned.textContent = 'Planejados';
-      const tabExecuted = document.createElement('button');
-      tabExecuted.className = 'tab';
-      tabExecuted.textContent = 'Executados';
-      tabNav.append(tabPlanned, tabExecuted);
-      dDet.appendChild(tabNav);
-
-      const plannedContainer = document.createElement('div');
-      plannedContainer.className = 'tab-content planned';
-      const executedContainer = document.createElement('div');
-      executedContainer.className = 'tab-content executed';
-      dDet.append(plannedContainer, executedContainer);
-
-      // Ações das abas
-      tabPlanned.onclick = () => {
-        tabPlanned.classList.add('active');
-        tabExecuted.classList.remove('active');
-        plannedContainer.style.display = 'block';
-        executedContainer.style.display = 'none';
-      };
-      tabExecuted.onclick = () => {
-        tabExecuted.classList.add('active');
-        tabPlanned.classList.remove('active');
-        executedContainer.style.display = 'block';
-        plannedContainer.style.display = 'none';
-      };
-
-      // Estado inicial
-      plannedContainer.style.display = 'block';
-      executedContainer.style.display = 'none';
-
       // Group card operations by method (case-insensitive for 'Dinheiro')
       const cashOps = dayTx.filter(t => t.method.toLowerCase() === 'dinheiro');
       const cardGroups = {};
       dayTx.filter(t => t.method.toLowerCase() !== 'dinheiro')
            .forEach(t => (cardGroups[t.method] = cardGroups[t.method] || []).push(t));
 
-      // Build invoices
+      // Seção de planejados
+      const plannedSection = document.createElement('div');
+      plannedSection.className = 'planned-section';
+      const plannedHeader = document.createElement('div');
+      plannedHeader.className = 'planned-header';
+      plannedHeader.textContent = 'Planejados:';
+      plannedSection.appendChild(plannedHeader);
+      const plannedList = document.createElement('ul');
+      plannedList.className = 'planned-list';
+      plannedSection.appendChild(plannedList);
+      dDet.appendChild(plannedSection);
+
+      // Cash: Planejados
+      const cashPlanned = cashOps.filter(t => t.planned);
+      const cashExec    = cashOps.filter(t => !t.planned);
+      cashPlanned.forEach(t => {
+        const li = document.createElement('li');
+        li.appendChild(makeLine(t));
+        plannedList.appendChild(li);
+      });
+
+      // Cartão: Planejados
+      Object.entries(cardGroups).forEach(([card, list]) => {
+        const invPlanned = list.filter(t => t.planned);
+        if (invPlanned.length) {
+          invPlanned.forEach(t => {
+            const li = document.createElement('li');
+            // Adiciona label do cartão antes da linha
+            const label = document.createElement('span');
+            label.textContent = `💳 ${card}: `;
+            label.style.marginRight = '6px';
+            li.appendChild(label);
+            li.appendChild(makeLine(t));
+            plannedList.appendChild(li);
+          });
+        }
+      });
+
+      // Fatura (executados no cartão)
       Object.entries(cardGroups).forEach(([card, list]) => {
         const invDet = document.createElement('details');
         invDet.className = 'invoice';
@@ -326,44 +328,41 @@ function renderAccordion() {
         const invTotal = list.reduce((s,t)=>s + t.val,0);
         invSum.textContent = `Fatura - ${card}  ${currency(invTotal)}`;
         invDet.appendChild(invSum);
-        const invPlanned = list.filter(t => t.planned);
         const invExec    = list.filter(t => !t.planned);
-
-        if (invPlanned.length) {
-          const sub = document.createElement('div');
-          sub.className = 'subheader';
-          sub.textContent = 'Planejados';
-          invDet.appendChild(sub);
-          invPlanned.forEach(t => invDet.appendChild(makeLine(t)));
-        }
         if (invExec.length) {
           const sub = document.createElement('div');
           sub.className = 'subheader';
           sub.textContent = 'Gastos do dia';
           invDet.appendChild(sub);
-          invExec.forEach(t => invDet.appendChild(makeLine(t)));
+          // Lista as operações executadas no cartão
+          const execList = document.createElement('ul');
+          execList.className = 'executed-list';
+          invExec.forEach(t => {
+            const li = document.createElement('li');
+            li.appendChild(makeLine(t));
+            execList.appendChild(li);
+          });
+          invDet.appendChild(execList);
         }
-        executedContainer.appendChild(invDet);
+        dDet.appendChild(invDet);
       });
 
-      // Cash: Planejados primeiro, depois executados
-      const cashPlanned = cashOps.filter(t => t.planned);
-      const cashExec    = cashOps.filter(t => !t.planned);
-
-      if (cashPlanned.length) {
-        const sub = document.createElement('div');
-        sub.className = 'subheader';
-        sub.textContent = 'Planejados';
-        plannedContainer.appendChild(sub);
-        cashPlanned.forEach(t => plannedContainer.appendChild(makeLine(t)));
-      }
-      if (cashExec.length) {
-        const sub = document.createElement('div');
-        sub.className = 'subheader';
-        sub.textContent = 'Gastos do dia';
-        executedContainer.appendChild(sub);
-        cashExec.forEach(t => executedContainer.appendChild(makeLine(t)));
-      }
+      // Seção de executados em dinheiro
+      const executedCash = document.createElement('div');
+      executedCash.className = 'executed-cash';
+      const execHeader = document.createElement('div');
+      execHeader.className = 'executed-header';
+      execHeader.textContent = 'Executados (Dinheiro):';
+      executedCash.appendChild(execHeader);
+      const execList = document.createElement('ul');
+      execList.className = 'executed-list';
+      cashExec.forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = `• ${t.desc} – ${currency(t.val)}`;
+        execList.appendChild(li);
+      });
+      executedCash.appendChild(execList);
+      dDet.appendChild(executedCash);
 
       mDet.appendChild(dDet);
     }
