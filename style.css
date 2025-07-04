@@ -252,7 +252,7 @@ h2 {
   border-radius: 20px;
   padding: 18px;
   box-sizing: border-box;
-  width: calc(100% - 8px);
+  width: 100%;
   max-width: 480px;
   height: auto;
   max-height: 80vh;
@@ -783,51 +783,3 @@ summary.day-summary::before {
   font-size: 1.8rem;
   color: #333;
 }
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1c1e;
-    --panel: #2a2a2d;
-    --border: #3a3a3c;
-  }
-
-  body {
-    background: var(--bg);
-    color: #f2f2f7;
-  }
-
-  /* Panels and containers */
-  .app-header,
-  .container,
-  .start-container,
-  .bottom-modal-box,
-  .card-list li,
-  .planned-section,
-  .executed-cash,
-  .invoice,
-  #accordion details,
-  #accordion details.month,
-  .table-wrapper th,
-  .table-wrapper td {
-    background: var(--panel);
-    border-color: var(--border);
-  }
-
-  /* Form controls */
-  input,
-  select,
-  textarea,
-  .bottom-modal-box input,
-  .bottom-modal-box select {
-    background: #3a3a3c;
-    border-color: var(--border);
-    color: #f2f2f7;
-  }
-
-  /* Text accents */
-  .month-meta,
-  summary.month-divider,
-  summary.day-summary,
-  .logo-text {
-    color: #e5e5ea;
-  }
-} */
