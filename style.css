@@ -778,14 +778,8 @@ summary.day-summary::before {
   margin-right: auto;
 }
 
-.logo-img {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-}
-
 .logo-text {
   font-weight: bold;
-  font-size: 1.1rem;
+  font-size: 2.2rem;
   color: #333;
 }
