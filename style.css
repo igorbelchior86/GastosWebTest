@@ -252,7 +252,7 @@ h2 {
   border-radius: 20px;
   padding: 18px;
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - 8px);
   max-width: 480px;
   height: auto;
   max-height: 80vh;
