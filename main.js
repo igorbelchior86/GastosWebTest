@@ -519,6 +519,8 @@ async function flushQueue() {
   if (USE_MOCK) return;  // skip real DB in mock mode
   const syncBtn = document.getElementById('syncNowBtn');
   syncBtn.classList.add('spin');
+  const spinStart = Date.now();
+
   const db = await getDb();
   const all = await db.getAll('tx');
   for (const tx of all) {
@@ -533,6 +535,14 @@ async function flushQueue() {
       console.error('[SYNC]', e);
     }
   }
+
+  // garante pelo menos 1s de animação
+  const elapsed = Date.now() - spinStart;
+  const minSpin = 1000;
+  if (elapsed < minSpin) {
+    await new Promise(res => setTimeout(res, minSpin - elapsed));
+  }
+
   syncBtn.classList.remove('spin');
   updatePendingBadge();
 }

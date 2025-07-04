@@ -832,3 +832,10 @@ details.day[data-has="true"] {
     font-size: 1rem;
     margin-left: 4px;
   }
+/* posiciona o botão de sincronizar à esquerda do card */
+#syncNowBtn {
+  position: fixed;
+  top: 16px;
+  right: 84px;     /* 24px (margem direita) + 48px (largura do card) + 12px gap */
+  z-index: 1100;
+}
