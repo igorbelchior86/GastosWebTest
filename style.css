@@ -835,8 +835,8 @@ details.day[data-has="true"] {
 /* Botão de sincronizar (⟳) */
 #syncNowBtn {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 21px;    /* aligns vertically within the header */
+  transform: none;
   right: 84px;         /* espaço antes do botão de cartões */
   width: 40px;
   height: 40px;
@@ -853,8 +853,8 @@ details.day[data-has="true"] {
 /* Ícone offline (📴) */
 #offlineIndicator {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 21px;    /* aligns vertically within the header */
+  transform: none;
   right: 132px;        /* 84px (sync btn) + 40px (sync width) + 8px gap */
   font-size: 1.3rem;
   z-index: 1100;
