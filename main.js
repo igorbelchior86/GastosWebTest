@@ -517,6 +517,8 @@ async function queueTx(tx) {
 }
 async function flushQueue() {
   if (USE_MOCK) return;  // skip real DB in mock mode
+  const syncBtn = document.getElementById('syncNowBtn');
+  syncBtn.classList.add('spin');
   const db = await getDb();
   const all = await db.getAll('tx');
   for (const tx of all) {
@@ -531,6 +533,7 @@ async function flushQueue() {
       console.error('[SYNC]', e);
     }
   }
+  syncBtn.classList.remove('spin');
   updatePendingBadge();
 }
 
@@ -540,13 +543,8 @@ function updatePendingBadge() {
       const syncBtn = document.getElementById('syncNowBtn');
       const offIc   = document.getElementById('offlineIndicator');
       const count = all.length;
-      if (count > 0) {
-        syncBtn.hidden = !navigator.onLine;
-        offIc.textContent = `📴 ${count}`;
-      } else {
-        syncBtn.hidden = true;
-        offIc.textContent = '📴';
-      }
+      syncBtn.hidden = false;                  // sempre visível
+      offIc.textContent = count ? `📴 ${count}` : '📴';
     }));
 }
 // dispara badge no arranque e após cada sync
