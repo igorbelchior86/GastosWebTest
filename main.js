@@ -475,8 +475,12 @@ async function queueTx(tx) {
   await db.put('tx', tx);
   updatePendingBadge();
   if ('serviceWorker' in navigator) {
-    const reg = await navigator.serviceWorker.ready;
-    reg.sync.register('sync-tx');
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.sync.register('sync-tx');
+    } catch (e) {
+      console.warn('[Sync]', e);   // tolera problemas com SW
+    }
   }
 }
 async function flushQueue() {
