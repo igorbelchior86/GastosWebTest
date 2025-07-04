@@ -252,7 +252,7 @@ h2 {
   border-radius: 20px;
   padding: 18px;
   box-sizing: border-box;
-  width: calc(100% - 4px);
+  width: calc(100% - 8px);
   max-width: 480px;
   height: auto;
   max-height: 80vh;
@@ -783,10 +783,6 @@ summary.day-summary::before {
   font-size: 1.8rem;
   color: #333;
 }
-.css
-/* ------------------------- */
-/*  Dark mode (auto‑follow)  */
-/* ------------------------- */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1c1c1e;
