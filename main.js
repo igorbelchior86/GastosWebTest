@@ -432,8 +432,12 @@ openCardBtn.onclick = () => cardModal.classList.remove('hidden');
 closeCardModal.onclick = () => cardModal.classList.add('hidden');
 cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
-(async()=>{
-  transactions=await load('tx',[]);
+ (async () => {
+  transactions = await load('tx', []);
+  // Garante que transactions seja um array; converte se vier como objeto
+  if (!Array.isArray(transactions)) {
+    transactions = Object.values(transactions || {});
+  }
   cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);
   if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
   startBalance=await load('startBal',null);
