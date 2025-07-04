@@ -276,6 +276,42 @@ function renderAccordion() {
       if (runningBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
 
+      // Abas Planejados / Executados
+      const tabNav = document.createElement('div');
+      tabNav.className = 'day-tabs';
+      const tabPlanned = document.createElement('button');
+      tabPlanned.className = 'tab active';
+      tabPlanned.textContent = 'Planejados';
+      const tabExecuted = document.createElement('button');
+      tabExecuted.className = 'tab';
+      tabExecuted.textContent = 'Executados';
+      tabNav.append(tabPlanned, tabExecuted);
+      dDet.appendChild(tabNav);
+
+      const plannedContainer = document.createElement('div');
+      plannedContainer.className = 'tab-content planned';
+      const executedContainer = document.createElement('div');
+      executedContainer.className = 'tab-content executed';
+      dDet.append(plannedContainer, executedContainer);
+
+      // Ações das abas
+      tabPlanned.onclick = () => {
+        tabPlanned.classList.add('active');
+        tabExecuted.classList.remove('active');
+        plannedContainer.style.display = 'block';
+        executedContainer.style.display = 'none';
+      };
+      tabExecuted.onclick = () => {
+        tabExecuted.classList.add('active');
+        tabPlanned.classList.remove('active');
+        executedContainer.style.display = 'block';
+        plannedContainer.style.display = 'none';
+      };
+
+      // Estado inicial
+      plannedContainer.style.display = 'block';
+      executedContainer.style.display = 'none';
+
       // Group card operations by method (case-insensitive for 'Dinheiro')
       const cashOps = dayTx.filter(t => t.method.toLowerCase() === 'dinheiro');
       const cardGroups = {};
@@ -307,7 +343,7 @@ function renderAccordion() {
           invDet.appendChild(sub);
           invExec.forEach(t => invDet.appendChild(makeLine(t)));
         }
-        dDet.appendChild(invDet);
+        executedContainer.appendChild(invDet);
       });
 
       // Cash: Planejados primeiro, depois executados
@@ -318,15 +354,15 @@ function renderAccordion() {
         const sub = document.createElement('div');
         sub.className = 'subheader';
         sub.textContent = 'Planejados';
-        dDet.appendChild(sub);
-        cashPlanned.forEach(t => dDet.appendChild(makeLine(t)));
+        plannedContainer.appendChild(sub);
+        cashPlanned.forEach(t => plannedContainer.appendChild(makeLine(t)));
       }
       if (cashExec.length) {
         const sub = document.createElement('div');
         sub.className = 'subheader';
         sub.textContent = 'Gastos do dia';
-        dDet.appendChild(sub);
-        cashExec.forEach(t => dDet.appendChild(makeLine(t)));
+        executedContainer.appendChild(sub);
+        cashExec.forEach(t => executedContainer.appendChild(makeLine(t)));
       }
 
       mDet.appendChild(dDet);
