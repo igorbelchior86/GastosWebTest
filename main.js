@@ -109,6 +109,7 @@ function renderCardList() {
 const makeLine = t => {
   const d = document.createElement('div');
   d.className = 'op-line';
+  d.dataset.txId = t.id;
 
   const topRow = document.createElement('div');
   topRow.className = 'op-main';
@@ -219,7 +220,7 @@ async function addTx() {
   // Close the modal
   toggleTxModal();
 
-  // Open month/day after accordion is rendered
+  // Open month/day after accordion is rendered, then flash the new operation
   setTimeout(() => {
     const key = `d-${tx.postDate}`;
     const monthIdx = new Date(tx.postDate).getMonth();
@@ -227,15 +228,17 @@ async function addTx() {
     if (monthDet) monthDet.open = true;
 
     const dayDetEl = document.querySelector(`details.day[data-key="${key}"]`);
-    if (dayDetEl) {
-      dayDetEl.open = true;
-      const daySummary = dayDetEl.querySelector('summary.day-summary');
-      if (daySummary) {
-        daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        daySummary.classList.add('flash-highlight');
-        setTimeout(() => daySummary.classList.remove('flash-highlight'), 1000);
+    if (dayDetEl) dayDetEl.open = true;
+
+    // Highlight the specific operation after a short delay
+    setTimeout(() => {
+      const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
+      if (opEl) {
+        opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        opEl.classList.add('flash-highlight');
+        setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
       }
-    }
+    }, 300);
   }, 0);
 }
 
