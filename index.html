@@ -16,6 +16,8 @@
     <div class="logo-title">
       <span class="logo-text">Gastos+</span>
     </div>
+    <span id="offlineIndicator" class="offline-icon" hidden>📴</span>
+    <button id="syncNowBtn" class="icon-btn" hidden title="Sincronizar agora">⟳</button>
     <button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
   </header>
 
@@ -44,7 +46,7 @@
         </table>
       </div>
       <div id="accordion"></div>
-      <button id="resetData" class="danger" style="margin-top:12px">Limpar TODOS</button>
+      <button id="resetData" class="danger" hidden style="margin-top:12px">Limpar TODOS</button>
     </div>
     <hr class="divider">
   </div>
@@ -107,4 +109,5 @@
     txModal.onclick = e => { if (e.target === txModal) toggleTxModal(); };
   </script>
 </body>
+<footer class="app-footer"><small id="version"></small></footer>
 </html>

@@ -789,3 +789,28 @@ summary.day-summary::before {
 details.day[data-has="true"] {
   border-left: 3px solid #000 !important;
 }
+
+.offline-icon {
+  margin-right: 12px;
+  font-size: 1.2rem;
+  color: #e74c3c;
+}
+.offline-icon[hidden] {
+  display: none;
+}
+/* Botão de sincronizar agora */
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #007AFF;
+  cursor: pointer;
+  margin-right: 12px;
+}
+/* Versão do app no rodapé */
+.app-footer {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 32px;
+}

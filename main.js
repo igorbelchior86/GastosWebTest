@@ -1,16 +1,18 @@
+import { openDB } from 'https://unpkg.com/idb?module';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
-
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
-const USE_MOCK = true;
+const USE_MOCK = false;               // produção
+const APP_VERSION = '1.0.0';
 let save, load;
+let firebaseDb;
 
 if (!USE_MOCK) {
 const firebaseConfig={apiKey:"AIzaSyATGZtBlnSPnFtVgTqJ_E0xmBgzLTmMkI0",authDomain:"gastosweb-e7356.firebaseapp.com",databaseURL:"https://gastosweb-e7356-default-rtdb.firebaseio.com",projectId:"gastosweb-e7356",storageBucket:"gastosweb-e7356.firebasestorage.app",messagingSenderId:"519966772782",appId:"1:519966772782:web:9ec19e944e23dbe9e899bf"};
-const app=initializeApp(firebaseConfig);const db=getDatabase(app);const PATH='orcamento365_9b8e04c5';
+const app=initializeApp(firebaseConfig);const db=getDatabase(app);firebaseDb = db;const PATH='orcamento365_9b8e04c5';
 const auth = getAuth(app);
 await signInAnonymously(auth);   // garante auth.uid antes dos gets/sets
 save=(k,v)=>set(ref(db,`${PATH}/${k}`),v);load=async(k,d)=>{const s=await get(ref(db,`${PATH}/${k}`));return s.exists()?s.val():d;};
@@ -156,7 +158,7 @@ const makeLine = t => {
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
-function addTx() {
+async function addTx() {
   if (startBalance === null) {
     showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
@@ -169,7 +171,7 @@ function addTx() {
     alert('Complete os campos');
     return;
   }
-  transactions.push({
+  const tx = {
     id: Date.now(),
     desc: d,
     val: v,
@@ -177,12 +179,17 @@ function addTx() {
     opDate: iso,
     postDate: post(iso, m),
     planned: iso > todayISO(),
-    ts: new Date().toISOString()
-  });
-  save('tx', transactions);
+    ts: new Date().toISOString(),
+    modifiedAt: new Date().toISOString()
+  };
+  transactions.push(tx);
+  const savedOffline = !navigator.onLine;
+  showToast(savedOffline ? 'Gravado offline' : 'Gravado');
+  await queueTx(tx);
   desc.value = '';
   val.value = '';
   date.value = todayISO();
+  updatePendingBadge();
   renderTable();
 }
 
@@ -412,4 +419,94 @@ openCardBtn.onclick = () => cardModal.classList.remove('hidden');
 closeCardModal.onclick = () => cardModal.classList.add('hidden');
 cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
-(async()=>{transactions=await load('tx',[]);cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});startBalance=await load('startBal',null);refreshMethods();renderCardList();initStart();date.value=todayISO();renderTable();})();
+(async()=>{
+  transactions=await load('tx',[]);
+  cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);
+  if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
+  startBalance=await load('startBal',null);
+  refreshMethods();
+  renderCardList();
+  initStart();
+  date.value=todayISO();
+  renderTable();
+  // exibe versão
+  const verEl = document.getElementById('version');
+  if (verEl) verEl.textContent = `v${APP_VERSION}`;
+  // se online, tenta esvaziar fila pendente
+  if (navigator.onLine) flushQueue();
+})();
+
+// Service Worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+// Listen for SW sync event and flush queue via Firebase client
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'sync-tx') {
+      flushQueue();
+    }
+  });
+}
+// Online/offline indicator
+const offlineIndicator = document.getElementById('offlineIndicator');
+window.addEventListener('online',  () => offlineIndicator.hidden = true);
+window.addEventListener('offline', () => offlineIndicator.hidden = false);
+offlineIndicator.hidden = navigator.onLine;
+
+// IndexedDB queue for offline transactions
+async function getDb() {
+  return openDB('gastos-offline', 1, {
+    upgrade(db) {
+      db.createObjectStore('tx', { keyPath: 'id' });
+    }
+  });
+}
+async function queueTx(tx) {
+  const db = await getDb();
+  await db.put('tx', tx);
+  updatePendingBadge();
+  if ('serviceWorker' in navigator) {
+    const reg = await navigator.serviceWorker.ready;
+    reg.sync.register('sync-tx');
+  }
+}
+async function flushQueue() {
+  const db = await getDb();
+  const all = await db.getAll('tx');
+  for (const tx of all) {
+    try {
+      const txRef = ref(firebaseDb, `${PATH}/tx/${tx.id}`);
+      const snap  = await get(txRef);
+      if (!snap.exists() || snap.val().modifiedAt <= tx.modifiedAt) {
+        await set(txRef, tx);
+      }
+      await db.delete('tx', tx.id);
+    } catch(e) {
+      console.error('[SYNC]', e);
+    }
+  }
+  updatePendingBadge();
+}
+
+function updatePendingBadge() {
+  getDb().then(db => db.getAll('tx')
+    .then(all => {
+      const syncBtn = document.getElementById('syncNowBtn');
+      const offIc   = document.getElementById('offlineIndicator');
+      const count = all.length;
+      if (count > 0) {
+        syncBtn.hidden = !navigator.onLine;
+        offIc.textContent = `📴 ${count}`;
+      } else {
+        syncBtn.hidden = true;
+        offIc.textContent = '📴';
+      }
+    }));
+}
+// dispara badge no arranque e após cada sync
+updatePendingBadge();
+
+// Botão de sincronização manual
+const syncBtn = document.getElementById('syncNowBtn');
+syncBtn.onclick = () => flushQueue();
