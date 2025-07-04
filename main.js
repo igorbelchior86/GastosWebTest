@@ -139,14 +139,17 @@ const makeLine = t => {
   topRow.appendChild(right);
   d.appendChild(topRow);
 
-  const ts = document.createElement('div');
-  ts.className = 'timestamp';
-  const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
-  const methodLabel = t.method === 'Dinheiro'
-    ? 'Dinheiro'
-    : `Cartão ${t.method}`;
-  ts.textContent = `${timeStr} - ${methodLabel}`;
-  d.appendChild(ts);
+  // Only show timestamp for planned transactions
+  if (t.planned) {
+    const ts = document.createElement('div');
+    ts.className = 'timestamp';
+    const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
+    const methodLabel = t.method === 'Dinheiro'
+      ? 'Dinheiro'
+      : `Cartão ${t.method}`;
+    ts.textContent = `${timeStr} - ${methodLabel}`;
+    d.appendChild(ts);
+  }
 
   return d;
 };
