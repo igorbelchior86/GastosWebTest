@@ -315,7 +315,10 @@ function renderAccordion() {
         invDet.className = 'invoice';
         const invSum = document.createElement('summary');
         const invTotal = list.reduce((s,t)=>s + t.val,0);
-        invSum.textContent = `Fatura - ${card}  ${currency(invTotal)}`;
+        invSum.innerHTML = `
+          <span class="invoice-label">💳 Fatura - ${card}</span>
+          <span class="invoice-total">${currency(invTotal)}</span>
+        `;
         invDet.appendChild(invSum);
         const invExec    = list.filter(t => !t.planned);
         if (invExec.length) {
