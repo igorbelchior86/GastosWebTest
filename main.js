@@ -30,6 +30,8 @@ const tbody=document.querySelector('#dailyTable tbody');
 
 const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+// Palavras que caracterizam “salário”
+const SALARY_WORDS = ['salário', 'salario', 'provento', 'rendimento', 'pagamento', 'paycheck', 'salary'];
 const mobile=()=>window.innerWidth<=480;
 const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit'}:{day:'2-digit',month:'2-digit',year:'numeric'});
 
@@ -287,7 +289,15 @@ function renderAccordion() {
         : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
       const hasCardDue = cards.some(card => card.due === d);
-      const labelWithDue = hasCardDue ? `${baseLabel} | 💳` : baseLabel;
+      const hasSalary  = dayTx.some(t =>
+        SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w))
+      );
+
+      const labelParts = [baseLabel];
+      if (hasCardDue) labelParts.push('💳');
+      if (hasSalary)  labelParts.push('💰');
+
+      const labelWithDue = labelParts.join(' | ');
       dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
       if (runningBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
