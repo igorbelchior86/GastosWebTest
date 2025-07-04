@@ -220,6 +220,11 @@ h2 {
   transition: opacity 0.3s ease;
 }
 
+.backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .bottom-modal:not(.hidden) {
   opacity: 1;
   pointer-events: auto;
