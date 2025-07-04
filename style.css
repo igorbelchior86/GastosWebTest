@@ -732,3 +732,7 @@ summary.day-summary::before {
   font-weight: 500;
   white-space: nowrap;
 }
+/* Evita quebra de linha no valor monetário */
+.value {
+  white-space: nowrap;
+}
