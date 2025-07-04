@@ -220,7 +220,7 @@ async function addTx() {
   // Close the modal
   toggleTxModal();
 
-  // Open month/day after accordion is rendered, then flash the new operation
+  // Open month/day and then scroll & highlight the new operation
   setTimeout(() => {
     const key = `d-${tx.postDate}`;
     const monthIdx = new Date(tx.postDate).getMonth();
@@ -230,16 +230,14 @@ async function addTx() {
     const dayDetEl = document.querySelector(`details.day[data-key="${key}"]`);
     if (dayDetEl) dayDetEl.open = true;
 
-    // Highlight the specific operation after a short delay
-    setTimeout(() => {
-      const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
-      if (opEl) {
-        opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        opEl.classList.add('flash-highlight');
-        setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
-      }
-    }, 300);
-  }, 0);
+    // Scroll and highlight the operation
+    const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
+    if (opEl) {
+      opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      opEl.classList.add('flash-highlight');
+      setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
+    }
+  }, 500);
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
