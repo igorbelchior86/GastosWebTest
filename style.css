@@ -1,3 +1,5 @@
+/* Oculta conteúdo enquanto carrega Firebase */
+.app-hidden { visibility: hidden; }
 .start-container {
   display: none;               /* evita flash antes do carregamento */
   background-color: #fff;

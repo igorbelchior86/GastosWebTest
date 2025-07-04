@@ -446,6 +446,8 @@ cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('
   initStart();
   date.value=todayISO();
   renderTable();
+  // exibe conteúdo após carregar dados
+  document.querySelector('.wrapper').classList.remove('app-hidden');
   // exibe versão
   const verEl = document.getElementById('version');
   if (verEl) verEl.textContent = `v${APP_VERSION}`;
