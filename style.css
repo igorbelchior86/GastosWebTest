@@ -427,7 +427,9 @@ input[type="date"] {
   position: relative;
   padding-left: 8px;
 }
-.op-item + .op-item::before {
+.op-item + .op-item::before,
+/* Dias com lançamentos: linha lateral mais forte */
+details.day[data-has="true"] + details.day[data-has="true"]::before {
   content: "";
   position: absolute;
   left: 0;
@@ -782,4 +784,8 @@ summary.day-summary::before {
   font-weight: bold;
   font-size: 1.8rem;
   color: #333;
+}
+/* Deixa a linha lateral em negrito quando há lançamentos no dia */
+details.day[data-has="true"] {
+  border-left: 3px solid #000 !important;
 }

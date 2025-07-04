@@ -267,6 +267,7 @@ function renderAccordion() {
       runningBalance += dayTotal;                           // atualiza saldo acumulado
       const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
       const dDet = document.createElement('details');
+      dDet.dataset.has = String(dayTx.length > 0);
       dDet.className = 'day';
       dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
       dDet.open = openKeys.includes(dDet.dataset.key);
