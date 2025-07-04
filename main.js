@@ -290,24 +290,27 @@ function renderAccordion() {
       dayTx.filter(t => t.method.toLowerCase() !== 'dinheiro')
            .forEach(t => (cardGroups[t.method] = cardGroups[t.method] || []).push(t));
 
-      // Seção de planejados
-      const plannedSection = document.createElement('div');
-      plannedSection.className = 'planned-section';
-      const plannedHeader = document.createElement('div');
-      plannedHeader.className = 'planned-header';
-      plannedHeader.textContent = 'Planejados:';
-      plannedSection.appendChild(plannedHeader);
-      const plannedList = document.createElement('ul');
-      plannedList.className = 'planned-list';
-      plannedSection.appendChild(plannedList);
-      dDet.appendChild(plannedSection);
+      // Seção de planejados (apenas se houver planejados)
+      const plannedOps = dayTx.filter(t => t.planned);
+      if (plannedOps.length) {
+        const plannedSection = document.createElement('div');
+        plannedSection.className = 'planned-section';
+        const plannedHeader = document.createElement('div');
+        plannedHeader.className = 'planned-header';
+        plannedHeader.textContent = 'Planejados:';
+        plannedSection.appendChild(plannedHeader);
+        const plannedList = document.createElement('ul');
+        plannedList.className = 'planned-list';
+        plannedSection.appendChild(plannedList);
 
-      // Planejados em dinheiro e cartão
-      dayTx.filter(t => t.planned).forEach(t => {
-        const li = document.createElement('li');
-        li.appendChild(makeLine(t));
-        plannedList.appendChild(li);
-      });
+        plannedOps.forEach(t => {
+          const li = document.createElement('li');
+          li.appendChild(makeLine(t));
+          plannedList.appendChild(li);
+        });
+
+        dDet.appendChild(plannedSection);
+      }
 
       // Fatura (executados no cartão)
       Object.entries(cardGroups).forEach(([card, list]) => {
@@ -334,23 +337,27 @@ function renderAccordion() {
         dDet.appendChild(invDet);
       });
 
-      // Seção de executados em dinheiro
-      const executedCash = document.createElement('div');
-      executedCash.className = 'executed-cash';
-      const execHeader = document.createElement('div');
-      execHeader.className = 'executed-header';
-      execHeader.textContent = 'Executados (Dinheiro):';
-      executedCash.appendChild(execHeader);
-      const execList = document.createElement('ul');
-      execList.className = 'executed-list';
-      const cashExec = cashOps.filter(t => !t.planned);
-      cashExec.forEach(t => {
-        const li = document.createElement('li');
-        li.appendChild(makeLine(t));
-        execList.appendChild(li);
-      });
-      executedCash.appendChild(execList);
-      dDet.appendChild(executedCash);
+      // Seção de executados em dinheiro (apenas se houver)
+      const cashExec = dayTx.filter(t => t.method.toLowerCase() === 'dinheiro' && !t.planned);
+      if (cashExec.length) {
+        const executedCash = document.createElement('div');
+        executedCash.className = 'executed-cash';
+        const execHeader = document.createElement('div');
+        execHeader.className = 'executed-header';
+        execHeader.textContent = 'Executados:';
+        executedCash.appendChild(execHeader);
+        const execList = document.createElement('ul');
+        execList.className = 'executed-list';
+
+        cashExec.forEach(t => {
+          const li = document.createElement('li');
+          li.appendChild(makeLine(t));
+          execList.appendChild(li);
+        });
+
+        executedCash.appendChild(execList);
+        dDet.appendChild(executedCash);
+      }
 
       mDet.appendChild(dDet);
     }
