@@ -440,12 +440,14 @@ closeCardModal.onclick = () => cardModal.classList.add('hidden');
 cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
  (async () => {
-  date.value=todayISO();
+  date.value = todayISO();
   // Renderiza imediatamente com dados em cache
   refreshMethods();
   renderCardList();
   initStart();
   renderTable();
+  // exibe conteúdo após carregar dados localmente
+  document.querySelector('.wrapper').classList.remove('app-hidden');
 
   const [liveTx, liveCards, liveBal] = await Promise.all([
     load('tx', []),
