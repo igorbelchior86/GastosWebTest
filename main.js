@@ -59,12 +59,13 @@ const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setSt
 const startContainer = document.querySelector('.start-container');
 const dividerSaldo = document.getElementById('dividerSaldo');
 
-const showToast = msg => {
+const showToast = (msg, type = 'error') => {
   const t = document.getElementById('toast');
   if (!t) return;
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  t.classList.remove('success', 'error');
+  t.classList.add('show', type);
+  setTimeout(() => t.classList.remove('show', type), 3000);
 };
 
 const togglePlanned = id => {
@@ -203,7 +204,7 @@ async function addTx() {
     await queueTx(tx);
     updatePendingBadge();
     renderTable();
-    showToast('Offline: gravado na fila');
+    showToast('Offline: transação salva na fila', 'error');
     return;
   }
 
@@ -219,26 +220,7 @@ async function addTx() {
 
   // Close the modal
   toggleTxModal();
-
-  // Expand month/day and scroll to day then operation
-  const monthIdx = new Date(tx.postDate).getMonth();
-  const monthDet = document.querySelector(`details.month[data-key="m-${monthIdx}"]`);
-  if (monthDet) monthDet.open = true;
-
-  const dayDetEl = document.querySelector(`details.day[data-key="d-${tx.postDate}"]`);
-  if (dayDetEl) dayDetEl.open = true;
-
-  // Scroll and highlight the new operation with manual centering
-  setTimeout(() => {
-    const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
-    if (opEl) {
-      const rect = opEl.getBoundingClientRect();
-      const offset = window.pageYOffset + rect.top - (window.innerHeight / 2 - rect.height / 2);
-      window.scrollTo({ top: offset, behavior: 'smooth' });
-      opEl.classList.add('flash-highlight');
-      setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
-    }
-  }, 100);
+  showToast('Transação realizada com sucesso', 'success');
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};

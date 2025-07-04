@@ -871,3 +871,10 @@ details.day[data-has="true"] {
   from { background-color: rgba(255, 255, 0, 0.6); }
   to   { background-color: transparent; }
 }
+/* Toast types */
+.toast.error {
+  background: #F56565; /* red */
+}
+.toast.success {
+  background: #48BB78; /* green */
+}
