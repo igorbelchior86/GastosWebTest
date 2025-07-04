@@ -220,7 +220,7 @@ async function addTx() {
 
   // Close the modal
   toggleTxModal();
-  showToast('Transação realizada com sucesso', 'success');
+  showToast('Tudo certo!', 'success');
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
