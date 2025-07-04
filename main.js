@@ -27,7 +27,13 @@ else {
     JSON.parse(localStorage.getItem(`${PATH}_${k}`)) ?? d;
 }
 
-let transactions=[],cards=[],startBalance=null;
+// Cache local (LocalStorage) p/ boot instantâneo
+const cacheGet  = (k, d) => JSON.parse(localStorage.getItem(`cache_${k}`)) ?? d;
+const cacheSet  = (k, v) => localStorage.setItem(`cache_${k}`, JSON.stringify(v));
+
+let transactions  = cacheGet('tx', []);
+let cards         = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
+let startBalance  = cacheGet('startBal', null);
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 
@@ -161,7 +167,7 @@ const makeLine = t => {
   return d;
 };
 
-function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
+function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
 async function addTx() {
   if (startBalance === null) {
@@ -188,6 +194,7 @@ async function addTx() {
     modifiedAt: new Date().toISOString()
   };
   transactions.push(tx);
+  cacheSet('tx', transactions);
   const savedOffline = !navigator.onLine;
   showToast(savedOffline ? 'Gravado offline' : 'Gravado');
   await queueTx(tx);
@@ -425,29 +432,46 @@ function initStart() {
   // mantém o botão habilitado; a função addTx impede lançamentos
   addBtn.classList.toggle('disabled', showStart);
 }
-setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;save('startBal',v);initStart();renderTable();};
-resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
+setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;cacheSet('startBal', v);save('startBal',v);initStart();renderTable();};
+resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;cacheSet('tx', []);cacheSet('cards', [{name:'Dinheiro',close:0,due:0}]);cacheSet('startBal', null);save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 openCardBtn.onclick = () => cardModal.classList.remove('hidden');
 closeCardModal.onclick = () => cardModal.classList.add('hidden');
 cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
 
  (async () => {
-  transactions = await load('tx', []);
-  // Garante que transactions seja um array; converte se vier como objeto
-  if (!Array.isArray(transactions)) {
-    transactions = Object.values(transactions || {});
-  }
-  cards=await load('cards',[{name:'Dinheiro',close:0,due:0}]);
-  if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
-  startBalance=await load('startBal',null);
+  date.value=todayISO();
+  // Renderiza imediatamente com dados em cache
   refreshMethods();
   renderCardList();
   initStart();
-  date.value=todayISO();
   renderTable();
-  // exibe conteúdo após carregar dados
-  document.querySelector('.wrapper').classList.remove('app-hidden');
+
+  const [liveTx, liveCards, liveBal] = await Promise.all([
+    load('tx', []),
+    load('cards', cards),
+    load('startBal', startBalance)
+  ]);
+
+  // Converte objeto → array se necessário
+  const fixedTx = Array.isArray(liveTx) ? liveTx : Object.values(liveTx || {});
+
+  if (JSON.stringify(fixedTx) !== JSON.stringify(transactions)) {
+    transactions = fixedTx;
+    cacheSet('tx', transactions);
+    renderTable();
+  }
+  if (JSON.stringify(liveCards) !== JSON.stringify(cards)) {
+    cards = liveCards;
+    if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
+    cacheSet('cards', cards);
+    refreshMethods(); renderCardList(); renderTable();
+  }
+  if (liveBal !== startBalance) {
+    startBalance = liveBal;
+    cacheSet('startBal', startBalance);
+    initStart(); renderTable();
+  }
   // exibe versão
   const verEl = document.getElementById('version');
   if (verEl) verEl.textContent = `v${APP_VERSION}`;
