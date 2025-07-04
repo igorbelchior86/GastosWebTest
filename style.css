@@ -863,3 +863,11 @@ details.day[data-has="true"] {
 .offline-icon {
   margin-right: 0;
 }
+/* realce piscante para operação adicionada */
+.flash-highlight {
+  animation: flash 1s ease-in-out;
+}
+@keyframes flash {
+  from { background-color: rgba(255, 255, 0, 0.6); }
+  to   { background-color: transparent; }
+}

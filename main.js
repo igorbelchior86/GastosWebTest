@@ -193,16 +193,40 @@ async function addTx() {
     ts: new Date().toISOString(),
     modifiedAt: new Date().toISOString()
   };
+  // Save locally and queue (or send) to server
   transactions.push(tx);
   cacheSet('tx', transactions);
-  const savedOffline = !navigator.onLine;
-  showToast(savedOffline ? 'Gravado offline' : 'Gravado');
+
+  // Offline case: queue and inform user
+  if (!navigator.onLine) {
+    await queueTx(tx);
+    updatePendingBadge();
+    renderTable();
+    showToast('Offline: gravado na fila');
+    return;
+  }
+
+  // Online case: send immediately
   await queueTx(tx);
+
+  // Clear form and UI
   desc.value = '';
   val.value = '';
   date.value = todayISO();
   updatePendingBadge();
   renderTable();
+
+  // Close the modal
+  toggleTxModal();
+
+  // Scroll and flash highlight the new entry
+  const key = `d-${tx.postDate}`;
+  const dayDet = document.querySelector(`details.day[data-key="${key}"] summary.day-summary`);
+  if (dayDet) {
+    dayDet.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    dayDet.classList.add('flash-highlight');
+    setTimeout(() => dayDet.classList.remove('flash-highlight'), 1000);
+  }
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
