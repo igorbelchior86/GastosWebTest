@@ -93,9 +93,16 @@
     const openTxBtn = document.getElementById('openTxModal');
     const txModal = document.getElementById('txModal');
     const closeTxModal = document.getElementById('closeTxModal');
-    openTxBtn.onclick = () => txModal.classList.remove('hidden');
-    closeTxModal.onclick = () => txModal.classList.add('hidden');
-    txModal.onclick = e => { if (e.target === txModal) txModal.classList.add('hidden'); };
+
+    function toggleTxModal() {
+      const isOpen = !txModal.classList.contains('hidden');
+      txModal.classList.toggle('hidden');
+      openTxBtn.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(45deg)';
+    }
+
+    openTxBtn.onclick = toggleTxModal;
+    closeTxModal.onclick = toggleTxModal;
+    txModal.onclick = e => { if (e.target === txModal) toggleTxModal(); };
   </script>
 </body>
 </html>
