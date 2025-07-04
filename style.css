@@ -80,6 +80,18 @@ body {
   padding-left: env(safe-area-inset-left, 6px);
   padding-right: env(safe-area-inset-right, 6px);
   max-width: 100%;
+  margin-top: 260px;
+}
+
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: white;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  padding: 12px 16px;
 }
 
 .container {
@@ -735,18 +747,4 @@ summary.day-summary::before {
 /* Evita quebra de linha no valor monetário */
 .value {
   white-space: nowrap;
-}
-.app-header {
-  position: sticky;
-  top: 0;
-  left: 0;
-  width: 100%;
-  background: white;
-  z-index: 100;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  padding: 12px 16px;
-}
-
-.app-header .form-grid {
-  background: white;
 }

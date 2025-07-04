@@ -12,24 +12,24 @@
   <link rel="manifest" href="site.webmanifest">
 </head>
 <body>
-  <div class="wrapper">
-    <header class="app-header">
-      <button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
+  <header class="app-header">
+    <button id="openCardModal" class="floating-card-button" title="Gerenciar cartões">💳</button>
 
-      <!-- Lançar operação -->
-      <div class="launch-section">
-        <h2>Lançar operação</h2>
-        <div class="form-grid">
-          <input id="desc" placeholder="Descrição">
-          <input id="value" type="number" placeholder="Valor (- despesa)">
-          <select id="method"></select>
-          <input id="opDate" type="date">
-          <button id="addBtn">Adicionar</button>
-        </div>
+    <div class="launch-section">
+      <h2>Lançar operação</h2>
+      <div class="form-grid">
+        <input id="desc" placeholder="Descrição">
+        <input id="value" type="number" placeholder="Valor (- despesa)">
+        <select id="method"></select>
+        <input id="opDate" type="date">
+        <button id="addBtn">Adicionar</button>
       </div>
+    </div>
 
-      <hr class="divider" id="dividerSaldo">
-    </header>
+    <hr class="divider" id="dividerSaldo">
+  </header>
+
+  <div class="wrapper">
 
     <!-- Saldo inicial -->
     <div class="start-container">
