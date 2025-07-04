@@ -228,21 +228,16 @@ async function addTx() {
   const dayDetEl = document.querySelector(`details.day[data-key="d-${tx.postDate}"]`);
   if (dayDetEl) dayDetEl.open = true;
 
-  // Allow DOM to update then scroll to day summary
+  // Scroll and highlight the new operation with manual centering
   setTimeout(() => {
-    const daySummary = document.querySelector(`details.day[data-key="d-${tx.postDate}"] summary.day-summary`);
-    if (daySummary) {
-      daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
+    if (opEl) {
+      const rect = opEl.getBoundingClientRect();
+      const offset = window.pageYOffset + rect.top - (window.innerHeight / 2 - rect.height / 2);
+      window.scrollTo({ top: offset, behavior: 'smooth' });
+      opEl.classList.add('flash-highlight');
+      setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
     }
-    // After scrolling to day, scroll to specific operation
-    setTimeout(() => {
-      const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
-      if (opEl) {
-        opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        opEl.classList.add('flash-highlight');
-        setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
-      }
-    }, 500);
   }, 100);
 }
 
