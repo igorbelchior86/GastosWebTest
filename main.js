@@ -7,7 +7,7 @@ let PATH;
 
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
-const USE_MOCK = true;                // ambiente de teste
+const USE_MOCK = false;               // usar banco real para testes
 const APP_VERSION = '1.0.0';
 let save, load;
 let firebaseDb;
@@ -449,16 +449,11 @@ cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('
   if (navigator.onLine) flushQueue();
 })();
 
-// Service Worker registration
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js');
-}
-// Listen for SW sync event and flush queue via Firebase client
-if ('serviceWorker' in navigator) {
+// Service Worker registration and sync event (disabled in mock mode)
+if (!USE_MOCK && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.type === 'sync-tx') {
-      flushQueue();
-    }
+    if (event.data?.type === 'sync-tx') flushQueue();
   });
 }
 // Online/offline indicator
@@ -485,6 +480,7 @@ async function queueTx(tx) {
   }
 }
 async function flushQueue() {
+  if (USE_MOCK) return;  // skip real DB in mock mode
   const db = await getDb();
   const all = await db.getAll('tx');
   for (const tx of all) {
