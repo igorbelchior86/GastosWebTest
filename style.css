@@ -718,6 +718,7 @@ summary.day-summary::before {
 /* Alinha o header da fatura */
 .invoice > summary {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: space-between;
   align-items: center;
   padding: 6px 12px;
@@ -725,7 +726,9 @@ summary.day-summary::before {
 }
 .invoice-label {
   font-weight: 600;
+  white-space: nowrap;
 }
 .invoice-total {
   font-weight: 500;
+  white-space: nowrap;
 }
