@@ -814,3 +814,8 @@ details.day[data-has="true"] {
   color: #666;
   margin-top: 32px;
 }
+  .logo-test-tag {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    margin-left: 4px;
+  }
