@@ -221,6 +221,7 @@ h2 {
 }
 
 /* Modal bottom sheet */
+/* Modal bottom sheet */
 .bottom-modal {
   position: fixed;
   inset: 0;
@@ -230,6 +231,8 @@ h2 {
   align-items: flex-end;
   z-index: 1000;
   transition: opacity 0.3s ease;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .backdrop-blur {
@@ -245,16 +248,19 @@ h2 {
 .bottom-modal-box {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 20px 20px 0 0;
+  border-radius: 20px;
   padding: 18px;
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - 48px);
   max-width: 480px;
-  height: 60vh;
+  height: auto;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
   transform: translateY(100%);
   transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  margin-bottom: 90px;
+  border-radius: 28px;
 }
 
 .bottom-modal:not(.hidden) .bottom-modal-box {
