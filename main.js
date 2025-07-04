@@ -220,7 +220,7 @@ async function addTx() {
   // Close the modal
   toggleTxModal();
 
-  // Expand month/day immediately
+  // Expand month/day and scroll to day then operation
   const monthIdx = new Date(tx.postDate).getMonth();
   const monthDet = document.querySelector(`details.month[data-key="m-${monthIdx}"]`);
   if (monthDet) monthDet.open = true;
@@ -228,15 +228,22 @@ async function addTx() {
   const dayDetEl = document.querySelector(`details.day[data-key="d-${tx.postDate}"]`);
   if (dayDetEl) dayDetEl.open = true;
 
-  // Scroll and highlight the new operation when DOM update is painted
-  requestAnimationFrame(() => {
-    const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
-    if (opEl) {
-      opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      opEl.classList.add('flash-highlight');
-      setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
+  // Allow DOM to update then scroll to day summary
+  setTimeout(() => {
+    const daySummary = document.querySelector(`details.day[data-key="d-${tx.postDate}"] summary.day-summary`);
+    if (daySummary) {
+      daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  });
+    // After scrolling to day, scroll to specific operation
+    setTimeout(() => {
+      const opEl = document.querySelector(`.op-line[data-tx-id="${tx.id}"]`);
+      if (opEl) {
+        opEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        opEl.classList.add('flash-highlight');
+        setTimeout(() => opEl.classList.remove('flash-highlight'), 1500);
+      }
+    }, 500);
+  }, 100);
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
