@@ -832,10 +832,34 @@ details.day[data-has="true"] {
     font-size: 1rem;
     margin-left: 4px;
   }
-/* posiciona o botão de sincronizar à esquerda do card */
+/* Botão de sincronizar (⟳) */
 #syncNowBtn {
   position: fixed;
-  top: 16px;
-  right: 84px;     /* 24px (margem direita) + 48px (largura do card) + 12px gap */
+  top: 50%;
+  transform: translateY(-50%);
+  right: 84px;         /* espaço antes do botão de cartões */
+  width: 40px;
+  height: 40px;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
   z-index: 1100;
+}
+
+/* Ícone offline (📴) */
+#offlineIndicator {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 132px;        /* 84px (sync btn) + 40px (sync width) + 8px gap */
+  font-size: 1.3rem;
+  z-index: 1100;
+}
+/* Remove margem que empurrava o ícone para a direita */
+.offline-icon {
+  margin-right: 0;
 }
