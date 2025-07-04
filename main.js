@@ -219,22 +219,24 @@ async function addTx() {
   // Close the modal
   toggleTxModal();
 
-  // Open relevant month and day, scroll and highlight
-  const key = `d-${tx.postDate}`;
-  const monthIdx = new Date(tx.postDate).getMonth();
-  const monthDet = document.querySelector(`details.month[data-key="m-${monthIdx}"]`);
-  if (monthDet) monthDet.open = true;
+  // Open month/day after accordion is rendered
+  setTimeout(() => {
+    const key = `d-${tx.postDate}`;
+    const monthIdx = new Date(tx.postDate).getMonth();
+    const monthDet = document.querySelector(`details.month[data-key="m-${monthIdx}"]`);
+    if (monthDet) monthDet.open = true;
 
-  const dayDetEl = document.querySelector(`details.day[data-key="${key}"]`);
-  if (dayDetEl) {
-    dayDetEl.open = true;
-    const daySummary = dayDetEl.querySelector('summary.day-summary');
-    if (daySummary) {
-      daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      daySummary.classList.add('flash-highlight');
-      setTimeout(() => daySummary.classList.remove('flash-highlight'), 1000);
+    const dayDetEl = document.querySelector(`details.day[data-key="${key}"]`);
+    if (dayDetEl) {
+      dayDetEl.open = true;
+      const daySummary = dayDetEl.querySelector('summary.day-summary');
+      if (daySummary) {
+        daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        daySummary.classList.add('flash-highlight');
+        setTimeout(() => daySummary.classList.remove('flash-highlight'), 1000);
+      }
     }
-  }
+  }, 0);
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
