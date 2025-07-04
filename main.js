@@ -102,7 +102,16 @@ const makeLine = t => {
 
   const left = document.createElement('div');
   left.className = 'op-left';
-  left.textContent = t.desc;
+  if (t.planned) {
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'plan-check';
+    chk.onchange = () => togglePlanned(t.id);
+    left.appendChild(chk);
+  }
+  const descNode = document.createElement('span');
+  descNode.textContent = t.desc;
+  left.appendChild(descNode);
 
   const right = document.createElement('div');
   right.className = 'op-right';
@@ -111,14 +120,6 @@ const makeLine = t => {
   editBtn.className = 'icon';
   editBtn.textContent = '✏️';
   editBtn.onclick = () => editTx(t.id);
-
-  if (t.planned) {
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.className = 'plan-check';
-    chk.onchange = () => togglePlanned(t.id);
-    right.appendChild(chk);
-  }
 
   right.appendChild(editBtn);
 
@@ -140,7 +141,11 @@ const makeLine = t => {
 
   const ts = document.createElement('div');
   ts.className = 'timestamp';
-  ts.textContent = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
+  const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
+  const methodLabel = t.method === 'Dinheiro'
+    ? 'Dinheiro'
+    : `Cartão ${t.method}`;
+  ts.textContent = `${timeStr} - ${methodLabel}`;
   d.appendChild(ts);
 
   return d;
