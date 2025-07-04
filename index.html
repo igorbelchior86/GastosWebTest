@@ -17,18 +17,6 @@
   </header>
 
   <div class="wrapper">
-    <!-- Lançar operação -->
-    <div>
-      <h2>Lançar operação</h2>
-      <div class="form-grid">
-        <input id="desc" placeholder="Descrição">
-        <input id="value" type="number" placeholder="Valor (- despesa)">
-        <select id="method"></select>
-        <input id="opDate" type="date">
-        <button id="addBtn">Adicionar</button>
-      </div>
-    </div>
-    <hr class="divider" id="dividerSaldo">
 
     <!-- Saldo inicial -->
     <div class="start-container">
@@ -78,9 +66,36 @@
     </div>
   </div>
 
+  <!-- Modal Transações -->
+  <div id="txModal" class="bottom-modal backdrop-blur hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Lançar operação</h2>
+      <div class="form-grid">
+        <input id="desc" placeholder="Descrição">
+        <input id="value" type="number" placeholder="Valor (- despesa)">
+        <select id="method"></select>
+        <input id="opDate" type="date">
+        <button id="addBtn">Adicionar</button>
+      </div>
+      <button id="closeTxModal">Fechar</button>
+    </div>
+  </div>
+
+  <button id="openTxModal" class="floating-add-button" title="Nova operação">＋</button>
+
   <script type="module" src="main.js"></script>
 
   <!-- Toast de erro -->
   <div id="toast" class="toast"></div>
+
+  <script>
+    const openTxBtn = document.getElementById('openTxModal');
+    const txModal = document.getElementById('txModal');
+    const closeTxModal = document.getElementById('closeTxModal');
+    openTxBtn.onclick = () => txModal.classList.remove('hidden');
+    closeTxModal.onclick = () => txModal.classList.add('hidden');
+    txModal.onclick = e => { if (e.target === txModal) txModal.classList.add('hidden'); };
+  </script>
 </body>
 </html>
