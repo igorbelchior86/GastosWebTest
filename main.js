@@ -219,13 +219,21 @@ async function addTx() {
   // Close the modal
   toggleTxModal();
 
-  // Scroll and flash highlight the new entry
+  // Open relevant month and day, scroll and highlight
   const key = `d-${tx.postDate}`;
-  const dayDet = document.querySelector(`details.day[data-key="${key}"] summary.day-summary`);
-  if (dayDet) {
-    dayDet.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    dayDet.classList.add('flash-highlight');
-    setTimeout(() => dayDet.classList.remove('flash-highlight'), 1000);
+  const monthIdx = new Date(tx.postDate).getMonth();
+  const monthDet = document.querySelector(`details.month[data-key="m-${monthIdx}"]`);
+  if (monthDet) monthDet.open = true;
+
+  const dayDetEl = document.querySelector(`details.day[data-key="${key}"]`);
+  if (dayDetEl) {
+    dayDetEl.open = true;
+    const daySummary = dayDetEl.querySelector('summary.day-summary');
+    if (daySummary) {
+      daySummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      daySummary.classList.add('flash-highlight');
+      setTimeout(() => daySummary.classList.remove('flash-highlight'), 1000);
+    }
   }
 }
 
