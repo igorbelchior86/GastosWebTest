@@ -1,3 +1,8 @@
+// Elements for Planejados modal
+const openPlannedBtn = document.getElementById('openPlannedBtn');
+const plannedModal   = document.getElementById('plannedModal');
+const closePlannedModal = document.getElementById('closePlannedModal');
+const plannedList    = document.getElementById('plannedList');
 import { openDB } from 'https://unpkg.com/idb?module';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
@@ -146,6 +151,9 @@ const makeLine = t => {
     const chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.className = 'plan-check';
+    // identificação para acessibilidade/autofill
+    // chk.id = `planCheck-${t.id}`;
+    chk.name = 'planned';
     chk.onchange = () => togglePlanned(t.id);
     left.appendChild(chk);
   }
@@ -179,17 +187,30 @@ const makeLine = t => {
   topRow.appendChild(right);
   d.appendChild(topRow);
 
-  // Only show timestamp for planned transactions
+  // Timestamp e método de pagamento
+  const ts = document.createElement('div');
+  ts.className = 'timestamp';
+  // Cria Date no fuso local a partir de YYYY-MM-DD
+  const [y, mo, da] = t.opDate.split('-').map(Number);
+  const dateObj = new Date(y, mo - 1, da);
+  const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const methodLabel = t.method === 'Dinheiro'
+    ? 'Dinheiro'
+    : `Cartão ${t.method}`;
+  // Lógica de timestamp:
   if (t.planned) {
-    const ts = document.createElement('div');
-    ts.className = 'timestamp';
-    const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour12: false });
-    const methodLabel = t.method === 'Dinheiro'
-      ? 'Dinheiro'
-      : `Cartão ${t.method}`;
-    ts.textContent = `${timeStr} - ${methodLabel}`;
-    d.appendChild(ts);
+    // apenas data e método para planejadas
+    ts.textContent = `${dateStr} - ${methodLabel}`;
+  } else if (t.opDate === todayISO()) {
+    // hora de execução para operações no dia corrente
+    const timeStr = new Date(t.ts)
+      .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    ts.textContent = timeStr;
+  } else {
+    // apenas data para execuções em dias diferentes
+    ts.textContent = dateStr;
   }
+  d.appendChild(ts);
 
   return d;
 };
@@ -531,6 +552,60 @@ if (!USE_MOCK && 'serviceWorker' in navigator) {
     if (event.data?.type === 'sync-tx') flushQueue();
   });
 }
+// Planejados modal handlers
+function togglePlannedModal() {
+  const isOpening = plannedModal.classList.contains('hidden');
+  if (isOpening) renderPlannedModal();
+  plannedModal.classList.toggle('hidden');
+}
+openPlannedBtn.onclick = togglePlannedModal;
+closePlannedModal.onclick = togglePlannedModal;
+plannedModal.onclick = e => { if (e.target === plannedModal) togglePlannedModal(); };
+
+function renderPlannedModal() {
+  plannedList.innerHTML = '';
+  // agrupa planejados por opDate
+  const grouped = {};
+  transactions.filter(t => t.planned).forEach(t => {
+    (grouped[t.opDate] = grouped[t.opDate] || []).push(t);
+  });
+  Object.keys(grouped).sort().forEach(iso => {
+    const [y, mo, da] = iso.split('-').map(Number);
+    const yy = y % 100;
+    const header = document.createElement('div');
+    header.className = 'subheader';
+    header.textContent = `${String(da).padStart(2,'0')}/${String(mo).padStart(2,'0')}/${String(yy).padStart(2,'0')}`;
+    plannedList.appendChild(header);
+    grouped[iso].forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'planned-item';
+      // row with checkbox, description, and value
+      const row = document.createElement('div');
+      row.className = 'planned-row';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.name = 'plannedModal';     // accessibility/autofill
+      chk.checked = false;
+      chk.onchange = () => { togglePlanned(t.id); renderPlannedModal(); renderTable(); };
+      row.appendChild(chk);
+      const desc = document.createElement('span');
+      desc.className = 'desc';
+      desc.textContent = t.desc;
+      row.appendChild(desc);
+      const val = document.createElement('span');
+      val.className = 'value';
+      val.textContent = currency(t.val);
+      row.appendChild(val);
+      item.appendChild(row);
+      // method below, indented
+      const methodDiv = document.createElement('div');
+      methodDiv.className = 'method';
+      methodDiv.textContent = t.method;
+      item.appendChild(methodDiv);
+      plannedList.appendChild(item);
+    });
+  });
+}
 // Online/offline indicator
 const offlineIndicator = document.getElementById('offlineIndicator');
 window.addEventListener('online',  () => offlineIndicator.hidden = true);
@@ -560,9 +635,7 @@ async function queueTx(tx) {
 }
 async function flushQueue() {
   if (USE_MOCK) return;  // skip real DB in mock mode
-  const syncBtn = document.getElementById('syncNowBtn');
-  syncBtn.classList.add('spin');
-  const spinStart = Date.now();
+  const spinStart = Date.now();     // placeholder for min‑spin
 
   const db = await getDb();
   const all = await db.getAll('tx');
@@ -586,23 +659,16 @@ async function flushQueue() {
     await new Promise(res => setTimeout(res, minSpin - elapsed));
   }
 
-  syncBtn.classList.remove('spin');
   updatePendingBadge();
 }
 
 function updatePendingBadge() {
   getDb().then(db => db.getAll('tx')
     .then(all => {
-      const syncBtn = document.getElementById('syncNowBtn');
       const offIc   = document.getElementById('offlineIndicator');
       const count = all.length;
-      syncBtn.hidden = false;                  // sempre visível
       offIc.textContent = count ? `📴 ${count}` : '📴';
     }));
 }
 // dispara badge no arranque e após cada sync
 updatePendingBadge();
-
-// Botão de sincronização manual
-const syncBtn = document.getElementById('syncNowBtn');
-syncBtn.onclick = () => flushQueue();

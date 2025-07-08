@@ -1,3 +1,27 @@
+/* Lista de Planejados */
+.planned-list {
+  padding: 0;
+  margin: 0;
+}
+.planned-list .subheader {
+  font-weight: 600;
+  margin: 12px 0 4px;
+  font-size: 1rem;
+}
+.planned-item {
+  display: block;          /* bloco para ocupar 100% da largura */
+  padding: 8px 12px;       /* add horizontal padding for left align */
+  border-bottom: 1px solid var(--border);
+}
+.planned-item .value {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.planned-item .method {
+  margin-left: 12px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
 /* Oculta conteúdo enquanto carrega Firebase */
 .app-hidden { visibility: hidden; }
 .start-container {
@@ -877,4 +901,77 @@ details.day[data-has="true"] {
 }
 .toast.success {
   background: #48BB78; /* green */
+}
+
+/* Botão Planejados */
+.floating-planned-button {
+  position: fixed;
+  top: 16px;
+  right: 84px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #007AFF;
+  color: white;
+  font-size: 24px;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 1100;
+  cursor: pointer;
+}
+/* Scroll interno no modal Planejados */
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  padding: 0 12px;
+}
+
+/* Ajustes na lista de planejados */
+.planned-list {
+  margin: 0;
+  padding: 0;
+}
+.planned-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* alinhamento de linhas no modal Planejados */
+.planned-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  width: 100%;
+  column-gap: 12px;
+}
+
+
+.planned-row .desc {
+  color: #000;
+  min-width: 0;               /* allow shrinking */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planned-row .value {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.planned-item .method {
+  margin: 4px 0 0 32px;   /* indent below checkbox */
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.planned-row input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  align-self: center;
+}
+
+#plannedModal #closePlannedModal {
+  display: none;
 }
