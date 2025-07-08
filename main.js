@@ -4,8 +4,16 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
 // Configurações de Firebase para produção e teste
-import { firebaseConfig as prodConfig } from './firebase.prod.config.js';
 import { firebaseConfig as testConfig } from './firebase.test.config.js';
+const prodConfig = {
+  apiKey: "AIzaSyATGZtBlnSPnFtVgTqJ_E0xmBgzLTmMkI0",
+  authDomain: "gastosweb-e7356.firebaseapp.com",
+  databaseURL: "https://gastosweb-e7356-default-rtdb.firebaseio.com",
+  projectId: "gastosweb-e7356",
+  storageBucket: "gastosweb-e7356.firebasestorage.app",
+  messagingSenderId: "519966772782",
+  appId: "1:519966772782:web:9ec19e944e23dbe9e899bf"
+};
 // Detecta ambiente de teste: localhost ou GitHub Pages em /GastosWebTest
 const host = window.location.hostname;
 const pathname = window.location.pathname;
