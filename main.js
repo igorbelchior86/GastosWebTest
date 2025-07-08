@@ -3,6 +3,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebas
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
+// Configurações de Firebase para produção e teste
+import { firebaseConfig as prodConfig } from './firebase.prod.config.js';
+import { firebaseConfig as testConfig } from './firebase.test.config.js';
+// Detecta ambiente de teste: localhost ou GitHub Pages em /GastosWebTest
+const host = window.location.hostname;
+const pathname = window.location.pathname;
+const isTestEnv = host.includes('localhost')
+  || (host === 'igorbelchior86.github.io' && pathname.startsWith('/GastosWebTest'));
+
 let PATH;
 
 // Flag for mocking data while working on UI.  
@@ -13,14 +22,22 @@ let save, load;
 let firebaseDb;
 
 if (!USE_MOCK) {
-  const firebaseConfig={apiKey:"AIzaSyATGZtBlnSPnFtVgTqJ_E0xmBgzLTmMkI0",authDomain:"gastosweb-e7356.firebaseapp.com",databaseURL:"https://gastosweb-e7356-default-rtdb.firebaseio.com",projectId:"gastosweb-e7356",storageBucket:"gastosweb-e7356.firebasestorage.app",messagingSenderId:"519966772782",appId:"1:519966772782:web:9ec19e944e23dbe9e899bf"};
-  const app=initializeApp(firebaseConfig);const db=getDatabase(app);firebaseDb = db;
-  PATH = 'orcamento365_9b8e04c5';
+  // Escolhe config de produção ou teste
+  const chosenConfig = isTestEnv ? testConfig : prodConfig;
+  const app = initializeApp(chosenConfig);
+  const db = getDatabase(app);
+  firebaseDb = db;
+  PATH = isTestEnv
+    ? 'orcamento365_9b8e04c5'  // mesmo namespace de produção no teste
+    : 'orcamento365_9b8e04c5';
   const auth = getAuth(app);
   await signInAnonymously(auth);   // garante auth.uid antes dos gets/sets
-  save=(k,v)=>set(ref(db,`${PATH}/${k}`),v);load=async(k,d)=>{const s=await get(ref(db,`${PATH}/${k}`));return s.exists()?s.val():d;};
-}
-else {
+  save = (k, v) => set(ref(db, `${PATH}/${k}`), v);
+  load = async (k, d) => {
+    const s = await get(ref(db, `${PATH}/${k}`));
+    return s.exists() ? s.val() : d;
+  };
+} else {
   PATH = 'mock_365'; // namespace no localStorage
   save = (k, v) => localStorage.setItem(`${PATH}_${k}`, JSON.stringify(v));
   load = async (k, d) =>
