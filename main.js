@@ -118,23 +118,20 @@ function renderCardList() {
     .forEach(c => {
       const li = document.createElement('li');
 
-      // Wrapper de swipe
       const wrap = document.createElement('div');
       wrap.className = 'swipe-wrapper';
 
-      // Ações (edit ➜ delete)
       const actions = document.createElement('div');
       actions.className = 'swipe-actions';
 
-      // EDITAR
       const editBtn = document.createElement('button');
       editBtn.className = 'icon edit';
-      editBtn.textContent = '✏️';
-      editBtn.onclick = () => {
+      editBtn.innerHTML = '✏️';
+      editBtn.addEventListener('click', () => {
         const newName  = prompt('Nome do cartão', c.name)?.trim();
         if (!newName) return;
         const newClose = parseInt(prompt('Dia de fechamento (1-31)', c.close), 10);
-        const newDue   = parseInt(prompt('Dia de vencimento (1-31)', c.due),   10);
+        const newDue   = parseInt(prompt('Dia de vencimento (1-31)', c.due), 10);
         if (
           isNaN(newClose) || isNaN(newDue) ||
           newClose < 1 || newClose > 31 ||
@@ -159,30 +156,28 @@ function renderCardList() {
         refreshMethods();
         renderCardList();
         renderTable();
-      };
+      });
       actions.appendChild(editBtn);
 
-      // DELETAR
       const delBtn = document.createElement('button');
       delBtn.className = 'icon danger delete';
-      delBtn.textContent = '🗑';
-      delBtn.onclick = () => {
+      delBtn.innerHTML = '🗑';
+      delBtn.addEventListener('click', () => {
         if (!confirm('Excluir cartão?')) return;
         cards = cards.filter(x => x.name !== c.name);
         save('cards', cards);
         refreshMethods();
         renderCardList();
         renderTable();
-      };
+      });
       actions.appendChild(delBtn);
 
-      // Linha do cartão (conteúdo)
       const line = document.createElement('div');
       line.className = 'card-line';
       line.innerHTML = `
         <div>
           <div class="card-name">${c.name}</div>
-          <div class="card-dates">Fech: ${c.close} | Venc: ${c.due}</div>
+          <div class="card-dates">Fechamento: ${c.close} | Vencimento: ${c.due}</div>
         </div>`;
 
       wrap.appendChild(actions);
@@ -190,33 +185,38 @@ function renderCardList() {
       li.appendChild(wrap);
       cardList.appendChild(li);
     });
-}
 
-// Swipe handler (inicialização única)
-if (!window.cardsSwipeInit) {
-  let startX = 0;
-  cardList.addEventListener('touchstart', e => {
-    const wrap = e.target.closest('.swipe-wrapper');
-    if (!wrap) return;
-    startX = e.touches[0].clientX;
-    wrap.dataset.startX = startX;
-  }, { passive: true });
+  if (!window.cardsSwipeInit) {
+    let startX = 0;
+    cardList.addEventListener('touchstart', e => {
+      const wrap = e.target.closest('.swipe-wrapper');
+      if (!wrap) return;
+      startX = e.touches[0].clientX;
+      wrap.dataset.startX = startX;
+    }, { passive: true });
 
-  cardList.addEventListener('touchend', e => {
-    const wrap = e.target.closest('.swipe-wrapper');
-    if (!wrap) return;
-    const start = parseFloat(wrap.dataset.startX || 0);
-    const diff  = start - e.changedTouches[0].clientX;
-    const line  = wrap.querySelector('.card-line');
-    const actW  = wrap.querySelector('.swipe-actions').offsetWidth;
-    if (diff > 30) {
-      line.style.transform = `translateX(-${actW}px)`;
-    } else if (diff < -30) {
-      line.style.transform = 'translateX(0)';
-    }
-  }, { passive: true });
+    cardList.addEventListener('touchend', e => {
+      const wrap = e.target.closest('.swipe-wrapper');
+      if (!wrap) return;
+      const start = parseFloat(wrap.dataset.startX || 0);
+      const diff  = start - e.changedTouches[0].clientX;
+      const line  = wrap.querySelector('.card-line');
+      const actW  = wrap.querySelector('.swipe-actions').offsetWidth;
+      // Close other open swipes
+      document.querySelectorAll('.card-line').forEach(l => {
+        if (l !== line) {
+          l.style.transform = 'translateX(0)';
+        }
+      });
+      if (diff > 30) {
+        line.style.transform = `translateX(-${actW}px)`;
+      } else if (diff < -30) {
+        line.style.transform = 'translateX(0)';
+      }
+    }, { passive: true });
 
-  window.cardsSwipeInit = true;
+    window.cardsSwipeInit = true;
+  }
 }
 const makeLine = t => {
   const d = document.createElement('div');

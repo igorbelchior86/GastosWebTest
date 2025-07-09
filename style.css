@@ -193,9 +193,9 @@ h2 {
 .card-list li {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   border-radius: 8px;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .card-list li .card-line {
@@ -994,6 +994,7 @@ details.day[data-has="true"] {
   gap: 8px;
   padding-right: 12px;
   background: #2a2a2c;
+  z-index: 0;
 }
 .swipe-actions button {
   width: 48px;
@@ -1010,5 +1011,9 @@ details.day[data-has="true"] {
   color: #FF3B30;
 }
 .card-line {
+  position: relative;
+  z-index: 1;
+  background: var(--panel);
+  padding: 8px 16px;
   transition: transform 0.2s ease;
 }
