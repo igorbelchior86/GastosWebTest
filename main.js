@@ -74,6 +74,43 @@ const SALARY_WORDS = ['salário', 'salario', 'provento', 'rendimento', 'pagament
 const mobile=()=>window.innerWidth<=480;
 const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit'}:{day:'2-digit',month:'2-digit',year:'numeric'});
 
+// ---------------------------------------------------------------------------
+// Sticky month header  (Safari/iOS não suporta <summary> sticky)
+// ---------------------------------------------------------------------------
+const headerEl      = document.querySelector('.app-header');
+const HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
+
+const stickyMonth     = document.createElement('div');
+stickyMonth.className = 'sticky-month';
+stickyMonth.style.top = HEADER_OFFSET + 'px';
+document.body.appendChild(stickyMonth);
+
+// Recalcula altura do header em rotação / resize
+window.addEventListener('resize', () => {
+  const h = headerEl.getBoundingClientRect().height;
+  stickyMonth.style.top = h + 'px';
+});
+
+function updateStickyMonth() {
+  let label = '';
+  const divs = document.querySelectorAll('summary.month-divider');
+  divs.forEach(div => {
+    const rect = div.getBoundingClientRect();
+    // choose the last divider whose top passed the header
+    if (rect.top <= HEADER_OFFSET) {
+      label = div.textContent.replace(/\s+/g, ' ').trim();
+    }
+  });
+  if (label) {
+    stickyMonth.textContent = label;
+    stickyMonth.classList.add('visible');
+  } else {
+    stickyMonth.classList.remove('visible');
+  }
+}
+
+window.addEventListener('scroll', updateStickyMonth);
+
 // Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
 const todayISO = () => {
   const d = new Date();
@@ -219,21 +256,42 @@ function renderCardList() {
   }
 }
 const makeLine = t => {
+  // Create swipe wrapper
+  const wrap = document.createElement('div');
+  wrap.className = 'swipe-wrapper';
+
+  // Create actions container
+  const actions = document.createElement('div');
+  actions.className = 'swipe-actions';
+
+  // Edit button
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon edit';
+  editBtn.textContent = '✏️';
+  editBtn.onclick = () => editTx(t.id);
+  actions.appendChild(editBtn);
+
+  // Delete button
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon danger delete';
+  delBtn.textContent = '🗑';
+  delBtn.onclick = () => delTx(t.id);
+  actions.appendChild(delBtn);
+
+  // Original operation line
   const d = document.createElement('div');
   d.className = 'op-line';
   d.dataset.txId = t.id;
 
+  // Build the content as before
   const topRow = document.createElement('div');
   topRow.className = 'op-main';
-
   const left = document.createElement('div');
   left.className = 'op-left';
   if (t.planned) {
     const chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.className = 'plan-check';
-    // identificação para acessibilidade/autofill
-    // chk.id = `planCheck-${t.id}`;
     chk.name = 'planned';
     chk.onchange = () => togglePlanned(t.id);
     left.appendChild(chk);
@@ -241,60 +299,68 @@ const makeLine = t => {
   const descNode = document.createElement('span');
   descNode.textContent = t.desc;
   left.appendChild(descNode);
-
   const right = document.createElement('div');
   right.className = 'op-right';
-
-  const editBtn = document.createElement('button');
-  editBtn.className = 'icon';
-  editBtn.textContent = '✏️';
-  editBtn.onclick = () => editTx(t.id);
-
-  right.appendChild(editBtn);
-
-  const delBtn = document.createElement('button');
-  delBtn.className = 'icon danger';
-  delBtn.textContent = '🗑';
-  delBtn.onclick = () => delTx(t.id);
-
   const value = document.createElement('span');
   value.className = 'value';
   value.textContent = `R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-  right.appendChild(delBtn);
   right.appendChild(value);
-
   topRow.appendChild(left);
   topRow.appendChild(right);
   d.appendChild(topRow);
 
-  // Timestamp e método de pagamento
+  // Timestamp & method
   const ts = document.createElement('div');
   ts.className = 'timestamp';
-  // Cria Date no fuso local a partir de YYYY-MM-DD
   const [y, mo, da] = t.opDate.split('-').map(Number);
   const dateObj = new Date(y, mo - 1, da);
   const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const methodLabel = t.method === 'Dinheiro'
-    ? 'Dinheiro'
-    : `Cartão ${t.method}`;
-  // Lógica de timestamp:
+  const methodLabel = t.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${t.method}`;
   if (t.planned) {
-    // apenas data e método para planejadas
     ts.textContent = `${dateStr} - ${methodLabel}`;
   } else if (t.opDate === todayISO()) {
-    // hora de execução para operações no dia corrente
-    const timeStr = new Date(t.ts)
-      .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
     ts.textContent = timeStr;
   } else {
-    // apenas data para execuções em dias diferentes
     ts.textContent = dateStr;
   }
   d.appendChild(ts);
 
-  return d;
+  // Assemble wrapper and return
+  wrap.appendChild(actions);
+  wrap.appendChild(d);
+  return wrap;
 };
+// Operations swipe handler (inicialização única)
+if (!window.opsSwipeInit) {
+  let startXOp = 0;
+  document.body.addEventListener('touchstart', e => {
+    const wrap = e.target.closest('.swipe-wrapper');
+    if (!wrap) return;
+    startXOp = e.touches[0].clientX;
+    wrap.dataset.startX = startXOp;
+  }, { passive: true });
+
+  document.body.addEventListener('touchend', e => {
+    const wrap = e.target.closest('.swipe-wrapper');
+    if (!wrap) return;
+    const start = parseFloat(wrap.dataset.startX || 0);
+    const diff = start - e.changedTouches[0].clientX;
+    const line = wrap.querySelector('.op-line');
+    const actW = wrap.querySelector('.swipe-actions').offsetWidth;
+    // Close other open swipes
+    document.querySelectorAll('.op-line').forEach(l => {
+      if (l !== line) l.style.transform = 'translateX(0)';
+    });
+    if (diff > 30) {
+      line.style.transform = `translateX(-${actW}px)`;
+    } else if (diff < -30) {
+      line.style.transform = 'translateX(0)';
+    }
+  }, { passive: true });
+
+  window.opsSwipeInit = true;
+}
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
@@ -376,6 +442,7 @@ function renderTable(){
   }
   // constrói o acordeão de 3 níveis
   renderAccordion();
+  updateStickyMonth();
 }
 
 // -----------------------------------------------------------------------------
@@ -534,8 +601,7 @@ function renderAccordion() {
 
       mDet.appendChild(dDet);
     }
-    // Adiciona summary do mês normalmente
-    mDet.appendChild(mSum);
+    // (month summary já foi adicionado no topo; não adicionar novamente)
     acc.appendChild(mDet);
 
     // Cria linha meta como elemento independente
@@ -548,6 +614,10 @@ function renderAccordion() {
     else label = 'Saldo projetado:';
 
     metaLine.innerHTML = `<span>| ${label}</span><strong>${currency(runningBalance)}</strong>`;
+    // Clique em "Saldo final" também expande/colapsa o mês
+    metaLine.addEventListener('click', () => {
+      mDet.open = !mDet.open;
+    });
 
     // Se o mês estiver fechado (collapsed), exibe metaLine abaixo de mDet
     if (!mDet.open) {
@@ -565,6 +635,7 @@ function renderAccordion() {
       }
     });
   }
+  updateStickyMonth();
 }
 
 function initStart() {
