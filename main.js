@@ -113,29 +113,110 @@ const closeCardModal=document.getElementById('closeCardModal');
 function refreshMethods(){met.innerHTML='';cards.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});}
 function renderCardList() {
   cardList.innerHTML = '';
-  cards.filter(c => c.name !== 'Dinheiro').forEach(c => {
-    const li = document.createElement('li');
-    li.innerHTML = `<div class="card-line">
-      <div>
-        <div class="card-name">${c.name}</div>
-        <div class="card-dates">Fechamento: ${c.close} | Vencimento: ${c.due}</div>
-      </div>
-    </div>`;
-    const del = document.createElement('button');
-    del.className = 'icon danger';
-    del.textContent = '🗑';
-    del.onclick = () => {
-      if (confirm('Excluir cartão?')) {
+  cards
+    .filter(c => c.name !== 'Dinheiro')
+    .forEach(c => {
+      const li = document.createElement('li');
+
+      // Wrapper de swipe
+      const wrap = document.createElement('div');
+      wrap.className = 'swipe-wrapper';
+
+      // Ações (edit ➜ delete)
+      const actions = document.createElement('div');
+      actions.className = 'swipe-actions';
+
+      // EDITAR
+      const editBtn = document.createElement('button');
+      editBtn.className = 'icon edit';
+      editBtn.textContent = '✏️';
+      editBtn.onclick = () => {
+        const newName  = prompt('Nome do cartão', c.name)?.trim();
+        if (!newName) return;
+        const newClose = parseInt(prompt('Dia de fechamento (1-31)', c.close), 10);
+        const newDue   = parseInt(prompt('Dia de vencimento (1-31)', c.due),   10);
+        if (
+          isNaN(newClose) || isNaN(newDue) ||
+          newClose < 1 || newClose > 31 ||
+          newDue   < 1 || newDue   > 31 ||
+          newClose >= newDue
+        ) { alert('Dados inválidos'); return; }
+        if (newName !== c.name && cards.some(card => card.name === newName)) {
+          alert('Já existe cartão com esse nome'); return;
+        }
+        const oldName = c.name;
+        c.name  = newName;
+        c.close = newClose;
+        c.due   = newDue;
+        transactions.forEach(t => {
+          if (t.method === oldName) {
+            t.method   = newName;
+            t.postDate = post(t.opDate, newName);
+          }
+        });
+        save('cards', cards);
+        save('tx', transactions);
+        refreshMethods();
+        renderCardList();
+        renderTable();
+      };
+      actions.appendChild(editBtn);
+
+      // DELETAR
+      const delBtn = document.createElement('button');
+      delBtn.className = 'icon danger delete';
+      delBtn.textContent = '🗑';
+      delBtn.onclick = () => {
+        if (!confirm('Excluir cartão?')) return;
         cards = cards.filter(x => x.name !== c.name);
         save('cards', cards);
         refreshMethods();
         renderCardList();
         renderTable();
-      }
-    };
-    li.querySelector('.card-line').appendChild(del);
-    cardList.appendChild(li);
-  });
+      };
+      actions.appendChild(delBtn);
+
+      // Linha do cartão (conteúdo)
+      const line = document.createElement('div');
+      line.className = 'card-line';
+      line.innerHTML = `
+        <div>
+          <div class="card-name">${c.name}</div>
+          <div class="card-dates">Fech: ${c.close} | Venc: ${c.due}</div>
+        </div>`;
+
+      wrap.appendChild(actions);
+      wrap.appendChild(line);
+      li.appendChild(wrap);
+      cardList.appendChild(li);
+    });
+}
+
+// Swipe handler (inicialização única)
+if (!window.cardsSwipeInit) {
+  let startX = 0;
+  cardList.addEventListener('touchstart', e => {
+    const wrap = e.target.closest('.swipe-wrapper');
+    if (!wrap) return;
+    startX = e.touches[0].clientX;
+    wrap.dataset.startX = startX;
+  }, { passive: true });
+
+  cardList.addEventListener('touchend', e => {
+    const wrap = e.target.closest('.swipe-wrapper');
+    if (!wrap) return;
+    const start = parseFloat(wrap.dataset.startX || 0);
+    const diff  = start - e.changedTouches[0].clientX;
+    const line  = wrap.querySelector('.card-line');
+    const actW  = wrap.querySelector('.swipe-actions').offsetWidth;
+    if (diff > 30) {
+      line.style.transform = `translateX(-${actW}px)`;
+    } else if (diff < -30) {
+      line.style.transform = 'translateX(0)';
+    }
+  }, { passive: true });
+
+  window.cardsSwipeInit = true;
 }
 const makeLine = t => {
   const d = document.createElement('div');
@@ -499,9 +580,20 @@ function initStart() {
 setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert('Valor inválido');return;}startBalance=v;cacheSet('startBal', v);save('startBal',v);initStart();renderTable();};
 resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;cacheSet('tx', []);cacheSet('cards', [{name:'Dinheiro',close:0,due:0}]);cacheSet('startBal', null);save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
-openCardBtn.onclick = () => cardModal.classList.remove('hidden');
-closeCardModal.onclick = () => cardModal.classList.add('hidden');
-cardModal.onclick = e => { if (e.target === cardModal) cardModal.classList.add('hidden'); };
+openCardBtn.onclick = () => {
+  document.body.style.overflow = 'hidden';
+  cardModal.classList.remove('hidden');
+};
+closeCardModal.onclick = () => {
+  document.body.style.overflow = '';
+  cardModal.classList.add('hidden');
+};
+cardModal.onclick = e => {
+  if (e.target === cardModal) {
+    document.body.style.overflow = '';
+    cardModal.classList.add('hidden');
+  }
+};
 
  (async () => {
   date.value = todayISO();
@@ -555,7 +647,14 @@ if (!USE_MOCK && 'serviceWorker' in navigator) {
 // Planejados modal handlers
 function togglePlannedModal() {
   const isOpening = plannedModal.classList.contains('hidden');
-  if (isOpening) renderPlannedModal();
+  if (isOpening) {
+    renderPlannedModal();
+    // Disable background scroll
+    document.body.style.overflow = 'hidden';
+  } else {
+    // Re-enable background scroll
+    document.body.style.overflow = '';
+  }
   plannedModal.classList.toggle('hidden');
 }
 openPlannedBtn.onclick = togglePlannedModal;

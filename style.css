@@ -299,6 +299,7 @@ h2 {
   transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
   margin-bottom: 90px;
   border-radius: 28px;
+  overscroll-behavior: contain;
 }
 
 .bottom-modal:not(.hidden) .bottom-modal-box {
@@ -924,7 +925,8 @@ details.day[data-has="true"] {
   flex: 1;
   overflow-y: auto;
   width: 100%;
-  padding: 0 12px;
+  padding: 0 24px 0 2px;
+  overscroll-behavior: contain;
 }
 
 /* Ajustes na lista de planejados */
@@ -974,4 +976,39 @@ details.day[data-has="true"] {
 
 #plannedModal #closePlannedModal {
   display: none;
+}
+
+
+/* --- Swipeable cards --- */
+.swipe-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+.swipe-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  background: #2a2a2c;
+}
+.swipe-actions button {
+  width: 48px;
+  height: 100%;
+  border: none;
+  background: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+.swipe-actions .edit {
+  color: #007AFF;
+}
+.swipe-actions .danger {
+  color: #FF3B30;
+}
+.card-line {
+  transition: transform 0.2s ease;
 }

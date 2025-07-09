@@ -111,9 +111,14 @@
     const txModal = document.getElementById('txModal');
 
     function toggleTxModal() {
-      const isOpen = !txModal.classList.contains('hidden');
+      const isOpening = txModal.classList.contains('hidden');
+      if (isOpening) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
       txModal.classList.toggle('hidden');
-      openTxBtn.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(45deg)';
+      openTxBtn.style.transform = isOpening ? 'rotate(45deg)' : 'rotate(0deg)';
     }
 
     openTxBtn.onclick = toggleTxModal;
