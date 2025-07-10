@@ -9,21 +9,16 @@ import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/1
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
 // Configurações de Firebase para produção e teste
-import { firebaseConfig as testConfig } from './firebase.test.config.js';
-const prodConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyATGZtBlnSPnFtVgTqJ_E0xmBgzLTmMkI0",
   authDomain: "gastosweb-e7356.firebaseapp.com",
   databaseURL: "https://gastosweb-e7356-default-rtdb.firebaseio.com",
   projectId: "gastosweb-e7356",
   storageBucket: "gastosweb-e7356.firebasestorage.app",
   messagingSenderId: "519966772782",
-  appId: "1:519966772782:web:9ec19e944e23dbe9e899bf"
+  appId: "1:519966772782:web:9ec19e944e23dbe9e899bf",
+  measurementId: "G-JZYYGSJKTZ"
 };
-// Detecta ambiente de teste: localhost ou GitHub Pages em /GastosWebTest
-const host = window.location.hostname;
-const pathname = window.location.pathname;
-const isTestEnv = host.includes('localhost')
-  || (host === 'igorbelchior86.github.io' && pathname.startsWith('/GastosWebTest'));
 
 let PATH;
 
@@ -35,14 +30,10 @@ let save, load;
 let firebaseDb;
 
 if (!USE_MOCK) {
-  // Escolhe config de produção ou teste
-  const chosenConfig = isTestEnv ? testConfig : prodConfig;
-  const app = initializeApp(chosenConfig);
+  const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
   firebaseDb = db;
-  PATH = isTestEnv
-    ? 'orcamento365_9b8e04c5'  // mesmo namespace de produção no teste
-    : 'orcamento365_9b8e04c5';
+  PATH = 'orcamento365_9b8e04c5';
   const auth = getAuth(app);
   await signInAnonymously(auth);   // garante auth.uid antes dos gets/sets
   save = (k, v) => set(ref(db, `${PATH}/${k}`), v);
@@ -67,6 +58,7 @@ let startBalance  = cacheGet('startBal', null);
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
+const txModalTitle = document.querySelector('#txModal h2');
 
 const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -122,6 +114,7 @@ const todayISO = () => {
 const post=(iso,m)=>{if(m==='Dinheiro')return iso;const c=cards.find(x=>x.name===m);if(!c)return iso;const [y,mo,d]=iso.split('-').map(Number);let mm=mo,yy=y;if(d>c.close){mm++;if(mm===13){mm=1;yy++;}}return yy+'-'+String(mm).padStart(2,'0')+'-'+String(c.due).padStart(2,'0');};
 
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
+let isEditing = null;
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
 const startContainer = document.querySelector('.start-container');
@@ -366,6 +359,25 @@ if (!window.opsSwipeInit) {
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
 async function addTx() {
+  // Modo edição?
+  if (isEditing !== null) {
+    const t = transactions.find(x => x.id === isEditing);
+    t.desc       = desc.value.trim();
+    t.val        = parseFloat(val.value);
+    t.method     = met.value;
+    t.opDate     = date.value;
+    t.postDate   = post(t.opDate, t.method);
+    t.modifiedAt = new Date().toISOString();
+    isEditing = null;
+    addBtn.textContent = 'Adicionar';
+    txModalTitle.textContent = 'Lançar operação';
+    save('tx', transactions);
+    renderTable();
+    toggleTxModal();
+    showToast('Alterações salvas!', 'success');
+    return;
+  }
+  // Modo adicionar (original)
   if (startBalance === null) {
     showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
@@ -389,11 +401,8 @@ async function addTx() {
     ts: new Date().toISOString(),
     modifiedAt: new Date().toISOString()
   };
-  // Save locally and queue (or send) to server
   transactions.push(tx);
   cacheSet('tx', transactions);
-
-  // Offline case: queue and inform user
   if (!navigator.onLine) {
     await queueTx(tx);
     updatePendingBadge();
@@ -401,24 +410,31 @@ async function addTx() {
     showToast('Offline: transação salva na fila', 'error');
     return;
   }
-
-  // Online case: send immediately
   await queueTx(tx);
-
-  // Clear form and UI
+  // Limpa formulário
   desc.value = '';
   val.value = '';
   date.value = todayISO();
   updatePendingBadge();
   renderTable();
-
-  // Close the modal
   toggleTxModal();
   showToast('Tudo certo!', 'success');
 }
 
 const delTx=id=>{if(!confirm('Apagar?'))return;transactions=transactions.filter(t=>t.id!==id);save('tx',transactions);renderTable();};
-const editTx=id=>{const t=transactions.find(x=>x.id===id);if(!t)return;const nd=prompt('Descrição',t.desc);if(nd===null)return;const nv=parseFloat(prompt('Valor',t.val));if(isNaN(nv))return;t.desc=nd.trim();t.val=nv;save('tx',transactions);renderTable();};
+const editTx = id => {
+  const t = transactions.find(x => x.id === id);
+  if (!t) return;
+  // Preenche modal com dados para edição
+  desc.value   = t.desc;
+  val.value    = t.val;
+  met.value    = t.method;
+  date.value   = t.opDate;
+  isEditing    = id;
+  addBtn.textContent = 'Salvar';
+  txModalTitle.textContent = 'Editar operação';
+  toggleTxModal();
+};
 
 function renderTable(){
   tbody.innerHTML='';

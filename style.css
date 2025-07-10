@@ -1042,3 +1042,37 @@ details.day[data-has="true"] {
   line-height: 1;
   z-index: 1001;
 }
+
+/* Ensure operations within invoice details use the #fafafa background */
+.invoice .op-line {
+  background: #fafafa !important;
+}
+/* Force invoice lines to container gray */
+#accordion .invoice .op-line {
+  background: #fafafa !important;
+}
+/* Ensure swipe wrapper in invoices matches container gray */
+#accordion .invoice .swipe-wrapper {
+  background: #fafafa !important;
+}
+
+/* Invoice accordion: ensure operation wrappers and timestamps use #fafafa */
+.invoice .swipe-wrapper,
+.invoice .op-line,
+.invoice .op-ts {
+  background: #fafafa !important;
+}
+/* Invoice list item background */
+.invoice .executed-list li {
+  background: #fafafa !important;
+}
+/* FORCE light-gray background across entire invoice block */
+.invoice,
+.invoice > summary,
+.invoice .executed-list,
+.invoice .executed-list li,
+.invoice .swipe-wrapper,
+.invoice .op-line,
+.invoice .op-ts {
+  background: #fafafa !important;
+}
