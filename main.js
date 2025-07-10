@@ -66,6 +66,7 @@ let cards         = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
 let startBalance  = cacheGet('startBal', null);
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
+const wrapperEl = document.querySelector('.wrapper');
 
 const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -502,7 +503,7 @@ function renderAccordion() {
       dDet.className = 'day';
       dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
       dDet.open = openKeys.includes(dDet.dataset.key);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       if (iso === today) dDet.classList.add('today');
       const dSum = document.createElement('summary');
       dSum.className = 'day-summary';
@@ -652,16 +653,19 @@ setStartBtn.onclick=()=>{const v=parseFloat(startInput.value);if(isNaN(v)){alert
 resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;cacheSet('tx', []);cacheSet('cards', [{name:'Dinheiro',close:0,due:0}]);cacheSet('startBal', null);save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 openCardBtn.onclick = () => {
-  document.body.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';   // bloqueia scroll de fundo
+  wrapperEl.style.overflow = 'hidden';      // bloqueia scroll no container principal
   cardModal.classList.remove('hidden');
 };
 closeCardModal.onclick = () => {
   document.body.style.overflow = '';
+  wrapperEl.style.overflow = '';
   cardModal.classList.add('hidden');
 };
 cardModal.onclick = e => {
   if (e.target === cardModal) {
     document.body.style.overflow = '';
+    wrapperEl.style.overflow = '';
     cardModal.classList.add('hidden');
   }
 };
@@ -720,17 +724,24 @@ function togglePlannedModal() {
   const isOpening = plannedModal.classList.contains('hidden');
   if (isOpening) {
     renderPlannedModal();
-    // Disable background scroll
     document.body.style.overflow = 'hidden';
+    wrapperEl.style.overflow = 'hidden';
   } else {
-    // Re-enable background scroll
     document.body.style.overflow = '';
+    wrapperEl.style.overflow = '';
   }
   plannedModal.classList.toggle('hidden');
 }
 openPlannedBtn.onclick = togglePlannedModal;
 closePlannedModal.onclick = togglePlannedModal;
 plannedModal.onclick = e => { if (e.target === plannedModal) togglePlannedModal(); };
+// Block scroll behind modal but allow scrolling inside it
+plannedModal.addEventListener('touchmove', e => {
+  if (e.target === plannedModal) e.preventDefault();
+}, { passive: false });
+plannedModal.addEventListener('wheel', e => {
+  if (e.target === plannedModal) e.preventDefault();
+}, { passive: false });
 
 function renderPlannedModal() {
   plannedList.innerHTML = '';
@@ -842,3 +853,11 @@ function updatePendingBadge() {
 }
 // dispara badge no arranque e após cada sync
 updatePendingBadge();
+
+
+// Prevent background scrolling on wheel when card modal is open
+document.addEventListener('wheel', e => {
+  if (!cardModal.classList.contains('hidden')) {
+    e.preventDefault();
+  }
+}, { passive: false });
