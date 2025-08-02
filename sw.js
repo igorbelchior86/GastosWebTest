@@ -6,7 +6,9 @@ const ASSETS = [
   './main.js',
   './icons/icon-192x192.png',
   './icons/icon-180x180.png',
-  './site.webmanifest'
+  './site.webmanifest',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
+  'https://fonts.googleapis.com/css2?family=Caveat&display=swap',
 ];
 
 // Instalação e pré-cache
@@ -28,28 +30,12 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Intercepta requisições
-self.addEventListener('fetch', event => {
-  event.respondWith((async () => {
-    if (event.request.method !== 'GET') {
-      // não cachear POST/PUT
-      return fetch(event.request);
-    }
-    const cached = await caches.match(event.request);
-    if (cached) return cached;
-    try {
-      const response = await Promise.race([
-        fetch(event.request),
-        new Promise((_, rej) => setTimeout(() => rej('timeout'), 10000))
-      ]);
-      const cache = await caches.open(CACHE);
-      cache.put(event.request, response.clone());
-      return response;
-    } catch (err) {
-      return cached || Response.error();
-    }
-  })());
-});
+// Cache-first, network-fallback for all GET requests
+self.addEventListener('fetch', e =>
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
+  )
+);
 
 // Notify clients to flush queue when back online
 self.addEventListener('sync', event => {
