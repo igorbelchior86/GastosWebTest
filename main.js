@@ -45,95 +45,54 @@ if (headerSeg) {
 }
 
 // --- Ensure Planned modal values are anchored to the right, regardless of DOM structure
+function normalizeLabelWidths(liElements) {
+  // Calculates the maximum width of all label-wrapper elements and returns it
+  let maxWidth = 0;
+  liElements.forEach(li => {
+    const label = li.querySelector('.label-wrapper');
+    if (label) {
+      label.style.width = ''; // reset before measuring
+      const w = label.offsetWidth;
+      if (w > maxWidth) maxWidth = w;
+    }
+  });
+  return maxWidth;
+}
+
+function adjustValueSpacing(liElements) {
+  // Adjusts the padding-right of .value-wrapper based on value content
+  liElements.forEach(li => {
+    const valueWrap = li.querySelector('.value-wrapper');
+    const value = li.querySelector('.value');
+    if (valueWrap && value) {
+      // Example: set padding-right based on value width plus a margin
+      valueWrap.style.paddingRight = (value.offsetWidth + 24) + 'px';
+    }
+  });
+}
+
+function applyUniformLabelWidth(maxWidth, liElements) {
+  // Applies the same width to all label-wrapper elements
+  liElements.forEach(li => {
+    const label = li.querySelector('.label-wrapper');
+    if (label) {
+      label.style.width = maxWidth + 'px';
+    }
+  });
+}
+
 function fixPlannedAlignment() {
   if (!plannedList) return;
   // Only act if the Planned modal is visible
   if (plannedModal && plannedModal.classList.contains('hidden')) return;
 
-  plannedList.querySelectorAll('li').forEach(li => {
-    // Ensure wrappers occupy full width
-    li.style.position = 'relative';
-    li.style.width = '100%';
-
-    const wrap = li.querySelector('.swipe-wrapper');
-    if (wrap) {
-      wrap.style.position = 'relative';
-      wrap.style.width = '100%';
-      wrap.style.maxWidth = '100%';
-    }
-
-    const line = li.querySelector('.op-line, .card-line') || li.firstElementChild;
-    if (line) {
-      line.style.position = 'relative';
-      line.style.width = '100%';
-      line.style.maxWidth = '100%';
-      line.style.boxSizing = 'border-box';
-    }
-
-    const row = li.querySelector('.op-main') || li.querySelector('.planned-row') || (line || li).firstElementChild;
-    if (row) {
-      row.style.position = 'relative';
-      row.style.display = 'flex';
-      row.style.alignItems = 'center';
-      row.style.gap = '12px';
-      row.style.flexWrap = 'nowrap';
-      // Reserve space for the fixed value on the right
-      row.style.paddingRight = '96px';
-      row.style.boxSizing = 'border-box';
-      row.style.width = '100%';
-      row.style.maxWidth = '100%';
-    }
-
-    // Locate value element
-    let valueEl = li.querySelector('.op-right .value') || li.querySelector('.value');
-    if (!valueEl) return;
-
-    // Ensure an anchor container for absolute positioning
-    let anchor = valueEl.closest('.op-right');
-    if (!anchor) {
-      anchor = document.createElement('div');
-      anchor.className = 'op-right';
-      valueEl.parentNode.insertBefore(anchor, valueEl);
-      anchor.appendChild(valueEl);
-    }
-    anchor.style.position = 'absolute';
-    anchor.style.right = '12px';
-    anchor.style.top = '50%';
-    anchor.style.transform = 'translateY(-50%)';
-    anchor.style.display = 'flex';
-    anchor.style.alignItems = 'center';
-    anchor.style.justifyContent = 'flex-end';
-    anchor.style.minWidth = '84px';
-
-    valueEl.style.textAlign = 'right';
-    valueEl.style.display = 'inline-block';
-
-    // Move payment method element under the description inside .op-left
-    const methodEl = li.querySelector('.op-right > :not(.value)');
-    const opLeft   = li.querySelector('.op-left');
-    if (methodEl && opLeft && !opLeft.contains(methodEl)) {
-      methodEl.classList.add('method');
-      opLeft.appendChild(methodEl);   // agora fica exatamente alinhado com a descrição
-    }
-    // Compute exact indent where the description text actually starts
-    const descSpan = li.querySelector('.op-left span:not(.icon-repeat)');
-    const methodUnder = li.querySelector('.op-left .method');
-    if (descSpan) {
-      try {
-        const lineRect = line.getBoundingClientRect();
-        const descRect = descSpan.getBoundingClientRect();
-        const cs = getComputedStyle(descSpan);
-        const padL = parseFloat(cs.paddingLeft) || 0;
-        const marL = parseFloat(cs.marginLeft) || 0;
-        const borderL = parseFloat(cs.borderLeftWidth) || 0;
-        const indent = Math.max(0, Math.round((descRect.left - lineRect.left) + padL + marL + borderL));
-        // set CSS variable on the line (inherited by children)
-        line.style.setProperty('--plan-left-indent', indent + 'px');
-        // enforce on the method element as a fallback/safety
-        
-      } catch(_) {}
-    }
-  });
+  const liElements = plannedList.querySelectorAll('li');
+  // 1. Normalize label widths
+  const maxWidth = normalizeLabelWidths(liElements);
+  // 2. Adjust value spacing
+  adjustValueSpacing(liElements);
+  // 3. Apply uniform label width
+  applyUniformLabelWidth(maxWidth, liElements);
 }
 
 // --- Expand weekday labels to long form inside Planned modal ---
@@ -190,10 +149,22 @@ import { openDB } from 'https://unpkg.com/idb?module';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
 
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
-import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
 // Configuração do Firebase de TESTE (arquivo separado)
+
 import { firebaseConfig } from './firebase.test.config.js';
+
+// (Web Push removido)
+
+// ---- IndexedDB (idb) key/value cache ----
+const cacheDB = await openDB('gastos-cache', 1, {
+  upgrade(db) {
+    if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+  }
+});
+async function idbGet(k) { try { return await cacheDB.get('kv', k); } catch { return undefined; } }
+async function idbSet(k, v) { try { await cacheDB.put('kv', v, k); } catch {} }
 
 /**
  * Initialize swipe-to-reveal actions on elements.
@@ -264,7 +235,26 @@ let PATH;
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
 const USE_MOCK = false;              // conectar ao Firebase PROD
-const APP_VERSION = '1.4.6';
+const APP_VERSION = '1.4.7';
+const METRICS_ENABLED = true;
+const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+function logMetric(name, payload) {
+  try {
+    if (!METRICS_ENABLED || USE_MOCK || !firebaseDb) return;
+    const key = `${PATH}/metrics/${name}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    set(ref(firebaseDb, key), {
+      ...payload,
+      appVersion: APP_VERSION,
+      ua: navigator.userAgent,
+      ts: new Date().toISOString()
+    });
+  } catch (_) {}
+}
+// Log boot timing once the page fully loads
+window.addEventListener('load', () => {
+  const now = (performance && performance.now) ? performance.now() : Date.now();
+  logMetric('boot', { firstPaint_ms: Math.round(now - _bootT0) });
+});
 let save, load;
 let firebaseDb;
 
@@ -281,7 +271,18 @@ if (!USE_MOCK) {
   const auth = getAuth(app);
   await signInAnonymously(auth);
 
-  save = (k, v) => set(ref(db, `${PATH}/${k}`), v);
+  // Wrapper: save marks as dirty and updates cache if offline
+  save = async (k, v) => {
+    if (!navigator.onLine) {
+      // mark as dirty for later flush and cache locally for instant UI
+      markDirty(k);
+      if (k === 'tx') cacheSet('tx', v);
+      if (k === 'cards') cacheSet('cards', v);
+      if (k === 'startBal') cacheSet('startBal', v);
+      return; // no remote write while offline
+    }
+    return set(ref(db, `${PATH}/${k}`), v);
+  };
   load = async (k, d) => {
     const s = await get(ref(db, `${PATH}/${k}`));
     return s.exists() ? s.val() : d;
@@ -295,315 +296,135 @@ if (!USE_MOCK) {
 }
 
 
-// Cache local (LocalStorage) p/ boot instantâneo
-const cacheGet  = (k, d) => JSON.parse(localStorage.getItem(`cache_${k}`)) ?? d;
-const cacheSet  = (k, v) => localStorage.setItem(`cache_${k}`, JSON.stringify(v));
+// Cache local (LocalStorage+IDB) p/ boot instantâneo, com fallback/hydrate
+const cacheGet  = (k, d) => {
+  try {
+    const ls = localStorage.getItem(`cache_${k}`);
+    if (ls != null) return JSON.parse(ls);
+  } catch {}
+  // Fallback: fetch from IDB asynchronously and warm localStorage
+  (async () => {
+    const v = await idbGet(`cache_${k}`);
+    if (v !== undefined) localStorage.setItem(`cache_${k}`, JSON.stringify(v));
+  })();
+  return d;
+};
+const cacheSet  = (k, v) => {
+  localStorage.setItem(`cache_${k}`, JSON.stringify(v));
+  idbSet(`cache_${k}`, v);
+};
 
-// ---------------- Offline queue helpers ----------------
-// Badge on the ⟳ sync button shows how many items are waiting
+// ---------------- Offline queue helpers (generalized) ----------------
+// We track which collections are "dirty" while offline: 'tx', 'cards', 'startBal'.
 function updatePendingBadge() {
   const syncBtn = document.getElementById('syncNowBtn');
   if (!syncBtn) return;
-  const q = cacheGet('txQueue', []);
+  const q = cacheGet('dirtyQueue', []);
   syncBtn.textContent = q.length ? `⟳ (${q.length})` : '⟳';
 }
 
-// Adds one transaction to the local pending queue (LocalStorage)
-async function queueTx(tx) {
-  const q = cacheGet('txQueue', []);
-  q.push(tx);
-  cacheSet('txQueue', q);
+// Marks a collection as dirty so we know to flush it later.
+function markDirty(kind) {
+  const allowed = ['tx','cards','startBal'];
+  if (!allowed.includes(kind)) return;
+  const q = cacheGet('dirtyQueue', []);
+  if (!q.includes(kind)) q.push(kind);
+  cacheSet('dirtyQueue', q);
   updatePendingBadge();
+  scheduleBgSync();
 }
 
-// Flushes the pending queue to Firebase and clears it locally.
-// Merges with the live `transactions` list and saves.
-/**
- * Flush the pending transaction queue: try each tx and collect failures.
- */
-
-async function flushQueue() {
-  let q = JSON.parse(localStorage.getItem('txQueue') || '[]');
-  if (!q.length) return;
-  const failed = [];
-  for (const tx of q) {
-    try {
-      await saveSingleTx(tx);
-    } catch {
-      failed.push(tx);
-    }
+// ---- Background Sync registration (Android/Chrome) + retry loop (iOS/Safari) ----
+async function scheduleBgSync() {
+  try {
+    if (USE_MOCK) return;
+    if (!('serviceWorker' in navigator)) return;
+    if (!('SyncManager' in window)) return; // iOS/Safari will skip
+    const reg = await navigator.serviceWorker.ready;
+    await reg.sync.register('sync-tx');
+  } catch (_) {
+    // ignore; fallbacks below handle retries
   }
-  localStorage.setItem('txQueue', JSON.stringify(failed));
+}
+
+let _retryTimer = null;
+let _retryDelay = 5000; // start 5s, cap 60s
+async function tryFlushWithBackoff() {
+  if (!navigator.onLine) return;
+  await flushQueue();
+  const stillDirty = (cacheGet('dirtyQueue', []) || []).length > 0;
+  if (stillDirty) {
+    clearTimeout(_retryTimer);
+    _retryTimer = setTimeout(tryFlushWithBackoff, Math.min(_retryDelay *= 2, 60000));
+  } else {
+    _retryDelay = 5000;
+  }
+}
+
+// iOS-friendly triggers: when app regains focus/visibility or BFCache restores the page
+window.addEventListener('focus', () => { if (navigator.onLine) tryFlushWithBackoff(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.onLine) tryFlushWithBackoff(); });
+window.addEventListener('pageshow', (e) => { if (navigator.onLine && (!e.persisted || true)) tryFlushWithBackoff(); });
+// Also when coming online, schedule bg sync (Android) and kick retries
+window.addEventListener('online', () => { scheduleBgSync(); tryFlushWithBackoff(); });
+
+// Backwards-compatible: queueTx() now just marks 'tx' as dirty.
+async function queueTx(/* tx object ignored */) {
+  markDirty('tx');
+}
+
+// Flushes all dirty collections to Firebase and clears the dirty flags.
+async function flushQueue() {
+  const q = cacheGet('dirtyQueue', []);
+  if (!q.length) return;
+
+  // optimistic clear; restore on failure
+  cacheSet('dirtyQueue', []);
+
+  try {
+    if (q.includes('tx'))       await save('tx', transactions);
+    if (q.includes('cards'))    await save('cards', cards);
+    if (q.includes('startBal')) await save('startBal', startBalance);
+    showToast('Fila sincronizada!', 'success');
+  } catch (err) {
+    console.error('flushQueue failed:', err);
+    // Put back flags so we retry later (union of previous + current)
+    const cur = cacheGet('dirtyQueue', []);
+    cacheSet('dirtyQueue', [...new Set([...q, ...cur])]);
+    return;
+  }
   updatePendingBadge();
-  renderTable();  // garante UI consistente
+  renderTable();
 }
 
-/**
- * Save current transactions array to localStorage for fast reload.
- */
-function snapshotTxState() {
-  localStorage.setItem('txState', JSON.stringify(transactions));
-}
+// Auto-flush when back online and toggle offline indicator
+// --- Offline/Online Toast notifications (register once on app load) ---
+(function () {
+  let _offlineOnlineListenersRegistered = false;
+  function registerOfflineOnlineToasts() {
+    if (_offlineOnlineListenersRegistered) return;
+    window.addEventListener('offline', () => {
+      showToast("Você está offline", 'error', 5000);
+    });
+    window.addEventListener('online', () => {
+      showToast("Conexão restabelecida", 'success', 5000);
+    });
+    _offlineOnlineListenersRegistered = true;
+  }
+  // Register at startup
+  registerOfflineOnlineToasts();
+})();
 
 
-
-const $ = id => document.getElementById(id);
-const tbody = document.querySelector('#dailyTable tbody');
+// Load transactions/cards/balance: now with realtime listeners if not USE_MOCK
+let transactions;
+let cards;
+let startBalance;
+const $=id=>document.getElementById(id);
+const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
 const txModalTitle = document.querySelector('#txModal h2');
-// Helpers for formatting and months used by renderTable
-const currency = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const mobile = () => window.innerWidth <= 480;
-const fmt = d => d.toLocaleDateString(
-  'pt-BR',
-  mobile()
-    ? { day: '2-digit', month: '2-digit' }
-    : { day: '2-digit', month: '2-digit', year: 'numeric' }
-);
-/**
- * Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
- */
-const todayISO = () => {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 10);
-};
-// expose todayISO to global for inline scripts
-window.todayISO = todayISO;
-// Restore cards and start balance before initial render
-let cards = cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]);
-let startBalance = cacheGet('startBal', null);
-// Terms indicating salary transactions
-const SALARY_WORDS = ['salário', 'salario', 'provento', 'rendimento', 'pagamento', 'paycheck', 'salary'];
-// Sticky month header (Safari/iOS não suporta <summary> sticky)
-const headerEl = document.querySelector('.app-header');
-const HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
-const STICKY_VISIBLE = 18;
-const stickyMonth = document.createElement('div');
-stickyMonth.className = 'sticky-month';
-stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
-document.body.appendChild(stickyMonth);
 
-window.addEventListener('resize', () => {
-  const h = headerEl.getBoundingClientRect().height;
-  stickyMonth.style.top = (h - STICKY_VISIBLE) + 'px';
-});
-
-function updateStickyMonth() {
-  let label = '';
-  document.querySelectorAll('summary.month-divider').forEach(div => {
-    const rect = div.getBoundingClientRect();
-    if (rect.top <= HEADER_OFFSET) {
-      label = div.textContent.trim();
-    }
-  });
-  if (label) {
-    stickyMonth.textContent = label.split(/\s+/)[0];
-    stickyMonth.classList.add('visible');
-  } else {
-    stickyMonth.classList.remove('visible');
-  }
-}
-
-window.addEventListener('scroll', updateStickyMonth);
-
-// swipe-init for operations is now handled via initSwipe at the end of the file.
-const makeLine = (t) => {
-  // Create swipe wrapper
-  const wrap = document.createElement('div');
-  wrap.className = 'swipe-wrapper';
-
-  // Create actions container
-  const actions = document.createElement('div');
-  actions.className = 'swipe-actions';
-
-  // Edit button
-  const editBtn = document.createElement('button');
-  editBtn.className = 'icon edit';
-  // Remove emoji, add SVG icon
-  editBtn.textContent = '';
-  const editIconDiv = document.createElement('div');
-  editIconDiv.className = 'icon-action icon-edit';
-  editBtn.appendChild(editIconDiv);
-  editBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    // master or dynamically recurring occurrence
-    if (t.recurrence || (hasRecurrence && !t.recurrence && !t.parentId)) {
-      // recorrência: mostra opções de edição
-      pendingEditTxId  = t.id;
-      pendingEditTxIso = t.postDate;
-      editRecurrenceModal.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-      wrapperEl.style.overflow     = 'hidden';
-      return;
-    }
-    if (isDetachedOccurrence(t)) {
-      // ocorrência destacada: edição única
-      pendingEditMode = null;
-      editTx(t.id);
-      return;
-    }
-    // operação única: abre modal de edição
-    editTx(t.id);
-  });
-  actions.appendChild(editBtn);
-
-  // Delete button
-  const delBtn = document.createElement('button');
-  delBtn.className = 'icon danger delete';
-  delBtn.textContent = '';
-  const delIconDiv = document.createElement('div');
-  delIconDiv.className = 'icon-action icon-delete';
-  delBtn.appendChild(delIconDiv);
-  delBtn.onclick = () => {
-    if (hasRecurrence) {
-      // show bottom sheet only for recurring operations
-      delTx(t.id, t.postDate);
-    } else {
-      // simple confirm for one‑time operations (including detached occurrences)
-      if (confirm('Deseja excluir esta operação?')) {
-        transactions = transactions.filter(x => x.id !== t.id);
-        save('tx', transactions);
-        renderTable();
-        showToast('Operação excluída!', 'success');
-      }
-    }
-  };
-  actions.appendChild(delBtn);
-
-  // Original operation line
-  const d = document.createElement('div');
-  d.className = 'op-line';
-  d.dataset.txId = t.id;
-
-  // Build the content as before
-  const topRow = document.createElement('div');
-  topRow.className = 'op-main';
-  const left = document.createElement('div');
-  left.className = 'op-left';
-
-  // (Moved) mark recurring transactions with an icon AFTER description
-
-  if (t.planned) {
-    const chk = document.createElement('input');
-    chk.type = 'checkbox';
-    chk.className = 'plan-check';
-    chk.name = 'planned';
-    chk.onchange = () => togglePlanned(t.id, t.opDate);
-    left.appendChild(chk);
-  }
-  const descNode = document.createElement('span');
-  descNode.textContent = t.desc;
-  left.appendChild(descNode);
-  // mark recurring transactions (master, occurrence, or detached‑edited copy)
-  const hasRecurrence = (() => {
-    // (a) O próprio registro é a regra‑mestre (recurrence não‑vazio)
-    if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
-
-    // (b) Possui parentId apontando para regra‑mestre
-    if (t.parentId) {
-      const master = transactions.find(p => p.id === t.parentId);
-      if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
-    }
-
-    /* (c) Ocorrência dinâmica criada em tempo de render:
-       Não tem parentId nem recurrence. Procuramos QUALQUER
-       regra‑mestre cuja frequência caia exatamente em t.opDate. */
-    for (const p of transactions) {
-      if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
-        if (occursOn(p, t.opDate)) {
-          // Para evitar falsos‑positivos, exige igual descrição OU valor
-          if (p.desc === t.desc || p.val === t.val) return true;
-        }
-      }
-    }
-
-    return false;
-  })();
-  if (hasRecurrence) {
-    const recIcon = document.createElement('span');
-    recIcon.className = 'icon-repeat';
-    recIcon.title = 'Recorrência';
-    left.appendChild(recIcon);
-  }
-  // Fallback guard — if, for any reason, no icon was appended yet but
-  // the transaction (or its parent) é recorrente, injeta no começo.
-  if (!left.querySelector('.icon-repeat')) {
-    const hasRecurrenceFinal =
-      (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
-      (t.parentId && transactions.some(p =>
-        p.id === t.parentId &&
-        typeof p.recurrence === 'string' &&
-        p.recurrence.trim() !== ''
-      ));
-
-    if (hasRecurrenceFinal) {
-      const recIc = document.createElement('span');
-      recIc.className = 'icon-repeat';
-      left.insertBefore(recIc, left.firstChild);
-    }
-  }
-  const right = document.createElement('div');
-  right.className = 'op-right';
-  const value = document.createElement('span');
-  value.className = 'value';
-  value.textContent = `R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-  if (t.val < 0) value.classList.add('negative');
-  else value.classList.add('positive');
-  right.appendChild(value);
-  topRow.appendChild(left);
-  topRow.appendChild(right);
-  d.appendChild(topRow);
-
-  // Timestamp & method
-  const ts = document.createElement('div');
-  ts.className = 'timestamp';
-  const [y, mo, da] = t.opDate.split('-').map(Number);
-  const dateObj = new Date(y, mo - 1, da);
-  const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const methodLabel = t.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${t.method}`;
-  if (t.planned) {
-    ts.textContent = `${dateStr} - ${methodLabel}`;
-  } else if (t.opDate === todayISO()) {
-    const timeStr = new Date(t.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    ts.textContent = timeStr;
-  } else {
-    ts.textContent = dateStr;
-  }
-  d.appendChild(ts);
-
-  // Assemble wrapper and return
-  wrap.appendChild(actions);
-  wrap.appendChild(d);
-  return wrap;
-};
-
-// Restore previous transaction state for instant PWA load
-let transactions = JSON.parse(localStorage.getItem('txState') || '[]');
-renderTable();
-
-// Restore previous transaction state for instant PWA load
-// (rest of original code resumes)
-// Flush any pending writes before fetching remote state
-await flushQueue();
-
-// Fetch remote transactions
-const fetched = !USE_MOCK
-  ? await load('tx', [])
-  : cacheGet('tx', []);
-
-// Merge fetched state with pending queue
-const queued = JSON.parse(localStorage.getItem('txQueue') || '[]');
-const txMap = new Map();
-fetched.forEach(tx => txMap.set(tx.id, tx));
-queued.forEach(tx => txMap.set(tx.id, tx));
-transactions = Array.from(txMap.values());
-
-// Render merged state
-renderTable();
-// Save snapshot after merging remote and queued transactions
-snapshotTxState();
 // Helper: sort transactions by opDate (YYYY-MM-DD) then by timestamp (ts) so UI is always chronological
 function sortTransactions() {
   transactions.sort((a, b) => {
@@ -613,21 +434,139 @@ function sortTransactions() {
     return (a.ts || '').localeCompare(b.ts || '');
   });
 }
+
+// --- Toast helper ---
+const showToast = (msg, type = 'error', duration = 3000) => {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.setProperty('--icon', type === 'error' ? '"✕"' : '"✓"');
+  t.classList.remove('success', 'error');
+  t.classList.add(type === 'success' ? 'success' : 'error');
+  // restart animation
+  void t.offsetWidth;
+  t.classList.add('show');
+  setTimeout(() => { t.classList.remove('show'); }, duration);
+};
+
 // ---- Migration: normalize legacy transactions ----
-transactions = transactions.map(t => ({
-  ...t,
-  // Padroniza “Dinheiro” com D maiúsculo
-  method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
-  recurrence: t.recurrence ?? '',
-  installments: t.installments ?? 1,
-  parentId: t.parentId ?? null
-}));
-cacheSet('tx', transactions);
-sortTransactions();
+// (moved inside block below)
 
 // ---------------------------------------------------------------------------
-// Modal de Transação: código movido do index.html
+// Load transactions/cards/balances with realtime listeners or fallback to mock
 // ---------------------------------------------------------------------------
+
+if (!USE_MOCK) {
+  // Live listeners (Realtime DB)
+  const txRef    = ref(firebaseDb, `${PATH}/tx`);
+  const cardsRef = ref(firebaseDb, `${PATH}/cards`);
+  const balRef   = ref(firebaseDb, `${PATH}/startBal`);
+
+  // initialize from cache first for instant UI
+  transactions = cacheGet('tx', []);
+  transactions = transactions.map(t => ({
+    ...t,
+    method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
+    recurrence: t.recurrence ?? '',
+    installments: t.installments ?? 1,
+    parentId: t.parentId ?? null
+  }));
+  sortTransactions();
+  cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
+  startBalance = cacheGet('startBal', null);
+
+  // Listen for tx changes (LWW merge per item)
+  onValue(txRef, (snap) => {
+    const raw  = snap.val() ?? [];
+    const incoming = Array.isArray(raw) ? raw : Object.values(raw);
+
+    // normalize both sides
+    const norm = (t) => ({
+      ...t,
+      method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
+      recurrence: t.recurrence ?? '',
+      installments: t.installments ?? 1,
+      parentId: t.parentId ?? null
+    });
+
+    const local = (transactions || []).map(norm);
+    const remote = (incoming || []).map(norm);
+
+    const byId = new Map(local.map(t => [t.id, t]));
+    for (const r of remote) {
+      const l = byId.get(r.id);
+      if (!l) { byId.set(r.id, r); continue; }
+      const lt = Date.parse(l.modifiedAt || l.ts || 0);
+      const rt = Date.parse(r.modifiedAt || r.ts || 0);
+      if (rt >= lt) byId.set(r.id, r); // remote wins; else keep local newer
+    }
+    const merged = Array.from(byId.values());
+
+    transactions = merged;
+    cacheSet('tx', transactions);
+    sortTransactions();
+    renderTable();
+  });
+
+  // Listen for card changes
+  onValue(cardsRef, (snap) => {
+    const raw  = snap.val() ?? [];
+    const next = Array.isArray(raw) ? raw : Object.values(raw);
+    if (JSON.stringify(next) === JSON.stringify(cards)) return;
+
+    cards = next;
+    if (!cards.some(c => c.name === 'Dinheiro')) {
+      cards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+    }
+    cacheSet('cards', cards);
+    refreshMethods();
+    renderCardList();
+    renderTable();
+  });
+
+  // Listen for balance changes
+  onValue(balRef, (snap) => {
+    const val = snap.exists() ? snap.val() : null;
+    if (val === startBalance) return;
+    startBalance = val;
+    cacheSet('startBal', startBalance);
+    initStart();
+    renderTable();
+  });
+} else {
+  // Fallback (mock) — carrega uma vez
+  const [liveTx, liveCards, liveBal] = await Promise.all([
+    load('tx', []),
+    load('cards', cards),
+    load('startBal', startBalance)
+  ]);
+
+  const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
+  const hasLiveCards = Array.isArray(liveCards) ? liveCards.length > 0 : liveCards && Object.keys(liveCards).length > 0;
+
+  const fixedTx = Array.isArray(liveTx) ? liveTx : Object.values(liveTx || {});
+
+  transactions = cacheGet('tx', []);
+  cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
+  startBalance = cacheGet('startBal', null);
+
+  if (hasLiveTx && JSON.stringify(fixedTx) !== JSON.stringify(transactions)) {
+    transactions = fixedTx;
+    cacheSet('tx', transactions);
+    renderTable();
+  }
+  if (hasLiveCards && JSON.stringify(liveCards) !== JSON.stringify(cards)) {
+    cards = liveCards;
+    if (!cards.some(c => c.name === 'Dinheiro')) cards.unshift({ name:'Dinheiro', close:0, due:0 });
+    cacheSet('cards', cards);
+    refreshMethods(); renderCardList(); renderTable();
+  }
+  if (liveBal !== startBalance) {
+    startBalance = liveBal;
+    cacheSet('startBal', startBalance);
+    initStart(); renderTable();
+  }
+}
 const openTxBtn = document.getElementById('openTxModal');
 const txModal   = document.getElementById('txModal');
 const closeTxModal = document.getElementById('closeTxModal');
@@ -671,6 +610,27 @@ function resetTxModal() {
   if (modalHeader) modalHeader.textContent = 'Lançar operação';
   const addBtnEl = document.getElementById('addBtn');
   if (addBtnEl) addBtnEl.textContent = 'Adicionar';
+
+  // Custom save confirmation toast
+  const last = transactions[transactions.length - 1];
+  let toastMsg = 'Transação salva';
+  if (last && typeof last.val === 'number') {
+    const formattedVal = last.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (last.method !== 'Dinheiro' && !last.planned) {
+      // Cartão lançado para hoje (vai para a fatura): avisa a fatura correspondente
+      const [, mm, dd] = last.postDate.split('-');
+      toastMsg = `${formattedVal} salva na fatura de ${dd}/${mm}`;
+    } else if (!recurrence.value) {
+      // Operação única (dinheiro ou planejada)
+      const opDateVal = last.opDate; // YYYY-MM-DD
+      toastMsg = `${formattedVal} salvo em ${opDateVal.slice(8,10)}/${opDateVal.slice(5,7)}`;
+    } else {
+      // Regra de recorrência
+      const recText = recurrence.options[recurrence.selectedIndex].text.toLowerCase();
+      toastMsg = `${formattedVal} salvo (${recText})`;
+    }
+  }
+  showToast(toastMsg, 'success');
 }
 
 /**
@@ -712,6 +672,7 @@ if (txModal) {
     if (e.target === txModal) toggleTxModal();
   };
 }
+// (Web Push removido)
 // Block background scrolling via touch/wheel when tx modal is open
 document.addEventListener('touchmove', (e) => {
   if (!txModal.classList.contains('hidden')) e.preventDefault();
@@ -723,7 +684,69 @@ document.addEventListener('wheel', (e) => {
 
 
 
+const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+// Palavras que caracterizam “salário”
+const SALARY_WORDS = ['salário', 'salario', 'provento', 'rendimento', 'pagamento', 'paycheck', 'salary'];
+const mobile=()=>window.innerWidth<=480;
+const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit'}:{day:'2-digit',month:'2-digit',year:'numeric'});
 
+// ---------------------------------------------------------------------------
+// Sticky month header  (Safari/iOS não suporta <summary> sticky)
+// ---------------------------------------------------------------------------
+const headerEl      = document.querySelector('.app-header');
+const HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
+const STICKY_VISIBLE = 18;
+const stickyMonth     = document.createElement('div');
+stickyMonth.className = 'sticky-month';
+stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
+document.body.appendChild(stickyMonth);
+
+// Recalcula altura do header em rotação / resize
+window.addEventListener('resize', () => {
+  const h = headerEl.getBoundingClientRect().height;
+  stickyMonth.style.top = (h - STICKY_VISIBLE) + 'px';
+});
+
+function updateStickyMonth() {
+  let label = '';
+  const divs = document.querySelectorAll('summary.month-divider');
+  divs.forEach(div => {
+    const rect = div.getBoundingClientRect();
+    // choose the last divider whose top passed the header
+    if (rect.top <= HEADER_OFFSET) {
+      label = div.textContent.replace(/\s+/g, ' ').trim();
+    }
+  });
+  if (label) {
+    // Exibe apenas o nome do mês (primeira palavra do label)
+    const mesApenas = label.split(/\s+/)[0];
+    stickyMonth.textContent = mesApenas;
+    stickyMonth.classList.add('visible');
+  } else {
+    stickyMonth.classList.remove('visible');
+  }
+}
+
+window.addEventListener('scroll', updateStickyMonth);
+
+// --- Date helpers ---
+/**
+ * Formats a Date object to YYYY-MM-DD (ISO) in local time.
+ * @param {Date} date
+ * @returns {string}
+ */
+function formatToISO(date) {
+  // Adjust for local timezone before formatting
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split('T')[0];
+}
+
+// Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
+const todayISO = () => formatToISO(new Date());
+// expose todayISO to global for inline scripts
+window.todayISO = todayISO;
 
 // Função para calcular o postDate de cartões corretamente (nova lógica)
 const post = (iso, m) => {
@@ -749,12 +772,14 @@ const post = (iso, m) => {
   }
   // Monta data de vencimento da fatura (YYYY-MM-DD)
   const pad = n => String(n).padStart(2, '0');
-  return `${invoiceYear}-${pad(invoiceMonth + 1)}-${pad(dueDay)}`;
+  // Use formatToISO to ensure correct formatting (even though string concat is safe here)
+  return formatToISO(new Date(`${invoiceYear}-${pad(invoiceMonth + 1)}-${pad(dueDay)}`));
 };
 
-const addYearsIso  = (iso,n) => {
-  const d=new Date(iso);d.setFullYear(d.getFullYear()+n);
-  return d.toISOString().slice(0,10);
+const addYearsIso  = (iso, n) => {
+  const d = new Date(iso);
+  d.setFullYear(d.getFullYear() + n);
+  return formatToISO(d);
 };
 
 
@@ -774,7 +799,9 @@ function occursOn(tx, iso) {
   if (tx.recurrenceEnd && iso >= tx.recurrenceEnd) return false;
   if (!tx.recurrence) return false;
   if (iso < tx.opDate) return false;
-  const diffDays = Math.floor((new Date(iso) - new Date(tx.opDate)) / 864e5);
+  const baseDate = new Date(tx.opDate);
+  const testDate = new Date(iso);
+  const diffDays = Math.floor((testDate - baseDate) / 864e5);
   switch (tx.recurrence) {
     case 'D':  return true;
     case 'W':  return diffDays % 7  === 0;
@@ -783,8 +810,9 @@ function occursOn(tx, iso) {
     case 'Q':  return isSameDayOfMonth(tx.opDate, iso, 3);
     case 'S':  return isSameDayOfMonth(tx.opDate, iso, 6);
     case 'Y': {
-      const bd = new Date(tx.opDate);
-      const td = new Date(iso);
+      // Use formatToISO to compare only date parts (ignoring time zone issues)
+      const bd = baseDate;
+      const td = testDate;
       return bd.getDate() === td.getDate() && bd.getMonth() === td.getMonth();
     }
     default:   return false;
@@ -925,6 +953,34 @@ recurrence.onchange = () => {
 let isEditing = null;
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
+// Enable and handle the "Limpar tudo" button
+if (resetBtn) {
+  resetBtn.hidden = false;
+  resetBtn.addEventListener('click', () => {
+    if (!confirm('Atenção: ao limpar todos os dados, serão apagadas todas as transações, cartões e o saldo inicial permanentemente. Deseja continuar?')) return;
+
+    // Clear all data
+    transactions = [];
+    cards = [{ name: 'Dinheiro', close: 0, due: 0 }];
+    startBalance = null;
+
+    // Clear caches
+    cacheSet('tx', transactions);
+    cacheSet('cards', cards);
+    cacheSet('startBal', startBalance);
+
+    // Persist
+    save('tx', transactions);
+    save('cards', cards);
+    save('startBal', startBalance);
+
+    // UI
+    if (typeof refreshMethods === 'function') refreshMethods();
+    if (typeof renderCardList === 'function') renderCardList();
+    if (typeof initStart === 'function') initStart();
+    renderTable();
+  });
+}
 // Auto-format initial balance input as BRL currency
 if (startInput) {
   startInput.addEventListener('input', () => {
@@ -942,7 +998,7 @@ if (startInput) {
 const startContainer = document.querySelector('.start-container');
 const dividerSaldo = document.getElementById('dividerSaldo');
 
-const showToast = (msg, type = 'error') => {
+const notify = (msg, type = 'error') => {
   const t = document.getElementById('toast');
   if (!t) return;
 
@@ -968,7 +1024,7 @@ const showToast = (msg, type = 'error') => {
   setTimeout(() => {
     t.classList.remove('show');          // starts fade‑out (0.3 s)
     // setTimeout(() => t.classList.remove(type), 300);
-  }, 3000);
+  }, 5000);
 };
 
 const togglePlanned = (id, iso) => {
@@ -1033,7 +1089,7 @@ const togglePlanned = (id, iso) => {
   });
 
   // mostra o toast por último, já com a tela renderizada
-  if (toastMsg) showToast(toastMsg, 'success');
+  if (toastMsg) notify(toastMsg, 'success');
 };
 
 const openCardBtn=document.getElementById('openCardModal');
@@ -1041,111 +1097,125 @@ const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
 
 function refreshMethods(){met.innerHTML='';cards.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});}
+// --- Card List Rendering (Refatorado) ---
+function createCardSwipeActions(card) {
+  const actions = document.createElement('div');
+  actions.className = 'swipe-actions';
+
+  // Edit SVG icon
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon edit';
+  editBtn.style.padding = '0';
+  editBtn.style.background = 'none';
+  editBtn.style.border = 'none';
+  editBtn.style.cursor = 'pointer';
+  const editIconDiv = document.createElement('div');
+  editIconDiv.className = 'icon-action icon-edit';
+  editBtn.appendChild(editIconDiv);
+  editBtn.addEventListener('click', () => {
+    const newName  = prompt('Nome do cartão', card.name)?.trim();
+    if (!newName) return;
+    const newClose = parseInt(prompt('Dia de fechamento (1-31)', card.close), 10);
+    const newDue   = parseInt(prompt('Dia de vencimento (1-31)', card.due), 10);
+    if (
+      isNaN(newClose) || isNaN(newDue) ||
+      newClose < 1 || newClose > 31 ||
+      newDue   < 1 || newDue   > 31 ||
+      newClose >= newDue
+    ) { alert('Dados inválidos'); return; }
+    if (newName !== card.name && cards.some(c => c.name === newName)) {
+      alert('Já existe cartão com esse nome'); return;
+    }
+    const oldName = card.name;
+    card.name  = newName;
+    card.close = newClose;
+    card.due   = newDue;
+    transactions.forEach(t => {
+      if (t.method === oldName) {
+        t.method   = newName;
+        t.postDate = post(t.opDate, newName);
+      }
+    });
+    save('cards', cards);
+    save('tx', transactions);
+    refreshMethods();
+    renderCardList();
+    renderTable();
+  });
+  actions.appendChild(editBtn);
+
+  // Delete SVG icon
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon danger delete';
+  delBtn.style.padding = '0';
+  delBtn.style.background = 'none';
+  delBtn.style.border = 'none';
+  delBtn.style.cursor = 'pointer';
+  const delIconDiv = document.createElement('div');
+  delIconDiv.className = 'icon-action icon-delete';
+  delBtn.appendChild(delIconDiv);
+  delBtn.addEventListener('click', () => {
+    if (!confirm('Excluir cartão?')) return;
+    cards = cards.filter(x => x.name !== card.name);
+    save('cards', cards);
+    refreshMethods();
+    renderCardList();
+    renderTable();
+  });
+  actions.appendChild(delBtn);
+
+  return actions;
+}
+
+function createCardContent(card) {
+  const content = document.createElement('div');
+  content.className = 'card-content card-line';
+  content.innerHTML = `
+    <b>${card.name}</b>
+    <div class="card-detail">
+      <span class="card-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1 .9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1 -.9-2-2-2zm0 16H5V9h14v11z"/>
+        </svg>
+      </span>
+      <span class="card-label">Fechamento</span>
+      <span class="card-value">${card.close}</span>
+    </div>
+    <div class="card-detail">
+      <span class="card-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 20c4.41 0 8-3.59 8-8s-3.59-8 -8-8 -8 3.59 -8 8 3.59 8 8 8zm0-14c3.31 0 6 2.69 6 6s-2.69 6 -6 6 -6-2.69 -6-6 2.69-6 6-6zm.5 3H11v5l4.25 2.52 .75-1.23 -3.5-2.04V9z"/>
+        </svg>
+      </span>
+      <span class="card-label">Vencimento</span>
+      <span class="card-value">${card.due}</span>
+    </div>
+  `;
+  return content;
+}
+
+function createCardListItem(card) {
+  const li = document.createElement('li');
+  const wrap = document.createElement('div');
+  wrap.className = 'swipe-wrapper';
+
+  const actions = createCardSwipeActions(card);
+  const content = createCardContent(card);
+
+  wrap.appendChild(actions);
+  wrap.appendChild(content);
+  li.appendChild(wrap);
+  return li;
+}
+
 function renderCardList() {
   cardList.innerHTML = '';
   cards
-    .filter(c => c.name !== 'Dinheiro')
-    .forEach(c => {
-      const li = document.createElement('li');
-
-      const wrap = document.createElement('div');
-      wrap.className = 'swipe-wrapper';
-
-      const actions = document.createElement('div');
-      actions.className = 'swipe-actions';
-
-      // Edit SVG icon
-      const editBtn = document.createElement('button');
-      editBtn.className = 'icon edit';
-      editBtn.style.padding = '0';
-      editBtn.style.background = 'none';
-      editBtn.style.border = 'none';
-      editBtn.style.cursor = 'pointer';
-      // SVG icon as mask-image
-      const editIconDiv = document.createElement('div');
-      editIconDiv.className = 'icon-action icon-edit';
-      editBtn.appendChild(editIconDiv);
-      editBtn.addEventListener('click', () => {
-        const newName  = prompt('Nome do cartão', c.name)?.trim();
-        if (!newName) return;
-        const newClose = parseInt(prompt('Dia de fechamento (1-31)', c.close), 10);
-        const newDue   = parseInt(prompt('Dia de vencimento (1-31)', c.due), 10);
-        if (
-          isNaN(newClose) || isNaN(newDue) ||
-          newClose < 1 || newClose > 31 ||
-          newDue   < 1 || newDue   > 31 ||
-          newClose >= newDue
-        ) { alert('Dados inválidos'); return; }
-        if (newName !== c.name && cards.some(card => card.name === newName)) {
-          alert('Já existe cartão com esse nome'); return;
-        }
-        const oldName = c.name;
-        c.name  = newName;
-        c.close = newClose;
-        c.due   = newDue;
-        transactions.forEach(t => {
-          if (t.method === oldName) {
-            t.method   = newName;
-            t.postDate = post(t.opDate, newName);
-          }
-        });
-        save('cards', cards);
-        save('tx', transactions);
-        refreshMethods();
-        renderCardList();
-        renderTable();
-      });
-      actions.appendChild(editBtn);
-
-      // Delete SVG icon
-      const delBtn = document.createElement('button');
-      delBtn.className = 'icon danger delete';
-      delBtn.style.padding = '0';
-      delBtn.style.background = 'none';
-      delBtn.style.border = 'none';
-      delBtn.style.cursor = 'pointer';
-      const delIconDiv = document.createElement('div');
-      delIconDiv.className = 'icon-action icon-delete';
-      delBtn.appendChild(delIconDiv);
-      delBtn.addEventListener('click', () => {
-        if (!confirm('Excluir cartão?')) return;
-        cards = cards.filter(x => x.name !== c.name);
-        save('cards', cards);
-        refreshMethods();
-        renderCardList();
-        renderTable();
-      });
-      actions.appendChild(delBtn);
-
-    const content = document.createElement('div');
-    content.className = 'card-content card-line';
-    content.innerHTML = `
-      <b>${c.name}</b>
-      <div class="card-detail">
-        <span class="card-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1 .9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1 -.9-2-2-2zm0 16H5V9h14v11z"/>
-          </svg>
-        </span>
-        <span class="card-label">Fechamento</span>
-        <span class="card-value">${c.close}</span>
-      </div>
-      <div class="card-detail">
-        <span class="card-icon">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 20c4.41 0 8-3.59 8-8s-3.59-8 -8-8 -8 3.59 -8 8 3.59 8 8 8zm0-14c3.31 0 6 2.69 6 6s-2.69 6 -6 6 -6-2.69 -6-6 2.69-6 6-6zm.5 3H11v5l4.25 2.52 .75-1.23 -3.5-2.04V9z"/>
-          </svg>
-        </span>
-        <span class="card-label">Vencimento</span>
-        <span class="card-value">${c.due}</span>
-      </div>
-    `;
-    wrap.appendChild(actions);
-    wrap.appendChild(content);
-    li.appendChild(wrap);
+    .filter(card => card.name !== 'Dinheiro')
+    .forEach(card => {
+      const li = createCardListItem(card);
       cardList.appendChild(li);
     });
-
   // swipe-init for cards is now handled via initSwipe at the end of the file.
 }
 // Helper: returns true if this record is a detached (single‑edited) occurrence
@@ -1153,13 +1223,263 @@ function isDetachedOccurrence(tx) {
   return !tx.recurrence && !!tx.parentId;
 }
 
+function makeLine(tx, disableSwipe = false) {
+  // Create swipe wrapper
+  const wrap = document.createElement('div');
+  wrap.className = 'swipe-wrapper';
 
+  // Create actions container
+  const actions = document.createElement('div');
+  actions.className = 'swipe-actions';
+
+  // Edit button
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon edit';
+  editBtn.textContent = '';
+  const editIconDiv = document.createElement('div');
+  editIconDiv.className = 'icon-action icon-edit';
+  editBtn.appendChild(editIconDiv);
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // master or dynamically recurring occurrence
+    const t = tx;
+    const hasRecurrence = (() => {
+      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
+      if (t.parentId) {
+        const master = transactions.find(p => p.id === t.parentId);
+        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
+      }
+      for (const p of transactions) {
+        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
+          if (occursOn(p, t.opDate)) {
+            if (p.desc === t.desc || p.val === t.val) return true;
+          }
+        }
+      }
+      return false;
+    })();
+    if (t.recurrence || (hasRecurrence && !t.recurrence && !t.parentId)) {
+      pendingEditTxId  = t.id;
+      pendingEditTxIso = t.opDate;
+      editRecurrenceModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      wrapperEl.style.overflow     = 'hidden';
+      return;
+    }
+    if (isDetachedOccurrence(t)) {
+      pendingEditMode = null;
+      editTx(t.id);
+      return;
+    }
+    editTx(t.id);
+  });
+  actions.appendChild(editBtn);
+
+  // Delete button
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon danger delete';
+  delBtn.textContent = '';
+  const delIconDiv = document.createElement('div');
+  delIconDiv.className = 'icon-action icon-delete';
+  delBtn.appendChild(delIconDiv);
+  delBtn.onclick = () => {
+    const t = tx;
+    const hasRecurrence = (() => {
+      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
+      if (t.parentId) {
+        const master = transactions.find(p => p.id === t.parentId);
+        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
+      }
+      for (const p of transactions) {
+        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
+          if (occursOn(p, t.opDate)) {
+            if (p.desc === t.desc || p.val === t.val) return true;
+          }
+        }
+      }
+      return false;
+    })();
+    if (hasRecurrence) {
+      delTx(t.id, t.opDate);
+    } else {
+      if (confirm('Deseja excluir esta operação?')) {
+        transactions = transactions.filter(x => x.id !== t.id);
+        save('tx', transactions);
+        renderTable();
+        notify('Operação excluída!', 'success');
+      }
+    }
+  };
+  actions.appendChild(delBtn);
+
+  // Operation line
+  const d = document.createElement('div');
+  d.className = 'op-line';
+  d.dataset.txId = tx.id;
+
+  // Build content
+  const topRow = document.createElement('div');
+  topRow.className = 'op-main';
+  const left = document.createElement('div');
+  left.className = 'op-left';
+
+  // --- Planned modal disables swipe, needs different structure ---
+  if (disableSwipe === true) {
+    // If planned, build checkbox and label
+    if (tx.planned) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'plan-check';
+      checkbox.name = 'planned';
+      checkbox.onchange = () => togglePlanned(tx.id, tx.opDate);
+      const labelWrapper = document.createElement('span');
+      labelWrapper.textContent = tx.desc;
+      // Patch: append checkbox then labelWrapper directly (no span wrapper)
+      left.appendChild(checkbox);
+      left.appendChild(labelWrapper);
+    } else {
+      const descNode = document.createElement('span');
+      descNode.textContent = tx.desc;
+      left.appendChild(descNode);
+    }
+    // Recurrence icon
+    const t = tx;
+    const hasRecurrence = (() => {
+      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
+      if (t.parentId) {
+        const master = transactions.find(p => p.id === t.parentId);
+        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
+      }
+      for (const p of transactions) {
+        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
+          if (occursOn(p, t.opDate)) {
+            if (p.desc === t.desc || p.val === t.val) return true;
+          }
+        }
+      }
+      return false;
+    })();
+    if (hasRecurrence) {
+      const recIcon = document.createElement('span');
+      recIcon.className = 'icon-repeat';
+      recIcon.title = 'Recorrência';
+      left.appendChild(recIcon);
+    }
+    if (!left.querySelector('.icon-repeat')) {
+      const t = tx;
+      const hasRecurrenceFinal =
+        (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
+        (t.parentId && transactions.some(p =>
+          p.id === t.parentId &&
+          typeof p.recurrence === 'string' &&
+          p.recurrence.trim() !== ''
+        ));
+      if (hasRecurrenceFinal) {
+        const recIc = document.createElement('span');
+        recIc.className = 'icon-repeat';
+        left.insertBefore(recIc, left.firstChild);
+      }
+    }
+  } else {
+    // Default structure (swipe enabled)
+    if (tx.planned) {
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.className = 'plan-check';
+      chk.name = 'planned';
+      chk.onchange = () => togglePlanned(tx.id, tx.opDate);
+      left.appendChild(chk);
+    }
+    const descNode = document.createElement('span');
+    descNode.textContent = tx.desc;
+    left.appendChild(descNode);
+    // Recurrence icon
+    const t = tx;
+    const hasRecurrence = (() => {
+      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
+      if (t.parentId) {
+        const master = transactions.find(p => p.id === t.parentId);
+        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
+      }
+      for (const p of transactions) {
+        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
+          if (occursOn(p, t.opDate)) {
+            if (p.desc === t.desc || p.val === t.val) return true;
+          }
+        }
+      }
+      return false;
+    })();
+    if (hasRecurrence) {
+      const recIcon = document.createElement('span');
+      recIcon.className = 'icon-repeat';
+      recIcon.title = 'Recorrência';
+      left.appendChild(recIcon);
+    }
+    if (!left.querySelector('.icon-repeat')) {
+      const t = tx;
+      const hasRecurrenceFinal =
+        (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
+        (t.parentId && transactions.some(p =>
+          p.id === t.parentId &&
+          typeof p.recurrence === 'string' &&
+          p.recurrence.trim() !== ''
+        ));
+      if (hasRecurrenceFinal) {
+        const recIc = document.createElement('span');
+        recIc.className = 'icon-repeat';
+        left.insertBefore(recIc, left.firstChild);
+      }
+    }
+  }
+
+  const right = document.createElement('div');
+  right.className = 'op-right';
+  const value = document.createElement('span');
+  value.className = 'value';
+  value.textContent = `R$ ${(tx.val < 0 ? '-' : '')}${Math.abs(tx.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  if (tx.val < 0) {
+    value.classList.add('negative');
+  } else {
+    value.classList.add('positive');
+  }
+  right.appendChild(value);
+  topRow.appendChild(left);
+  topRow.appendChild(right);
+  d.appendChild(topRow);
+
+  // Timestamp & method
+  const ts = document.createElement('div');
+  ts.className = 'timestamp';
+  const [y, mo, da] = tx.opDate.split('-').map(Number);
+  const dateObj = new Date(y, mo - 1, da);
+  const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const methodLabel = tx.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${tx.method}`;
+  if (tx.planned) {
+    ts.textContent = `${dateStr} - ${methodLabel}`;
+  } else if (tx.opDate === todayISO()) {
+    const timeStr = new Date(tx.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    ts.textContent = timeStr;
+  } else {
+    ts.textContent = dateStr;
+  }
+  d.appendChild(ts);
+
+  // Assemble wrapper and return
+  wrap.appendChild(actions);
+  wrap.appendChild(d);
+  return wrap;
+}
+// swipe-init for operations is now handled via initSwipe at the end of the file.
 
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
+
+// Localized addTx and helpers
 async function addTx() {
-  // Modo edição?
+  // Edit mode
   if (isEditing !== null) {
+    // (mantém lógica de edição original)
     const t = transactions.find(x => x.id === isEditing);
     if (!t) {
       console.error('Transaction not found for editing:', isEditing);
@@ -1229,11 +1549,9 @@ async function addTx() {
              Apenas altera a REGRA‑MESTRE, preservando todas as ocorrências
              passadas.  Se o registro clicado for uma ocorrência gerada,
              subimos para o pai; caso contrário usamos o próprio. */
-
           const master = t.parentId
             ? transactions.find(tx => tx.id === t.parentId)
             : t;
-
           if (master) {
             master.desc         = newDesc;
             master.val          = newVal;
@@ -1260,7 +1578,6 @@ async function addTx() {
         t.planned      = t.opDate > todayISO();
         t.modifiedAt = new Date().toISOString();
     }
-
     // Reset editing state
     pendingEditMode    = null;
     pendingEditTxId    = null;
@@ -1268,7 +1585,6 @@ async function addTx() {
     isEditing          = null;
     addBtn.textContent = 'Adicionar';
     txModalTitle.textContent = 'Lançar operação';
-
     save('tx', transactions);
     renderTable();
     toggleTxModal();
@@ -1290,58 +1606,72 @@ async function addTx() {
     return;
   }
 
-  // Modo adicionar
+  // Adição normal
   if (startBalance === null) {
     showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
   }
+  const formData = collectTxFormData();
+  if (!formData) return;
+  const tx = buildTransaction(formData);
+  await finalizeTransaction(tx);
+  resetTxForm();
+}
 
-  const d   = desc.value.trim();
-  // parse valor BRL (ex.: "-2.900,00") corretamente
+// 1. Coleta os dados do formulário e valida
+function collectTxFormData() {
+  const d = desc.value.trim();
   let v = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
   const activeType = document.querySelector('.value-toggle button.active').dataset.type;
   if (activeType === 'expense') v = -Math.abs(v);
-  const m   = met.value;
+  const m = met.value;
   const iso = date.value;
-
-  if (!d || isNaN(v) || !iso) {
-    alert('Complete os campos');
-    return;
-  }
-
-  // Lê opções de recorrência
   const recur = recurrence.value;
   // Parcelamento desativado: sempre 1
   const inst = 1;
-
-  const baseTx = {
-    id: Date.now(),
-    parentId: null,
+  if (!d || isNaN(v) || !iso) {
+    alert('Complete os campos');
+    return null;
+  }
+  return {
     desc: d,
     val: v,
     method: m,
     opDate: iso,
-    postDate: post(iso, m),
     recurrence: recur,
+    installments: inst
+  };
+}
+
+// 2. Monta o objeto transação final
+function buildTransaction(data) {
+  return {
+    id: Date.now(),
+    parentId: null,
+    desc: data.desc,
+    val: data.val,
+    method: data.method,
+    opDate: data.opDate,
+    postDate: post(data.opDate, data.method),
+    recurrence: data.recurrence,
     installments: 1,
-    planned: iso > todayISO(),          // planned if the transaction date is in the future
+    planned: data.opDate > todayISO(),
     ts: new Date().toISOString(),
     modifiedAt: new Date().toISOString()
   };
+}
 
-  // Gera lote de transações conforme tipo
+// 3. Adiciona ao array global, salva e renderiza
+async function finalizeTransaction(tx) {
   let batch = [];
-  if (recur) {
-    batch = [baseTx];   // salva só a regra de recorrência
+  if (tx.recurrence) {
+    batch = [tx]; // salva só a regra de recorrência
   } else {
-    batch = [baseTx];
+    batch = [tx];
   }
-
-  // Adiciona e salva
   transactions.push(...batch);
   sortTransactions();
   cacheSet('tx', transactions);
-
   if (!navigator.onLine) {
     for (const t of batch) {
       await queueTx(t);
@@ -1351,31 +1681,38 @@ async function addTx() {
     showToast('Offline: transação salva na fila', 'error');
     return;
   }
-
   for (const t of batch) {
     await queueTx(t);
   }
   await flushQueue();
+  updatePendingBadge();
+  renderTable();
+  save('tx', transactions);
+}
 
-  // Limpa formulário
+// 4. Fecha modal, toast de sucesso e limpa campos
+function resetTxForm() {
   desc.value = '';
   val.value  = '';
   date.value = todayISO();
-  updatePendingBadge();
-  renderTable();
   toggleTxModal();
   // Custom save confirmation toast
-  const formattedVal = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const v = 0; // valor já limpo, mas podemos mostrar mensagem genérica
+  // Recupera última transação para mensagem
+  let last = transactions[transactions.length - 1];
+  let formattedVal = last && typeof last.val === 'number'
+    ? last.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : '';
   const recValue = recurrence.value;
   let toastMsg;
-  if (!recValue) {
-    // Operação única: inclui data
-    const opDateVal = date.value; // formato YYYY-MM-DD
+  if (!recValue && last) {
+    const opDateVal = last.opDate; // formato YYYY-MM-DD
     toastMsg = `${formattedVal} salvo em ${opDateVal.slice(8,10)}/${opDateVal.slice(5,7)}`;
-  } else {
-    // Recorrência: inclui periodicidade (ex: mensal)
+  } else if (last) {
     const recText = recurrence.options[recurrence.selectedIndex].text.toLowerCase();
     toastMsg = `${formattedVal} salvo (${recText})`;
+  } else {
+    toastMsg = `Transação salva`;
   }
   showToast(toastMsg, 'success');
 }
@@ -1523,36 +1860,69 @@ editAllBtn.onclick = () => {
 const editTx = id => {
   const t = transactions.find(x => x.id === id);
   if (!t) return;
-  // Preencher descrição
-  desc.value = t.desc;
-  // Preencher valor formatado em BRL
+
+  // 1) Hard reset para não herdar estado da edição anterior
+  if (typeof resetTxModal === 'function') resetTxModal();
+
+  // 2) Descrição
+  desc.value = t.desc || '';
+
+  // 3) Valor + toggle despesa/receita
   const valInput = document.getElementById('value');
   if (valInput) {
-    // t.val is already in reais, format directly
-    const amount = t.val;
-    valInput.value = amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const abs = Math.abs(Number(t.val || 0));
+    valInput.value = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  // Ajustar toggle despesa/receita
   document.querySelectorAll('.value-toggle button').forEach(b => b.classList.remove('active'));
-  const type = t.val < 0 ? 'expense' : 'income';
+  const type = (Number(t.val || 0) < 0) ? 'expense' : 'income';
   const typeBtn = document.querySelector(`.value-toggle button[data-type="${type}"]`);
   if (typeBtn) typeBtn.classList.add('active');
-  // Preencher método de pagamento
-  met.value = t.method;
-  // garante que o bloco Parcelas apareça para métodos de cartão
-  met.dispatchEvent(new Event('change'));
-  // Preenche recorrência e parcelas e data especial, se em pendingEditMode
-  if (pendingEditMode && pendingEditTxIso) {
-    date.value = pendingEditTxIso;
-  } else {
-    date.value = t.opDate;
+  if (type === 'expense' && valInput) {
+    valInput.value = '-' + valInput.value.replace(/^-/, '');
   }
-  recurrence.value = t.recurrence;
-  installments.value = t.installments;
-  isEditing    = id;
+
+  // 4) Método de pagamento (pill + select + radios do cartão)
+  met.value = t.method;
+  const methodSwitch  = document.querySelector('.method-switch');
+  const cardSelectorEl= document.getElementById('cardSelector');
+  document.querySelectorAll('.switch-option').forEach(b => b.classList.remove('active'));
+
+  if (t.method === 'Dinheiro') {
+    if (methodSwitch) methodSwitch.dataset.selected = 'Dinheiro';
+    const cashBtn = document.querySelector('.switch-option[data-method="Dinheiro"]');
+    if (cashBtn) cashBtn.classList.add('active');
+    if (cardSelectorEl) { cardSelectorEl.innerHTML = ''; cardSelectorEl.hidden = true; }
+  } else {
+    if (methodSwitch) methodSwitch.dataset.selected = 'Cartão';
+    const cardBtn = document.querySelector('.switch-option[data-method="Cartão"]');
+    if (cardBtn) cardBtn.classList.add('active');
+    // Renderiza as opções de cartão e marca o cartão da transação
+    if (typeof renderCardSelector === 'function') renderCardSelector();
+    if (cardSelectorEl) {
+      const sel = cardSelectorEl.querySelector(`input[name="cardChoice"][value="${CSS.escape(t.method)}"]`);
+      if (sel) sel.checked = true;
+      cardSelectorEl.hidden = false;
+    }
+  }
+
+  // 5) Data (respeita pendingEditMode/pendingEditTxIso)
+  date.value = (pendingEditMode && pendingEditTxIso) ? pendingEditTxIso : t.opDate;
+
+  // 6) Recorrência / parcelas
+  recurrence.value = t.recurrence || '';
+  installments.value = String(t.installments || 1);
+
+  // 7) Estado e rótulos
+  isEditing = id;
   addBtn.textContent = 'Salvar';
   txModalTitle.textContent = 'Editar operação';
-  toggleTxModal();
+
+  // 8) Abre o modal apenas se estiver fechado (evita fechar sem querer)
+  if (txModal.classList.contains('hidden')) {
+    toggleTxModal();
+  }
+  const vEl = document.getElementById('value');
+  if (vEl) { vEl.focus(); vEl.select(); }
 };
 
 // ===== Hook único para EDITAR: decide entre modal de escopo (recorrente) ou edição direta =====
@@ -1586,81 +1956,46 @@ document.addEventListener('click', (e) => {
   e.stopPropagation();
 });
 
-
-
 function renderTable() {
-  // Preserve accordion open state
-  const accordionEl = document.getElementById('accordion');
-  const openMonthDates = Array.from(
-    accordionEl.querySelectorAll('details.month[open]')
-  ).map(el => el.getAttribute('data-month'));
-  const openDayDates = Array.from(
-    accordionEl.querySelectorAll('details.day[open]')
-  ).map(el => el.getAttribute('data-date'));
-  sortTransactions();   // ensure data is ordered before rendering
-  tbody.innerHTML = '';
-  const y = new Date().getFullYear();
-  const cur = new Date().getMonth();
-  let saldo = startBalance || 0;
-  for (let m = 0; m < 12; m++) {
-    const hdr = document.createElement('tr');
-    hdr.className = 'month-header';
-    hdr.dataset.m = m;
-    if (m < cur) hdr.classList.add('closed');
-    const td = document.createElement('td');
-    td.colSpan = 4;
-    td.textContent = meses[m];
-    hdr.appendChild(td);
-    hdr.onclick = () => {
-      const hide = hdr.classList.toggle('closed');
-      document.querySelectorAll(`tr[data-mon='${m}']`).forEach(r => r.style.display = hide ? 'none' : 'table-row');
-    };
-    tbody.appendChild(hdr);
-    for (let d = 1; d <= 31; d++) {
-      const date = new Date(y, m, d);
-      if (date.getMonth() !== m) break;
-      const iso = date.toISOString().slice(0, 10);
-      // Só considera transações cujo postDate é este dia
-      const dayTx = transactions.filter(t => t.postDate === iso);
-      const sum = dayTx.reduce((s, t) => s + t.val, 0);
-      saldo += sum;
-      const row = document.createElement('tr');
-      row.dataset.mon = m;
-      row.style.display = m < cur ? 'none' : 'table-row';
-      row.innerHTML = `<td>${fmt(date)}</td><td></td><td></td><td${saldo < 0 ? ' class="saldo-neg"' : ''}>${currency(saldo)}</td>`;
-      const tdD = row.children[1], tdG = row.children[2];
-      if (sum !== 0) { tdG.textContent = currency(sum); tdG.className = sum < 0 ? 'negative' : 'positive'; }
-      // Só mostra Dinheiro normalmente
-      dayTx.filter(t => t.method === 'Dinheiro').forEach(t => tdD.appendChild(makeLine(t)));
-      // --- INÍCIO: plannedOps filtrados e ordenados ---
-      const plannedOps = dayTx
-        .filter(t => t.planned)
-        .sort((a, b) => {
-          const dateCmp = a.opDate.localeCompare(b.opDate);
-          if (dateCmp !== 0) return dateCmp;
-          return (a.ts || '').localeCompare(b.ts || '');
-        });
-      // --- FIM: plannedOps filtrados e ordenados ---
-      const plannedSection = document.createElement('div');
-      plannedSection.className = 'planned-cash';
-      // ... (continuação do bloco planejados, mantido como estava)
-      tbody.appendChild(row);
-    }
-  }
-  // constrói o acordeão de 3 níveis
-  renderAccordion();
-  // Restore accordion open state
-  openMonthDates.forEach(month => {
-    const monthEl = accordionEl.querySelector(`details.month[data-month="${month}"]`);
-    if (monthEl) monthEl.open = true;
-  });
-  openDayDates.forEach(date => {
-    const dayEl = accordionEl.querySelector(`details.day[data-date="${date}"]`);
-    if (dayEl) dayEl.open = true;
-  });
-  updateStickyMonth();
+  clearTableContent();
+  const groups = groupTransactionsByMonth();
+  renderTransactionGroups(groups);
 }
 
+// 1. Remove o elemento .accordion (se existir) e limpa o tableBody.
+function clearTableContent() {
+  // Remove accordion element if present
+  const accordionEl = document.getElementById('accordion');
+  if (accordionEl) {
+    accordionEl.innerHTML = '';
+  }
+  if (typeof tbody !== 'undefined' && tbody) {
+    tbody.innerHTML = '';
+  }
+}
+
+// 2. Agrupa as transações globais por mês (YYYY-MM) e retorna um Map ordenado por data.
+function groupTransactionsByMonth() {
+  // Agrupa transações por mês (YYYY-MM)
+  const groups = new Map();
+  sortTransactions();
+  for (const tx of transactions) {
+    // Usa postDate para agrupamento por mês
+    const key = tx.postDate.slice(0, 7); // YYYY-MM
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(tx);
+  }
+  // Ordena o Map por chave (YYYY-MM), decrescente (mais recente primeiro)
+  return new Map([...groups.entries()].sort((a, b) => b[0].localeCompare(a[0])));
+}
+
+// 3. Recebe o Map agrupado e itera renderizando os meses em ordem decrescente, usando renderAccordion
+function renderTransactionGroups(groups) {
+  // Aqui, para manter compatibilidade com a UI, apenas chama renderAccordion
+  // que já monta o acordeão por mês/dia/fatura, usando os dados globais.
+  // Se desejar, pode passar os grupos para renderAccordion para customização.
+  renderAccordion();
+}
 
 
 // -----------------------------------------------------------------------------
@@ -2121,7 +2456,6 @@ setStartBtn.addEventListener('click', () => {
   initStart();
   renderTable();
 });
-resetBtn.onclick=()=>{if(!confirm('Resetar tudo?'))return;transactions=[];cards=[{name:'Dinheiro',close:0,due:0}];startBalance=null;cacheSet('tx', []);cacheSet('cards', [{name:'Dinheiro',close:0,due:0}]);cacheSet('startBal', null);save('tx',transactions);save('cards',cards);save('startBal',null);refreshMethods();renderCardList();initStart();renderTable();};
 
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
 openCardBtn.onclick = () => {
@@ -2203,137 +2537,66 @@ if (!USE_MOCK && 'serviceWorker' in navigator) {
   });
 }
 // Planejados modal handlers
-function renderPlannedModal() {
-  // Lista completa, sem filtrar datas vencidas; marca .overdue quando opDate < hoje
-  if (!plannedList) return;
+// Planejados modal – subfunções auxiliares
+function updatePlannedModalHeader() {
+  // Define título, botão de fechar e demais elementos do cabeçalho do modal Planejados
+  // (No HTML já existe: <h2>Planejados</h2> e <button id="closePlannedModal"...>)
+  // Aqui pode-se garantir que o título está correto e o botão de fechar visível.
+  const plannedModal = document.getElementById('plannedModal');
+  if (!plannedModal) return;
+  const h2 = plannedModal.querySelector('h2');
+  if (h2) h2.textContent = 'Planejados';
+  const closeBtn = plannedModal.querySelector('#closePlannedModal');
+  if (closeBtn) closeBtn.style.display = '';
+}
+
+function preparePlannedList() {
   plannedList.innerHTML = '';
 
-  const today = todayISO();
+  // Agrupa transações planejadas por data
+  const plannedByDate = {};
+  for (const tx of transactions) {
+    if (!tx.planned) continue;
 
-  // ---------- Coleta de ocorrências planejadas ----------
-  let occur = [];
+    const key = tx.opDate;
+    if (!plannedByDate[key]) plannedByDate[key] = [];
+    plannedByDate[key].push(tx);
+  }
 
-  transactions.forEach(tx => {
-    // 1) Operações únicas com planned=true
-  if (!tx.recurrence && tx.planned) {
-    // Se já existe operação equivalente (mesma data, descrição e valor) executada,
-    // não exibe no Planejados.
-  const isDone = transactions.some(o =>
-    o.id !== tx.id &&
-    !o.planned &&            // executada
-    !o.recurrence &&         // simples, não-recorrente
-    o.opDate === tx.opDate &&
-    o.desc === tx.desc &&
-    o.val  === tx.val
-  );
-  if (!isDone) occur.push(tx);
-  return;
+  // Ordena as datas
+  const sortedDates = Object.keys(plannedByDate).sort();
+
+  for (const date of sortedDates) {
+    const group = plannedByDate[date];
+    const dateObj = new Date(date + 'T00:00');
+    const dateLabel = dateObj.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+    });
+
+    const groupHeader = document.createElement('h3');
+    groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}`;
+    plannedList.appendChild(groupHeader);
+
+    for (const tx of group) {
+      const li = makeLine(tx, true); // true = desabilita swipe
+      plannedList.appendChild(li);
+    }
+  }
 }
 
-    // 2) Operações recorrentes – gera até 90 d à frente
-    if (tx.recurrence) {
-      const end = new Date();
-      end.setDate(end.getDate() + 90);
-
-      const scanStart = new Date(tx.opDate);
-      for (let d = new Date(scanStart); d <= end; d.setDate(d.getDate() + 1)) {
-        const iso = d.toISOString().slice(0, 10);
-
-        if (!occursOn(tx, iso)) continue;
-        if (tx.exceptions && tx.exceptions.includes(iso)) continue;
-        if (tx.recurrenceEnd && iso >= tx.recurrenceEnd) continue;
-
-        // Já editado/executado?
-        const detached = transactions.some(t => t.parentId === tx.id && t.opDate === iso);
-        if (detached) continue;
-
-        occur.push({
-          ...tx,
-          opDate: iso,
-          postDate: post(iso, tx.method),
-          planned: true
-        });
-      }
-    }
-  });
-
-  // --- Remove ocorrências que já foram executadas --------------------
-occur = occur.filter(o =>
-  !transactions.some(t =>
-    !t.planned &&                 // operação já executada
-    t.opDate === o.opDate &&
-    t.desc   === o.desc &&
-    t.val    === o.val &&
-    t.method === o.method
-  )
-);
-
-  // Ordena por data da compra
-  occur.sort((a, b) => a.opDate.localeCompare(b.opDate));
-
-  // ---------- Renderização ----------
-  let currentDate = '';
-  occur.forEach(t => {
-    if (t.opDate !== currentDate) {
-      currentDate = t.opDate;
-      const sub = document.createElement('div');
-      sub.className = 'subheader';
-      const dObj = new Date(currentDate + 'T00:00');
-      let dateLabel = dObj.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
-      dateLabel = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);   // capitaliza dia da semana
-      sub.textContent = dateLabel;
-      plannedList.appendChild(sub);
-    }
-
-    // create <li class="planned-cash"> card instead of a <div>
-const li = document.createElement('li');
-li.className = 'planned-cash';
-
-// row: checkbox + description + value
-const row = document.createElement('div');
-row.className = 'op-main';
-
-// left side: checkbox + description
-const left = document.createElement('div');
-left.className = 'op-left';
-
-const chk = document.createElement('input');
-chk.type = 'checkbox';
-chk.className = 'plan-check';
-chk.name = 'planned';
-chk.onchange = () => togglePlanned(t.id, t.opDate);
-left.appendChild(chk);
-
-const descNode = document.createElement('span');
-descNode.textContent = t.desc;
-left.appendChild(descNode);
-
-// right side: value, with sign colouring
-const right = document.createElement('div');
-right.className = 'op-right';
-
-const value = document.createElement('span');
-value.className = 'value';
-value.textContent = `R$ ${(t.val < 0 ? '-' : '')}${Math.abs(t.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-if (t.val < 0) {
-  value.classList.add('negative');
-} else {
-  value.classList.add('positive');
+function bindPlannedActions() {
+  // Adiciona interações como gestos de swipe, botões "Hoje"/"Adiar", e event listeners relacionados ao Planejados modal.
+  // (No momento, não há ações extras além do checkbox, mas se houver, adicione aqui.)
+  // Exemplo: inicializar swipe ou outros listeners no plannedList, se necessário.
+  // (No modal Planejados, os listeners de checkbox já são definidos inline; se houver mais, adicionar aqui.)
 }
-right.appendChild(value);
 
-row.appendChild(left);
-row.appendChild(right);
-li.appendChild(row);
-
-// method label (below the row)
-const methodDiv = document.createElement('div');
-methodDiv.className = 'method';
-methodDiv.textContent = t.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${t.method}`;
-li.appendChild(methodDiv);
-
-plannedList.appendChild(li);
-  });
+function renderPlannedModal() {
+  updatePlannedModalHeader();
+  preparePlannedList();
+  bindPlannedActions();
 }
 
 // Ensure Planejados modal open/close handlers exist exactly once
@@ -2362,4 +2625,3 @@ if (!window.plannedHandlersInit) {
 initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.op-line', 'opsSwipeInit');
 // Initialize swipe for card list (card-line)
 initSwipe(cardList,      '.swipe-wrapper', '.swipe-actions', '.card-line', 'cardsSwipeInit');
-

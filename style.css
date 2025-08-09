@@ -53,13 +53,14 @@
   margin-top: 2px;
   font-size: 0.9rem;
   color: var(--txt-muted);
-  padding-left: var(--check-space) !important; /* fallback: alinha sob descrição */
+  margin-left: var(--check-space) !important;
+  padding-left: 0 !important;
 }
 
-/* Planned modal: day headers and description text must be white */
 #plannedModal .subheader { color: #fff; }
 #plannedModal .planned-list > li .op-left span:not(.method) { color: #fff; }
 #plannedModal .planned-list .op-left input.plan-check + span { color: #fff; }
+#plannedModal h3 { color: #FFFFFF; }
 
 /* Planned modal: valor fixo à direita do cartão */
 #plannedModal .planned-list > li .op-line{
@@ -497,6 +498,8 @@ summary.day-summary .icon-invoice::before{
 #syncNowBtn,#offlineIndicator{position:absolute;top:21px;z-index:1100;background:none;border:none;cursor:pointer;}
 #syncNowBtn{right:124px;width:40px;height:40px;font-size:1.5rem;display:flex;align-items:center;justify-content:center;}
 #offlineIndicator{right:172px;font-size:1.3rem;}
+#enablePushBtn{position:absolute;top:21px;right:76px;width:40px;height:40px;font-size:1.3rem;background:none;border:none;cursor:pointer;}
+#enablePushBtn.enabled{opacity:.6;}
 .offline-icon{margin-right:0;font-size:1.2rem;color:#e74c3c;}
 .offline-icon[hidden]{display:none;}
 
@@ -788,35 +791,24 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
 
 /* Planned modal: render circular checkbox via the description span, keep native input clickable */
 #plannedModal .planned-list .op-left{ position: relative; }
-#plannedModal .planned-list .op-left input.plan-check{
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  opacity: 0;            /* invisible but clickable */
-  z-index: 2;
-  cursor: pointer;
-}
-#plannedModal .planned-list .op-left input.plan-check + span{
-  position: relative;
-  display: inline-block;
-  padding-left: var(--check-space) !important;   /* garante não sobreposição */
-}
-#plannedModal .planned-list .op-left input.plan-check + span::before{
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+#plannedModal .planned-list .op-left input.plan-check {
   width: 24px;
   height: 24px;
   border: 2px solid var(--txt-muted);
   border-radius: 50%;
   background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  align-self: center;
+  box-sizing: border-box;
+  cursor: pointer;
 }
-#plannedModal .planned-list .op-left input.plan-check:checked + span::before{
+
+#plannedModal .planned-list .op-left input.plan-check:checked {
   background: var(--blue);
   border-color: var(--blue);
 }
@@ -1470,7 +1462,8 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 }
 
 /* Planned items as cards in Planned Modal */
-#plannedModal .planned-list > li.planned-cash {
+/* Planned items as cards in Planned Modal */
+#plannedModal #plannedList > li.planned-cash {
   background: rgba(255,255,255,0.08);
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   padding: 12px 16px;
@@ -1491,10 +1484,11 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 }
 
 /* Grid-based layout for planned modal children */
-#plannedModal .planned-cash .op-main { display: contents; }
-#plannedModal .planned-cash .op-left { grid-column: 1; grid-row: 1; min-width: 0; }
-#plannedModal .planned-cash .op-right { display: contents; }
-#plannedModal .planned-cash .op-right .value {
+/* Grid-based layout for planned modal children */
+#plannedModal #plannedList .planned-cash .op-main { display: contents; }
+#plannedModal #plannedList .planned-cash .op-left { grid-column: 1; grid-row: 1; min-width: 0; }
+#plannedModal #plannedList .planned-cash .op-right { display: contents; }
+#plannedModal #plannedList .planned-cash .op-right .value {
   grid-column: 2;
   grid-row: 1;
   justify-self: end;
@@ -1502,8 +1496,8 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   font-weight: 600;
 }
 /* Qualquer conteúdo da direita que não seja o valor vira a linha de método, abaixo da descrição */
-#plannedModal .planned-cash .op-right > :not(.value),
-#plannedModal .planned-cash .method {
+#plannedModal #plannedList .planned-cash .op-right > :not(.value),
+#plannedModal #plannedList .planned-cash .method {
   grid-column: 1;
   grid-row: 2;
   justify-self: start;
@@ -1511,8 +1505,8 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   margin-top: 2px;
   font-size: 0.9rem;
   color: var(--txt-muted);
-  padding-left: 44px;   /* alinha abaixo da descrição após o checkbox */
-  margin-left: 0;       /* cancela regra antiga */
+  margin-left: 100px !important;
+  padding-left: 100px !important;
 }
 /* Guard rails: prevent horizontal overflow in bottom modals */
 .bottom-modal,
@@ -1588,4 +1582,8 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 .toast {
   white-space: nowrap;
 }
-
+/* —— FIX: header icons overlapping the segmented control —— */
+#enablePushBtn{ position: static !important; right: auto; top: auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.18); border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+#offlineIndicator{ position: static !important; right: auto; top: auto; width:40px; height:40px; display:flex; align-items:center; justify-content:center; }
+/* keep the segmented control from pushing over icons */
+.header-seg{ margin-left: 0; margin-right: 0; }
