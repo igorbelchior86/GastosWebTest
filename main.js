@@ -127,7 +127,11 @@ function expandPlannedDayLabels() {
 
 // Hooks: on open button click, after modal transition, and whenever list mutates
 if (openPlannedBtn) {
-  openPlannedBtn.addEventListener('click', () => setTimeout(() => { fixPlannedAlignment(); expandPlannedDayLabels(); }, 0));
+  openPlannedBtn.addEventListener('click', () => setTimeout(() => {
+    renderPlannedModal();
+    fixPlannedAlignment();
+    expandPlannedDayLabels();
+  }, 0));
 }
 
 const plannedBox = plannedModal ? plannedModal.querySelector('.bottom-modal-box') : null;
@@ -385,7 +389,6 @@ async function flushQueue() {
     if (q.includes('tx'))       await save('tx', transactions);
     if (q.includes('cards'))    await save('cards', cards);
     if (q.includes('startBal')) await save('startBal', startBalance);
-    showToast('Fila sincronizada!', 'success');
   } catch (err) {
     console.error('flushQueue failed:', err);
     // Put back flags so we retry later (union of previous + current)
@@ -448,7 +451,29 @@ const showToast = (msg, type = 'error', duration = 3000) => {
   t.classList.add('show');
   setTimeout(() => { t.classList.remove('show'); }, duration);
 };
+function buildSaveToast(tx) {
+  try {
+    const valueNum = typeof tx.val === 'number' ? tx.val : Number((tx.val || '0').toString().replace(/[^0-9.-]/g, ''));
+    const formattedVal = valueNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const isCard = tx.method && tx.method !== 'Dinheiro';
+    const hasOpDate = !!tx.opDate;
+    const renderIso = tx.postDate || (hasOpDate && tx.method ? post(tx.opDate, tx.method) : null);
 
+    if (isCard && renderIso && !tx.planned && (!hasOpDate || renderIso !== tx.opDate)) {
+      const [, mm, dd] = renderIso.split('-');
+      return `${formattedVal} salva na fatura de ${dd}/${mm}`;
+    }
+    if (!tx.recurrence) {
+      const iso = hasOpDate ? tx.opDate : todayISO();
+      return `${formattedVal} salvo em ${iso.slice(8,10)}/${iso.slice(5,7)}`;
+    }
+    const recSel = document.getElementById('recurrence');
+    const recText = recSel ? (recSel.options[recSel.selectedIndex].text || '').toLowerCase() : 'recorrente';
+    return `${formattedVal} salvo (${recText})`;
+  } catch {
+    return 'Transação salva';
+  }
+}
 // ---- Migration: normalize legacy transactions ----
 // (moved inside block below)
 
@@ -480,7 +505,7 @@ if (!USE_MOCK) {
     const raw  = snap.val() ?? [];
     const incoming = Array.isArray(raw) ? raw : Object.values(raw);
 
-    // normalize both sides
+    // normalize helper
     const norm = (t) => ({
       ...t,
       method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
@@ -489,23 +514,39 @@ if (!USE_MOCK) {
       parentId: t.parentId ?? null
     });
 
-    const local = (transactions || []).map(norm);
     const remote = (incoming || []).map(norm);
 
-    const byId = new Map(local.map(t => [t.id, t]));
-    for (const r of remote) {
-      const l = byId.get(r.id);
-      if (!l) { byId.set(r.id, r); continue; }
-      const lt = Date.parse(l.modifiedAt || l.ts || 0);
-      const rt = Date.parse(r.modifiedAt || r.ts || 0);
-      if (rt >= lt) byId.set(r.id, r); // remote wins; else keep local newer
-    }
-    const merged = Array.from(byId.values());
+    // If we're online and have no local pending changes for 'tx',
+    // trust the server (support hard deletions). Otherwise, do LWW merge.
+    const dirty = cacheGet('dirtyQueue', []);
+    const hasPendingTx = Array.isArray(dirty) && dirty.includes('tx');
 
-    transactions = merged;
+    if (navigator.onLine && !hasPendingTx) {
+      // Source-of-truth: server. This allows deletions/resets from other clients to propagate.
+      transactions = remote;
+    } else {
+      // Merge: keep local edits that haven't been flushed yet; remote wins on conflicts by timestamp
+      const local = (transactions || []).map(norm);
+      const byId = new Map(local.map(t => [t.id, t]));
+      for (const r of remote) {
+        const l = byId.get(r.id);
+        if (!l) { byId.set(r.id, r); continue; }
+        const lt = Date.parse(l.modifiedAt || l.ts || 0);
+        const rt = Date.parse(r.modifiedAt || r.ts || 0);
+        if (rt >= lt) byId.set(r.id, r);
+      }
+      transactions = Array.from(byId.values());
+    }
+
     cacheSet('tx', transactions);
     sortTransactions();
     renderTable();
+    // Refresh Planned modal if it is visible
+    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+      renderPlannedModal();
+      fixPlannedAlignment();
+      expandPlannedDayLabels();
+}
   });
 
   // Listen for card changes
@@ -610,27 +651,6 @@ function resetTxModal() {
   if (modalHeader) modalHeader.textContent = 'Lançar operação';
   const addBtnEl = document.getElementById('addBtn');
   if (addBtnEl) addBtnEl.textContent = 'Adicionar';
-
-  // Custom save confirmation toast
-  const last = transactions[transactions.length - 1];
-  let toastMsg = 'Transação salva';
-  if (last && typeof last.val === 'number') {
-    const formattedVal = last.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    if (last.method !== 'Dinheiro' && !last.planned) {
-      // Cartão lançado para hoje (vai para a fatura): avisa a fatura correspondente
-      const [, mm, dd] = last.postDate.split('-');
-      toastMsg = `${formattedVal} salva na fatura de ${dd}/${mm}`;
-    } else if (!recurrence.value) {
-      // Operação única (dinheiro ou planejada)
-      const opDateVal = last.opDate; // YYYY-MM-DD
-      toastMsg = `${formattedVal} salvo em ${opDateVal.slice(8,10)}/${opDateVal.slice(5,7)}`;
-    } else {
-      // Regra de recorrência
-      const recText = recurrence.options[recurrence.selectedIndex].text.toLowerCase();
-      toastMsg = `${formattedVal} salvo (${recText})`;
-    }
-  }
-  showToast(toastMsg, 'success');
 }
 
 /**
@@ -773,7 +793,7 @@ const post = (iso, m) => {
   // Monta data de vencimento da fatura (YYYY-MM-DD)
   const pad = n => String(n).padStart(2, '0');
   // Use formatToISO to ensure correct formatting (even though string concat is safe here)
-  return formatToISO(new Date(`${invoiceYear}-${pad(invoiceMonth + 1)}-${pad(dueDay)}`));
+  return formatToISO(new Date(invoiceYear, invoiceMonth, dueDay));
 };
 
 const addYearsIso  = (iso, n) => {
@@ -819,7 +839,30 @@ function occursOn(tx, iso) {
   }
 }
 
+
+
 const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
+// Toast pós‑salvar baseado na transação realmente criada
+if (addBtn && !addBtn.dataset.toastSaveHook) {
+  addBtn.dataset.toastSaveHook = '1';
+  // Usa captura para executar antes de possíveis stopPropagation
+  addBtn.addEventListener('click', () => {
+    const label = (addBtn.textContent || '').toLowerCase();
+    // Somente quando é "Adicionar" (não em edição/salvar)
+    if (!label.includes('adicion')) return;
+    // Defer para permitir que a tx seja criada e inserida em `transactions`
+    setTimeout(() => {
+      if (!Array.isArray(transactions) || !transactions.length) return;
+      // Escolhe a transação com maior timestamp (ts)
+      let latest = null;
+      for (const t of transactions) {
+        if (!latest || (t.ts || '') > (latest.ts || '')) latest = t;
+      }
+      if (!latest) return;
+      try { showToast(buildSaveToast(latest), 'success'); } catch (_) {}
+    }, 0);
+  }, { capture: true });
+}
 // Auto-format value input as BRL currency while typing
 val.type = 'text';  // ensure it's text for formatting
 val.addEventListener('input', () => {
@@ -1614,8 +1657,9 @@ async function addTx() {
   const formData = collectTxFormData();
   if (!formData) return;
   const tx = buildTransaction(formData);
-  await finalizeTransaction(tx);
-  resetTxForm();
+  const _promise = finalizeTransaction(tx); // fire-and-forget
+  resetTxForm();                            // fecha o modal já
+  _promise.catch(err => console.error('finalizeTransaction failed:', err));
 }
 
 // 1. Coleta os dados do formulário e valida
@@ -1663,31 +1707,32 @@ function buildTransaction(data) {
 
 // 3. Adiciona ao array global, salva e renderiza
 async function finalizeTransaction(tx) {
-  let batch = [];
-  if (tx.recurrence) {
-    batch = [tx]; // salva só a regra de recorrência
-  } else {
-    batch = [tx];
-  }
+  let batch = tx.recurrence ? [tx] : [tx];
+
+  // Atualiza UI/estado imediatamente
   transactions.push(...batch);
   sortTransactions();
   cacheSet('tx', transactions);
-  if (!navigator.onLine) {
-    for (const t of batch) {
-      await queueTx(t);
+
+  try {
+    if (!navigator.onLine) {
+      for (const t of batch) await queueTx(t);
+      updatePendingBadge();
+      renderTable();
+      showToast('Offline: transação salva na fila', 'error');
+      return;
     }
+
+    // Online: enfileira sem aguardar e faz flush em background
+    for (const t of batch) queueTx(t); // fire-and-forget
+    flushQueue().catch(err => console.error('flushQueue (async) failed:', err));
+
     updatePendingBadge();
     renderTable();
-    showToast('Offline: transação salva na fila', 'error');
-    return;
+    save('tx', transactions);
+  } catch (e) {
+    console.error('finalizeTransaction error:', e);
   }
-  for (const t of batch) {
-    await queueTx(t);
-  }
-  await flushQueue();
-  updatePendingBadge();
-  renderTable();
-  save('tx', transactions);
 }
 
 // 4. Fecha modal, toast de sucesso e limpa campos
@@ -1962,13 +2007,9 @@ function renderTable() {
   renderTransactionGroups(groups);
 }
 
-// 1. Remove o elemento .accordion (se existir) e limpa o tableBody.
+// 1. NÃO limpe o #accordion aqui para preservar estado; apenas zere o tableBody (legacy).
 function clearTableContent() {
-  // Remove accordion element if present
-  const accordionEl = document.getElementById('accordion');
-  if (accordionEl) {
-    accordionEl.innerHTML = '';
-  }
+  // Preserva o estado do acordeão; a limpeza/recálculo é feita dentro de renderAccordion().
   if (typeof tbody !== 'undefined' && tbody) {
     tbody.innerHTML = '';
   }
@@ -2227,7 +2268,7 @@ function renderAccordion() {
     let monthEndBalanceForHeader;
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(2025, mIdx, d);
-      const iso = dateObj.toISOString().slice(0, 10);
+      const iso = formatToISO(dateObj);
       const dayTx = txByDate(iso);
 
       // === DAILY IMPACT (novas regras) — TABELA: só cálculo, sem UI ===
@@ -2553,36 +2594,64 @@ function updatePlannedModalHeader() {
 function preparePlannedList() {
   plannedList.innerHTML = '';
 
-  // Agrupa transações planejadas por data
+  // Agrupa por data
   const plannedByDate = {};
-  for (const tx of transactions) {
-    if (!tx.planned) continue;
-
+  const add = (tx) => {
     const key = tx.opDate;
     if (!plannedByDate[key]) plannedByDate[key] = [];
     plannedByDate[key].push(tx);
+  };
+
+  const today = todayISO();
+
+  // 1) Planejados já salvos (a partir de hoje)
+  for (const tx of transactions) {
+    if (!tx) continue;
+    if (tx.planned && tx.opDate && tx.opDate >= today) add(tx);
   }
 
-  // Ordena as datas
+  // 2) Filhas de recorrência projetadas para os próximos 90 dias
+  const DAYS_AHEAD = 90;
+  for (const master of transactions) {
+    if (!master || !master.recurrence) continue;
+
+    for (let i = 1; i <= DAYS_AHEAD; i++) {           // começa em amanhã; hoje nasce executada
+      const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + i);
+      const iso = typeof formatToISO === 'function' ? formatToISO(d) : d.toISOString().slice(0,10);
+      if (!occursOn(master, iso)) continue;
+
+      // evita duplicata se já houver planejado nesse dia
+      const dup = (plannedByDate[iso] || []).some(t =>
+        (t.parentId && t.parentId === master.id) ||
+        ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
+         Math.abs(Number(t.val||0))===Math.abs(Number(master.val||0)))
+      );
+      if (dup) continue;
+
+      add({
+        ...master,
+        id: `${master.id || 'r'}_${iso}`,
+        parentId: master.id || null,
+        opDate: iso,
+        postDate: post(iso, master.method),
+        planned: true,
+        recurrence: master.recurrence,   // mantém ícone de recorrência
+      });
+    }
+  }
+
+  // 3) Ordena e renderiza mantendo o DOM atual
   const sortedDates = Object.keys(plannedByDate).sort();
-
   for (const date of sortedDates) {
-    const group = plannedByDate[date];
-    const dateObj = new Date(date + 'T00:00');
-    const dateLabel = dateObj.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: '2-digit',
-      month: '2-digit',
-    });
+    const group = plannedByDate[date].sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
 
+    const dateObj = new Date(date+'T00:00');
+    const dateLabel = dateObj.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
     const groupHeader = document.createElement('h3');
-    groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}`;
+    groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
     plannedList.appendChild(groupHeader);
 
-    for (const tx of group) {
-      const li = makeLine(tx, true); // true = desabilita swipe
-      plannedList.appendChild(li);
-    }
+    for (const tx of group) plannedList.appendChild(makeLine(tx, true)); // sem wrapper extra
   }
 }
 
