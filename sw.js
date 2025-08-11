@@ -1,4 +1,4 @@
-const CACHE = 'v7';   // bump para nova versão
+const CACHE = 'v8';   // bump para nova versão
 const RUNTIME = { pages: 'pages-v1', assets: 'assets-v1', cdn: 'cdn-v1' };
 const ASSETS = [
   './',
@@ -41,20 +41,44 @@ self.addEventListener('activate', event => {
 
 // Intercepta requisições
 self.addEventListener('fetch', event => {
+  const { request } = event;
+
+  // Only handle GETs here
+  if (request.method !== 'GET') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // App-Shell: navigation requests → Cache-First index.html
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const cache = await caches.open(CACHE);
+        const cachedShell = await cache.match('./index.html', { ignoreSearch: true });
+        if (cachedShell) return cachedShell;
+        const fresh = await fetch('./index.html', { cache: 'no-store' });
+        cache.put('./index.html', fresh.clone());
+        return fresh;
+      } catch (_) {
+        // As a last resort, try cache again (in case fetch failed mid-flight)
+        const fallback = await caches.match('./index.html', { ignoreSearch: true });
+        return fallback || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Static assets & other GETs → Cache-First with background fill
   event.respondWith((async () => {
-    if (event.request.method !== 'GET') {
-      // não cachear POST/PUT
-      return fetch(event.request);
-    }
-    const cached = await caches.match(event.request, { ignoreSearch: true });
+    const cached = await caches.match(request, { ignoreSearch: true });
     if (cached) return cached;
     try {
       const response = await Promise.race([
-        fetch(event.request),
+        fetch(request),
         new Promise((_, rej) => setTimeout(() => rej('timeout'), 10000))
       ]);
       const cache = await caches.open(CACHE);
-      cache.put(event.request, response.clone());
+      cache.put(request, response.clone());
       return response;
     } catch (err) {
       return cached || Response.error();

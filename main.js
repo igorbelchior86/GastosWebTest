@@ -24,6 +24,40 @@ const plannedModal   = document.getElementById('plannedModal');
 const closePlannedModal = document.getElementById('closePlannedModal');
 const plannedList    = document.getElementById('plannedList');
 
+// --- Planned modal helpers/guards ---
+function hidePlannedModal() {
+  if (!plannedModal) return;
+  plannedModal.classList.add('hidden');
+}
+
+// Close when clicking backdrop (outside the sheet)
+if (plannedModal && !plannedModal.dataset.backdropHooked) {
+  plannedModal.dataset.backdropHooked = '1';
+  plannedModal.addEventListener('click', (e) => {
+    if (e.target === plannedModal) hidePlannedModal();
+  });
+}
+
+// Close before opening other modals (edit/delete) to avoid overlap
+if (plannedModal && plannedList && !plannedList.dataset.editCloseHooked) {
+  plannedList.dataset.editCloseHooked = '1';
+  plannedModal.addEventListener(
+    'click',
+    (e) => {
+      const t = /** @type {HTMLElement} */ (e.target);
+      const hit = t.closest('.swipe-actions .edit, .swipe-actions .delete, button[data-action="edit"], button[data-action="delete"], .icon-edit, .icon-delete');
+      if (hit) hidePlannedModal();
+    },
+    { capture: true }
+  );
+}
+
+// Also wire the X button
+if (closePlannedModal && !closePlannedModal.dataset.closeHooked) {
+  closePlannedModal.dataset.closeHooked = '1';
+  closePlannedModal.addEventListener('click', hidePlannedModal);
+}
+
 // Header segmented control → delega para os botões originais
 const headerSeg = document.querySelector('.header-seg');
 if (headerSeg) {
@@ -685,11 +719,36 @@ function toggleTxModal() {
 }
 
 // Attach event handlers if elements exist
-if (openTxBtn) openTxBtn.onclick = toggleTxModal;
-if (closeTxModal) closeTxModal.onclick = toggleTxModal;
+// Helper: sair do modo edição e limpar o formulário
+function _cancelEditingAndReset() {
+  try { if (typeof isEditing !== 'undefined') isEditing = false; } catch (_) {}
+  resetTxModal();
+}
+
+// Abrir sempre como "novo": garante formulário zerado
+if (openTxBtn) {
+  openTxBtn.onclick = () => {
+    try { if (typeof isEditing !== 'undefined') isEditing = false; } catch (_) {}
+    resetTxModal();
+    if (txModal.classList.contains('hidden')) toggleTxModal();
+  };
+}
+
+// Fechar (X) encerra edição e limpa estado
+if (closeTxModal) {
+  closeTxModal.onclick = () => {
+    _cancelEditingAndReset();
+    if (!txModal.classList.contains('hidden')) toggleTxModal();
+  };
+}
+
+// Clique no backdrop também encerra edição e limpa
 if (txModal) {
   txModal.onclick = (e) => {
-    if (e.target === txModal) toggleTxModal();
+    if (e.target === txModal) {
+      _cancelEditingAndReset();
+      toggleTxModal();
+    }
   };
 }
 // (Web Push removido)
