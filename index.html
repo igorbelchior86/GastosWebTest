@@ -14,7 +14,8 @@
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1.4.7">
+  <link rel="stylesheet" href="style.css?v=1.4.8(a20)">
+  <link rel="stylesheet" href="login.css?v=1.4.8(a20)">
 
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
@@ -65,9 +66,22 @@
         </table>
       </div>
       <div id="accordion"></div>
-      <button id="resetData" class="danger" style="margin-top:12px">Limpar tudo</button>
+      <button id="resetData" class="danger" style="margin-top:12px; display:none" hidden>Limpar tudo</button>
     </div>
     <hr class="divider">
+    <footer class="app-footer"><small id="version">v1.4.8(a20)</small></footer>
+  </div>
+
+  <!-- Modal Ajustes -->
+  <div id="settingsModal" class="bottom-modal backdrop-blur hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Ajustes</h2>
+      <button id="closeSettingsModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="modal-content">
+        <!-- conteúdo futuro -->
+      </div>
+    </div>
   </div>
 
   <!-- Modal Cartões -->
@@ -143,6 +157,10 @@
         <div class="date-input-wrapper">
           <input id="opDate" name="opDate" type="date">
         </div>
+        <!-- Pagamento de fatura: parcelar -->
+        <label class="form-row" id="invoiceParcelRow" style="display:none; align-items:center; gap:8px;">
+          <input type="checkbox" id="invoiceParcel"> Parcelar
+        </label>
         <button id="addBtn" class="add-button">Adicionar</button>
       </div>
     </div>
@@ -190,15 +208,89 @@
     </div>
   </div>
 
+  <!-- Modal Confirmar mover para hoje -->
+  <div id="confirmMoveModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmMoveTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmMoveTitle">Confirmação</h2>
+      <button id="closeConfirmMove" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="confirmMoveText" style="margin: 6px 0 4px; color:#fff; text-align:center;">Operação concluída. Gostaria de mover para hoje?</p>
+        <button id="confirmMoveYes" class="action-btn">Sim</button>
+        <button id="confirmMoveNo" class="action-btn cancel-btn">Não</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ações inferiores: Home/Ajustes em pill e Adicionar separadamente -->
+  <div class="floating-pill" role="tablist" aria-label="Atalhos inferiores" data-selected="home">
+    <div class="pill-highlight" aria-hidden="true"></div>
+    <button type="button" class="pill-option" data-action="home" role="tab" aria-selected="true" aria-label="Home">
+      <span class="pill-icon icon-home"></span>
+    </button>
+    <button type="button" class="pill-option" data-action="settings" role="tab" aria-selected="false" aria-label="Ajustes">
+      <span class="pill-icon icon-gear"></span>
+    </button>
+  </div>
   <button id="openTxModal" class="floating-add-button" title="Nova operação">＋</button>
 
-  <script type="module" src="main.js?v=1.4.7"></script>
+  <!-- Early skeleton and unhide: runs before main.js to ensure immediate UI -->
+  <script>
+  (function(){
+    try{
+      // Mark skeleton boot so CSS can hide the start-balance box
+      document.documentElement.classList.add('skeleton-boot');
+      var wrap = document.querySelector('.wrapper');
+      if (wrap) wrap.classList.remove('app-hidden');
+      var acc = document.getElementById('accordion');
+      if (!acc || acc.children.length) return;
+      var now = new Date();
+      // Alinhar com o render atual (usa 2025)
+      var year = 2025; // mesmo ano usado no render final
+      function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+      var curMonth = now.getMonth();
+      for (var mIdx=0; mIdx<12; mIdx++){
+        var monthName = new Date(year, mIdx).toLocaleDateString('pt-BR',{month:'long'});
+        var mDet = document.createElement('details');
+        mDet.className='month'; mDet.dataset.key = 'm-'+mIdx;
+        mDet.open = (mIdx >= curMonth);
+        var mSum = document.createElement('summary');
+        mSum.className='month-divider';
+        // Cabeçalho do mês
+        var row = document.createElement('div'); row.className='month-row';
+        var name = document.createElement('span'); name.className='month-name'; name.textContent = cap(monthName).toUpperCase();
+        row.appendChild(name);
+        var meta = document.createElement('div'); meta.className='month-meta';
+        var label = document.createElement('span'); label.className='meta-label';
+        // Label conforme passado/atual/futuro
+        if (mIdx < curMonth) label.textContent = 'Saldo final:';
+        else if (mIdx === curMonth) label.textContent = 'Saldo atual:';
+        else label.textContent = 'Saldo projetado:';
+        var value = document.createElement('span'); value.className='meta-value';
+        var pill = document.createElement('span'); pill.className='skeleton skeleton-pill'; pill.style.width='120px';
+        value.appendChild(pill);
+        meta.appendChild(label); meta.appendChild(value);
+        mSum.appendChild(row); mSum.appendChild(meta);
+        mDet.appendChild(mSum);
+        acc.appendChild(mDet);
+      }
+      acc.dataset.state = 'skeleton';
+      var sticky = document.querySelector('.sticky-month');
+      if (sticky) {
+        var stickyMonthName = new Date(year, curMonth).toLocaleDateString('pt-BR',{month:'long'});
+        sticky.textContent = cap(stickyMonthName);
+      }
+    }catch(e){}
+  })();
+  </script>
+  <script type="module" src="auth.js?v=1.4.8(a20)"></script>
+  <script type="module" src="login.view.js?v=1.4.8(a20)"></script>
+  <script type="module" src="main.js?v=1.4.8(a20)"></script>
   <!-- Styles moved to style.css -->
 
   <!-- Toast de erro -->
   <div id="toast" class="toast"></div>
 
   <!-- Scripts moved to main.js -->
-  <footer class="app-footer"><small id="version">v1.4.7</small></footer>
 </body>
 </html>

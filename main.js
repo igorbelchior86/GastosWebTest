@@ -18,45 +18,46 @@ const editSingleBtn = document.getElementById('editSingleBtn');
 const editFutureBtn = document.getElementById('editFutureBtn');
 const editAllBtn = document.getElementById('editAllBtn');
 const cancelEditRecurrence = document.getElementById('cancelEditRecurrence');
+// Modal Confirmar mover para hoje - refs
+const confirmMoveModal = document.getElementById('confirmMoveModal');
+const confirmMoveYes   = document.getElementById('confirmMoveYes');
+const confirmMoveNo    = document.getElementById('confirmMoveNo');
+const closeConfirmMove = document.getElementById('closeConfirmMove');
+const confirmMoveText  = document.getElementById('confirmMoveText');
+// Settings modal – refs
+const settingsModalEl = document.getElementById('settingsModal');
+const closeSettingsModalBtn = document.getElementById('closeSettingsModal');
+
+// Pay-invoice mode state
+let isPayInvoiceMode = false;
+let pendingInvoiceCtx = null; // { card, dueISO, remaining }
+
+function askMoveToToday() {
+  // Fallback para confirm nativo se modal não existir
+  if (!confirmMoveModal || !confirmMoveYes || !confirmMoveNo) {
+    return Promise.resolve(window.confirm('Operação concluída. Gostaria de mover para hoje?'));
+  }
+  return new Promise(resolve => {
+    const cleanup = () => {
+      confirmMoveModal.classList.add('hidden');
+      // Remove temporary listeners
+      confirmMoveYes.onclick = null;
+      confirmMoveNo.onclick = null;
+      if (closeConfirmMove) closeConfirmMove.onclick = null;
+      confirmMoveModal.onclick = null;
+    };
+    confirmMoveYes.onclick = () => { cleanup(); resolve(true); };
+    confirmMoveNo.onclick  = () => { cleanup(); resolve(false); };
+    if (closeConfirmMove) closeConfirmMove.onclick = () => { cleanup(); resolve(false); };
+    confirmMoveModal.onclick = (e) => { if (e.target === confirmMoveModal) { cleanup(); resolve(false); } };
+    confirmMoveModal.classList.remove('hidden');
+  });
+}
 // Elements for Planejados modal
 const openPlannedBtn = document.getElementById('openPlannedBtn');
 const plannedModal   = document.getElementById('plannedModal');
 const closePlannedModal = document.getElementById('closePlannedModal');
 const plannedList    = document.getElementById('plannedList');
-
-// --- Planned modal helpers/guards ---
-function hidePlannedModal() {
-  if (!plannedModal) return;
-  plannedModal.classList.add('hidden');
-}
-
-// Close when clicking backdrop (outside the sheet)
-if (plannedModal && !plannedModal.dataset.backdropHooked) {
-  plannedModal.dataset.backdropHooked = '1';
-  plannedModal.addEventListener('click', (e) => {
-    if (e.target === plannedModal) hidePlannedModal();
-  });
-}
-
-// Close before opening other modals (edit/delete) to avoid overlap
-if (plannedModal && plannedList && !plannedList.dataset.editCloseHooked) {
-  plannedList.dataset.editCloseHooked = '1';
-  plannedModal.addEventListener(
-    'click',
-    (e) => {
-      const t = /** @type {HTMLElement} */ (e.target);
-      const hit = t.closest('.swipe-actions .edit, .swipe-actions .delete, button[data-action="edit"], button[data-action="delete"], .icon-edit, .icon-delete');
-      if (hit) hidePlannedModal();
-    },
-    { capture: true }
-  );
-}
-
-// Also wire the X button
-if (closePlannedModal && !closePlannedModal.dataset.closeHooked) {
-  closePlannedModal.dataset.closeHooked = '1';
-  closePlannedModal.addEventListener('click', hidePlannedModal);
-}
 
 // Header segmented control → delega para os botões originais
 const headerSeg = document.querySelector('.header-seg');
@@ -74,6 +75,101 @@ if (headerSeg) {
         headerSeg.dataset.selected = 'cards';
         openCardBtn.click();
       }
+    }
+  });
+}
+// ---------------- Settings (Ajustes) modal ----------------
+function escHtml(s){
+  return (s==null?"":String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+}
+function renderSettingsModal(){
+  if (!settingsModalEl) return;
+  const box = settingsModalEl.querySelector('.modal-content');
+  if (!box) return;
+  const u = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
+  const name  = u && u.displayName ? u.displayName : 'Usuário';
+  const email = u && u.email ? u.email : '';
+  const photo = u && u.photoURL ? u.photoURL : '';
+  box.innerHTML = `
+    <div class="settings-card">
+      <div class="settings-profile">
+        <div class="settings-avatar">
+          <img id="settingsAvatar" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy"/>
+        </div>
+        <div class="settings-names">
+          <div class="settings-name">${escHtml(name)}</div>
+          <div class="settings-sub">${escHtml(email)}</div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1.15rem;font-weight:700;color:var(--txt-main);">Tema</h2>
+    <div class="settings-card settings-theme-card">
+      <div class="theme-row" id="themeButtons">
+        <button type="button" class="theme-btn" data-theme="light">Claro</button>
+        <button type="button" class="theme-btn" data-theme="dark">Escuro</button>
+        <button type="button" class="theme-btn" data-theme="system">Sistema</button>
+      </div>
+    </div>
+
+    <div class="settings-list">
+      <div class="settings-item danger">
+        <button type="button" id="logoutBtn" class="settings-cta">
+          <span class="settings-icon icon-logout"></span>
+          <span>Sair da conta</span>
+        </button>
+      </div>
+    </div>`;
+  const img = box.querySelector('#settingsAvatar');
+  if (img) {
+    if (photo) {
+      try { img.src = photo.replace(/=s\d+-c.*/, '=s128-c'); } catch(_) { img.src = photo; }
+    } else {
+      img.src = 'icons/icon-180x180.png';
+    }
+    img.onerror = () => { img.onerror = null; img.src = 'icons/icon-180x180.png'; };
+  }
+  const outBtn = box.querySelector('#logoutBtn');
+  if (outBtn) outBtn.onclick = async () => { try { await window.Auth?.signOut(); } catch(_) {} closeSettings(); };
+  // Theme buttons wiring
+  const themeButtons = box.querySelectorAll('.theme-btn');
+  if (themeButtons && themeButtons.length) {
+    const saved = localStorage.getItem('ui:theme') || 'system';
+    // helper to update visuals
+    function updateThemeButtons(active) {
+      themeButtons.forEach(b => {
+        const t = b.dataset.theme;
+        const isActive = t === active;
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    }
+    // initialize visuals
+    updateThemeButtons(saved === 'system' ? 'system' : saved);
+    themeButtons.forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.theme;
+        localStorage.setItem('ui:theme', v);
+        applyThemePreference(v);
+        updateThemeButtons(v);
+      });
+    });
+  }
+}
+function openSettings(){ if (!settingsModalEl) return; renderSettingsModal(); document.documentElement.classList.add('modal-open'); settingsModalEl.classList.remove('hidden'); }
+function closeSettings(){ if (!settingsModalEl) return; settingsModalEl.classList.add('hidden'); document.documentElement.classList.remove('modal-open'); }
+if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettings);
+if (settingsModalEl) settingsModalEl.addEventListener('click', (e)=>{ if (e.target === settingsModalEl) closeSettings(); });
+// React to auth state updates and keep the modal content fresh
+try { document.addEventListener('auth:state', renderSettingsModal); } catch(_) {}
+// Bottom floating pill actions
+const bottomPill = document.querySelector('.floating-pill');
+if (bottomPill) {
+  bottomPill.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill-option');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'settings') {
+      openSettings();
     }
   });
 }
@@ -183,14 +279,49 @@ if (plannedList) {
   mo.observe(plannedList, { childList: true, subtree: true });
 }
 
-import { openDB } from 'https://unpkg.com/idb?module';
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
+// ---------------- Theme helpers ----------------
+function getSystemPref() {
+  try {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  } catch (_) { return 'dark'; }
+}
 
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-auth.js";
+function applyThemePreference(pref) {
+  // pref: 'light' | 'dark' | 'system'
+  let resolved = pref === 'system' ? getSystemPref() : pref;
+  const root = document.documentElement;
+  if (resolved === 'light') {
+    root.classList.add('light');
+    root.setAttribute('data-theme', 'light');
+  } else {
+    root.classList.remove('light');
+    root.setAttribute('data-theme', 'dark');
+  }
+}
+
+function initThemeFromStorage(){
+  const saved = localStorage.getItem('ui:theme') || 'system';
+  applyThemePreference(saved);
+  // If system preference changes and user chose 'system', listen and update
+  try {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    mq.addEventListener && mq.addEventListener('change', () => {
+      const current = localStorage.getItem('ui:theme') || 'system';
+      if (current === 'system') applyThemePreference('system');
+    });
+  } catch (_) {}
+}
+
+// Initialize theme early
+initThemeFromStorage();
+
+
+import { openDB } from 'https://unpkg.com/idb?module';
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
+
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
 
 // Configuração do Firebase de TESTE (arquivo separado)
-
 import { firebaseConfig } from './firebase.test.config.js';
 
 // (Web Push removido)
@@ -215,11 +346,16 @@ async function idbSet(k, v) { try { await cacheDB.put('kv', v, k); } catch {} }
 function initSwipe(root, wrapperSel, actionsSel, lineSel, onceFlag) {
   if (window[onceFlag]) return;
   let startX = 0;
+  const DRAG_ACTIVATE_PX = 6; // threshold to consider a swipe gesture
   root.addEventListener('touchstart', e => {
     const wrap = e.target.closest(wrapperSel);
     if (!wrap) return;
+    // Limit swipe start to interactions on the line element only
+    const lineHit = e.target.closest(lineSel);
+    if (!lineHit) return;
     startX = e.touches[0].clientX;
     wrap.dataset.startX = startX;
+    wrap.dataset.swiping = '0';
     const line = wrap.querySelector(lineSel);
     const m = new WebKitCSSMatrix(getComputedStyle(line).transform);
     wrap.dataset.offset = m.m41 || 0;
@@ -227,33 +363,42 @@ function initSwipe(root, wrapperSel, actionsSel, lineSel, onceFlag) {
   root.addEventListener('touchmove', e => {
     const wrap = e.target.closest(wrapperSel);
     if (!wrap) return;
+    if (!e.target.closest(lineSel)) return;
     const start = parseFloat(wrap.dataset.startX || 0);
     const offset = parseFloat(wrap.dataset.offset || 0);
     const diff   = start - e.touches[0].clientX;
     const line   = wrap.querySelector(lineSel);
-    const actions= wrap.querySelector(actionsSel);
-    const actW   = actions.offsetWidth;
+    // Prefer external, targeted actions (e.g., invoice header pay button), then fallback to local
+    let actions = document.querySelector(`${actionsSel}[data-for="${wrap.dataset.swipeId}"]`) || wrap.querySelector(actionsSel);
+    const actW   = actions.offsetWidth || 96; // fallback width
     line.style.transition = 'none';
     let newTx = offset - diff;
     newTx = Math.max(Math.min(newTx, 0), -actW);
     line.style.transform = `translateX(${newTx}px)`;
-    actions.style.opacity = Math.abs(newTx) / actW;
+    const op = Math.abs(newTx) / actW;
+    actions.style.opacity = op;
+    actions.style.pointerEvents = op > 0.05 ? 'auto' : 'none';
+    // Mark as swiping to avoid toggling <details>
+    if (Math.abs(diff) >= DRAG_ACTIVATE_PX) wrap.dataset.swiping = '1';
   }, { passive: true });
   root.addEventListener('touchend', e => {
     const wrap = e.target.closest(wrapperSel);
     if (!wrap) return;
+    if (!e.target.closest(lineSel)) return;
     const start  = parseFloat(wrap.dataset.startX || 0);
     const offset = parseFloat(wrap.dataset.offset || 0);
     const diff   = start - e.changedTouches[0].clientX;
     const line   = wrap.querySelector(lineSel);
-    const actions= wrap.querySelector(actionsSel);
-    const actW   = actions.offsetWidth;
+    // Prefer external, targeted actions (e.g., invoice header pay button), then fallback to local
+    let actions = document.querySelector(`${actionsSel}[data-for="${wrap.dataset.swipeId}"]`) || wrap.querySelector(actionsSel);
+    const actW   = actions.offsetWidth || 96;
     let finalTx  = offset - diff;
     const shouldOpen = Math.abs(finalTx) > actW / 2;
     finalTx = shouldOpen ? -actW : 0;
     line.style.transition = '';
     line.style.transform  = `translateX(${finalTx}px)`;
     actions.style.opacity = shouldOpen ? 1 : 0;
+    actions.style.pointerEvents = shouldOpen ? 'auto' : 'none';
     if (typeof navigator.vibrate === 'function') {
       navigator.vibrate(30);
     }
@@ -262,23 +407,47 @@ function initSwipe(root, wrapperSel, actionsSel, lineSel, onceFlag) {
       if(l!==line){l.style.transform='translateX(0)';}
     });
     document.querySelectorAll(actionsSel).forEach(a=>{
-      if(a!==actions){a.style.opacity=0;}
+      if(a!==actions){a.style.opacity=0; a.style.pointerEvents='none';}
     });
+    // Allow clicks again shortly after swipe ends
+    setTimeout(()=>{ if (wrap) wrap.dataset.swiping = '0'; }, 80);
   }, { passive: true });
   window[onceFlag] = true;
 }
 
+// Prevent toggling <details> when the user swipes the invoice header line
+document.addEventListener('click', (e) => {
+  const sum = e.target.closest('.invoice-header-line');
+  if (!sum) return;
+  const det = sum.closest('details.invoice');
+  if (det && det.dataset.swiping === '1') {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
 let PATH;
+// Casa compartilhada (PROD atual) e e‑mails que devem enxergar esta Casa
+const WID_CASA = 'orcamento365_9b8e04c5';
+const CASA_EMAILS = ['icmbelchior@gmail.com','sarargjesus@gmail.com'];
+function resolvePathForUser(user){
+  if (!user) return null;
+  const email = (user.email || '').toLowerCase();
+  if (CASA_EMAILS.includes(email)) return WID_CASA;
+  return `users/${user.uid}`;
+}
 
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
 const USE_MOCK = false;              // conectar ao Firebase PROD
-const APP_VERSION = '1.4.7';
+const APP_VERSION = '1.4.8(a20)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
   try {
-    if (!METRICS_ENABLED || USE_MOCK || !firebaseDb) return;
+    // Only log when DB ready and a workspace PATH is known (after auth)
+    if (!METRICS_ENABLED || USE_MOCK || !firebaseDb || !PATH) return;
+    if (window.Auth && !window.Auth.currentUser) return;
     const key = `${PATH}/metrics/${name}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
     set(ref(firebaseDb, key), {
       ...payload,
@@ -299,15 +468,13 @@ let firebaseDb;
 if (!USE_MOCK) {
   // Seleciona config conforme ambiente
   const cfg = firebaseConfig;
-  const app  = initializeApp(cfg);
+  const app  = (getApps().length ? getApp() : initializeApp(cfg));
   const db   = getDatabase(app);
   firebaseDb = db;
 
-  // Mesmo caminho de DB para ambos os ambientes
-  PATH = 'orcamento365_9b8e04c5';
+  // PATH será definido após o login (Casa para e‑mails definidos; pessoal para demais)
 
-  const auth = getAuth(app);
-  await signInAnonymously(auth);
+  // Auth is required; handled by auth.js (Google). No anonymous sign-in.
 
   // Wrapper: save marks as dirty and updates cache if offline
   save = async (k, v) => {
@@ -454,13 +621,16 @@ async function flushQueue() {
 
 
 // Load transactions/cards/balance: now with realtime listeners if not USE_MOCK
-let transactions;
-let cards;
+let transactions = [];
+let cards = [{ name:'Dinheiro', close:0, due:0 }];
 let startBalance;
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
 const txModalTitle = document.querySelector('#txModal h2');
+
+// Compute a consistent bottom reserve so the last day stops above the pseudo‑footer
+// computeEndPad removido – espaço final constante pelo CSS
 
 // Helper: sort transactions by opDate (YYYY-MM-DD) then by timestamp (ts) so UI is always chronological
 function sortTransactions() {
@@ -470,6 +640,37 @@ function sortTransactions() {
     // Fallback: compare timestamps when same date
     return (a.ts || '').localeCompare(b.ts || '');
   });
+}
+
+// Sanitize legacy transactions: ensure postDate/opDate/planned exist
+function sanitizeTransactions(list) {
+  let changed = false;
+  const out = (list || []).map((t) => {
+    if (!t) return t;
+    const nt = { ...t };
+    // Ensure opDate exists; fallback to date from ts
+    if (!nt.opDate) {
+      if (nt.ts) {
+        try { nt.opDate = new Date(nt.ts).toISOString().slice(0, 10); } catch { nt.opDate = todayISO(); }
+      } else {
+        nt.opDate = todayISO();
+      }
+      changed = true;
+    }
+    // Ensure postDate exists; compute with card rule
+    if (!nt.postDate) {
+      const method = nt.method || 'Dinheiro';
+      try { nt.postDate = post(nt.opDate, method); } catch { nt.postDate = nt.opDate; }
+      changed = true;
+    }
+    // Ensure planned flag exists
+    if (typeof nt.planned === 'undefined' && nt.opDate) {
+      nt.planned = nt.opDate > todayISO();
+      changed = true;
+    }
+    return nt;
+  });
+  return { list: out, changed };
 }
 
 // --- Toast helper ---
@@ -516,20 +717,24 @@ function buildSaveToast(tx) {
 // ---------------------------------------------------------------------------
 
 if (!USE_MOCK) {
-  // Live listeners (Realtime DB)
-  const txRef    = ref(firebaseDb, `${PATH}/tx`);
-  const cardsRef = ref(firebaseDb, `${PATH}/cards`);
-  const balRef   = ref(firebaseDb, `${PATH}/startBal`);
+  // Start realtime listeners only after user is authenticated
+  const startRealtime = () => {
+    // Live listeners (Realtime DB)
+    const txRef    = ref(firebaseDb, `${PATH}/tx`);
+    const cardsRef = ref(firebaseDb, `${PATH}/cards`);
+    const balRef   = ref(firebaseDb, `${PATH}/startBal`);
 
   // initialize from cache first for instant UI
   transactions = cacheGet('tx', []);
-  transactions = transactions.map(t => ({
-    ...t,
-    method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
-    recurrence: t.recurrence ?? '',
-    installments: t.installments ?? 1,
-    parentId: t.parentId ?? null
-  }));
+  transactions = (transactions || [])
+    .filter(t => t) // ignora null/undefined
+    .map(t => ({
+      ...t,
+      method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
+      recurrence: t.recurrence ?? '',
+      installments: t.installments ?? 1,
+      parentId: t.parentId ?? null
+    }));
   sortTransactions();
   cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
   startBalance = cacheGet('startBal', null);
@@ -548,7 +753,9 @@ if (!USE_MOCK) {
       parentId: t.parentId ?? null
     });
 
-    const remote = (incoming || []).map(norm);
+    const remote = (incoming || [])
+      .filter(t => t)
+      .map(norm);
 
     // If we're online and have no local pending changes for 'tx',
     // trust the server (support hard deletions). Otherwise, do LWW merge.
@@ -572,7 +779,14 @@ if (!USE_MOCK) {
       transactions = Array.from(byId.values());
     }
 
+    // Sanitize legacy/malformed items
+    const s = sanitizeTransactions(transactions);
+    transactions = s.list;
     cacheSet('tx', transactions);
+    if (s.changed) {
+      // Persist sanitized data back to server (best-effort)
+      try { save('tx', transactions); } catch (_) {}
+    }
     sortTransactions();
     renderTable();
     // Refresh Planned modal if it is visible
@@ -580,7 +794,7 @@ if (!USE_MOCK) {
       renderPlannedModal();
       fixPlannedAlignment();
       expandPlannedDayLabels();
-}
+    }
   });
 
   // Listen for card changes
@@ -608,6 +822,17 @@ if (!USE_MOCK) {
     initStart();
     renderTable();
   });
+  };
+
+  const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
+  if (readyUser) { PATH = resolvePathForUser(readyUser); startRealtime(); }
+  else {
+    const h = (e) => {
+      const u = e.detail && e.detail.user;
+      if (u) { document.removeEventListener('auth:state', h); PATH = resolvePathForUser(u); startRealtime(); }
+    };
+    document.addEventListener('auth:state', h);
+  }
 } else {
   // Fallback (mock) — carrega uma vez
   const [liveTx, liveCards, liveBal] = await Promise.all([
@@ -685,6 +910,14 @@ function resetTxModal() {
   if (modalHeader) modalHeader.textContent = 'Lançar operação';
   const addBtnEl = document.getElementById('addBtn');
   if (addBtnEl) addBtnEl.textContent = 'Adicionar';
+  // Reset pay-invoice mode UI bits
+  isPayInvoiceMode = false;
+  pendingInvoiceCtx = null;
+  if (txModal && txModal.dataset && txModal.dataset.mode) delete txModal.dataset.mode;
+  const invoiceParcelRow = document.getElementById('invoiceParcelRow');
+  const invoiceParcel = document.getElementById('invoiceParcel');
+  if (invoiceParcelRow) invoiceParcelRow.style.display = 'none';
+  if (invoiceParcel) invoiceParcel.checked = false;
 }
 
 /**
@@ -696,69 +929,280 @@ function toggleTxModal() {
     if (!isEditing) {
       resetTxModal();
     }
-    // Prevent background scrolling when modal is open
-    if (document.body) document.body.style.overflow = 'hidden';
-    if (wrapperEl) wrapperEl.style.overflow = 'hidden';
+    // Não travar o body; overlay já bloqueia a interação
   } else {
     // Restore scrolling
-    if (document.body) document.body.style.overflow = '';
-    if (wrapperEl) wrapperEl.style.overflow = '';
+    // sem alterações no body
   }
   txModal.classList.toggle('hidden');
   // Rotate the floating button to indicate state
   if (openTxBtn) {
     openTxBtn.style.transform = isOpening ? 'rotate(45deg)' : 'rotate(0deg)';
   }
-  if (isOpening) {
-    const valInput = document.getElementById('value');
-    if (valInput) {
-      valInput.focus();
-      valInput.select();
-    }
+  if (isOpening) focusValueField();
+  // Reflect global modal-open state (used by CSS to hide floating buttons/footer)
+  updateModalOpenState();
+  // Ao fechar o modal, sempre limpar estado de edição para evitar reabrir em modo editar
+  if (!isOpening) {
+    isEditing = null;
+    pendingEditMode = null;
+    pendingEditTxId = null;
+    pendingEditTxIso = null;
   }
 }
 
+function focusValueField() {
+  const valInput = document.getElementById('value');
+  if (!valInput) return;
+  // Ensure numeric keypad attributes remain
+  try {
+    if (valInput.type !== 'tel') valInput.type = 'tel';
+    valInput.setAttribute('inputmode', 'decimal');
+  } catch (_) {}
+
+  const doFocus = () => {
+    if (txModal && txModal.classList.contains('hidden')) return;
+    try {
+      valInput.focus({ preventScroll: true });
+      // Select all to start typing immediately
+      if (typeof valInput.select === 'function') valInput.select();
+    } catch (_) {}
+  };
+  // Multiple attempts to accommodate iOS timing quirks
+  doFocus();
+  setTimeout(doFocus, 80);
+  setTimeout(doFocus, 200);
+  requestAnimationFrame(doFocus);
+}
+
 // Attach event handlers if elements exist
-// Helper: sair do modo edição e limpar o formulário
-function _cancelEditingAndReset() {
-  try { if (typeof isEditing !== 'undefined') isEditing = false; } catch (_) {}
-  resetTxModal();
-}
-
-// Abrir sempre como "novo": garante formulário zerado
-if (openTxBtn) {
-  openTxBtn.onclick = () => {
-    try { if (typeof isEditing !== 'undefined') isEditing = false; } catch (_) {}
+if (openTxBtn) openTxBtn.onclick = () => {
+  // O botão "+" sempre deve abrir em modo "Adicionar"
+  isEditing = null;
+  pendingEditMode = null;
+  pendingEditTxId = null;
+  pendingEditTxIso = null;
+  if (txModal && txModal.classList.contains('hidden')) {
     resetTxModal();
-    if (txModal.classList.contains('hidden')) toggleTxModal();
-  };
-}
+  }
+  toggleTxModal();
+  // Try to focus within the user gesture
+  focusValueField();
+};
 
-// Fechar (X) encerra edição e limpa estado
-if (closeTxModal) {
-  closeTxModal.onclick = () => {
-    _cancelEditingAndReset();
-    if (!txModal.classList.contains('hidden')) toggleTxModal();
-  };
+// Helper: apply/remove body class depending on whether any bottom-modal is open
+function updateModalOpenState() {
+  const open = !!document.querySelector('.bottom-modal:not(.hidden)');
+  const root = document.documentElement || document.body;
+  if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
 }
-
-// Clique no backdrop também encerra edição e limpa
+if (closeTxModal) closeTxModal.onclick = toggleTxModal;
 if (txModal) {
   txModal.onclick = (e) => {
-    if (e.target === txModal) {
-      _cancelEditingAndReset();
-      toggleTxModal();
-    }
+    if (e.target === txModal) toggleTxModal();
   };
 }
+// Botão Home: centraliza o dia atual, mantendo-o colapsado
+const homeBtn = document.getElementById('scrollTodayBtn');
+//const settingsModalEl = document.getElementById('settingsModal');
+const closeSettingsModal = document.getElementById('closeSettingsModal');
+function scrollTodayIntoView() {
+  try {
+    const iso = todayISO();
+    const wrap = wrapperEl || document.scrollingElement || document.documentElement;
+    let dayEl = document.querySelector('details.day.today') ||
+                document.querySelector(`details.day[data-key="d-${iso}"]`);
+    if (!dayEl) { showToast('Dia atual não encontrado', 'error'); return; }
+    const monthEl = dayEl.closest('details.month');
+    if (monthEl && !monthEl.open) {
+      monthEl.open = true;
+      // aguarda próximo frame para layout estabilizar e reexecuta
+      requestAnimationFrame(() => scrollTodayIntoView());
+      return;
+    }
+    // manter colapsado (adiado para depois do scroll)
+    if (dayEl.open) dayEl.open = false;
+    // Centraliza manualmente no scroll container principal
+    requestAnimationFrame(() => {
+      try {
+        const wrapRect = wrap.getBoundingClientRect();
+        const elRect   = dayEl.getBoundingClientRect();
+        const current  = wrap.scrollTop || 0;
+        const elTopInWrap = (elRect.top - wrapRect.top) + current;
+        // Desconta overlays fixos que ocupam área visível acima do conteúdo (ex.: sticky-month)
+        let overlayAbove = 0;
+        const sticky = document.querySelector('.sticky-month');
+        // O sticky pode ficar "visível" durante o scroll; antecipe sempre sua altura
+        if (sticky) {
+          overlayAbove += sticky.offsetHeight || 0; // ~52px
+        }
+        const footerReserve = 180; // altura ajustada para alinhar o dia mais acima
+        const effectiveViewport = Math.max(1, (wrap.clientHeight - overlayAbove - footerReserve));
+        const targetTop = Math.max(
+          0,
+          elTopInWrap - (effectiveViewport / 2) + (dayEl.offsetHeight / 2)
+        );
+        wrap.scrollTo({ top: targetTop, behavior: 'smooth' });
+      } catch (_) {
+        dayEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }
+    });
+  } catch (_) {}
+}
+if (homeBtn) homeBtn.addEventListener('click', scrollTodayIntoView);
+
+// Bottom pill: Home/Ajustes
+(function setupBottomPill(){
+  const pill = document.querySelector('.floating-pill');
+  if (!pill) return;
+  const highlight = pill.querySelector('.pill-highlight');
+  const options = pill.querySelectorAll('.pill-option');
+  const setSelected = (key) => {
+    pill.dataset.selected = key;
+    options.forEach(b => b.setAttribute('aria-selected', b.dataset.action === key ? 'true' : 'false'));
+  };
+  const updateHighlight = () => {
+    const sel = pill.querySelector('.pill-option[aria-selected="true"]');
+    if (!sel || !highlight) return;
+    const pr = pill.getBoundingClientRect();
+    const sr = sel.getBoundingClientRect();
+    const x = sr.left - pr.left - 6; // 6px padding left
+    highlight.style.transform = `translateX(${Math.max(0,x)}px)`;
+    highlight.style.width = `${sr.width}px`;
+  };
+  options.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action;
+      setSelected(action); updateHighlight();
+      if (action === 'home') scrollTodayIntoView();
+else if (action === 'settings') {
+        if (settingsModalEl) { renderSettings(); settingsModalEl.classList.remove('hidden'); }
+        updateModalOpenState();
+      }
+    });
+  });
+  window.addEventListener('resize', updateHighlight);
+  setTimeout(updateHighlight, 60);
+})();
+
+// Settings modal close handlers
+if (closeSettingsModal) closeSettingsModal.onclick = () => { settingsModalEl.classList.add('hidden'); updateModalOpenState(); };
+if (settingsModalEl) settingsModalEl.onclick = (e) => { if (e.target === settingsModalEl) { settingsModalEl.classList.add('hidden'); updateModalOpenState(); } };
+
+// ---------- Settings modal rendering ----------
+function getProfileFromAuth() {
+  try {
+    const u = window.Auth && window.Auth.currentUser;
+    if (!u) return null;
+    return { name: u.displayName || '', email: u.email || '', photo: u.photoURL || '' };
+  } catch { return null; }
+}
+
+function persistProfile(p) { try { cacheSet('profile', p); } catch {} }
+function loadCachedProfile() { try { return cacheGet('profile', null); } catch { return null; } }
+
+function renderSettings() {
+  if (!settingsModalEl) return;
+  const box = settingsModalEl.querySelector('.modal-content');
+  if (!box) return;
+  // Get profile (auth → cache; fallback cache)
+  let prof = getProfileFromAuth();
+  if (prof && prof.email) persistProfile(prof);
+  if (!prof) prof = loadCachedProfile() || { name:'', email:'', photo:'' };
+
+  // Build profile card
+  const avatarImg = prof.photo ? `<img src="${prof.photo}" alt="Avatar"/>` : '';
+  const sub = prof.email || '';
+  const cardHTML = `
+    <div class="settings-card">
+      <div class="settings-profile">
+        <div class="settings-avatar">${avatarImg}</div>
+        <div class="settings-names">
+          <div class="settings-name">${(prof.name||'')}</div>
+          <div class="settings-sub">${sub}</div>
+        </div>
+      </div>
+    </div>`;
+  const listHTML = `
+    <div class="settings-list">
+      <div class="settings-item danger">
+        <button id="logoutBtn" class="settings-cta">
+          <span class="settings-icon icon-logout"></span>
+          <span>Sair da conta</span>
+        </button>
+        <span class="right"></span>
+      </div>
+    </div>`;
+  box.innerHTML = cardHTML + listHTML;
+  const btn = box.querySelector('#logoutBtn');
+  if (btn) btn.onclick = async () => {
+    try { await (window.Auth && window.Auth.signOut ? window.Auth.signOut() : Promise.resolve()); }
+    catch (_) {}
+    // Clear local state minimal
+    try { cacheSet('profile', null); } catch {}
+    settingsModalEl.classList.add('hidden');
+    updateModalOpenState();
+    // UI overlay de login aparece via auth state
+  };
+}
+
+// Re-render settings when auth user changes (to keep profile fresh)
+document.addEventListener('auth:state', () => {
+  try { renderSettings(); } catch {}
+});
 // (Web Push removido)
-// Block background scrolling via touch/wheel when tx modal is open
+// Block background scrolling via touch/wheel sempre que houver um modal aberto
+function anyModalOpen(){ return !!document.querySelector('.bottom-modal:not(.hidden)'); }
+function isInScrollableModal(el){
+  const content = el && el.closest ? el.closest('.bottom-modal .modal-content') : null;
+  if (!content) return false;
+  let node = el;
+  while (node && node !== content.parentElement) {
+    const style = window.getComputedStyle(node);
+    const oy = style.overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return true;
+    node = node.parentElement;
+  }
+  // fallback: treat .modal-content as scrollable container
+  return content && content.scrollHeight > content.clientHeight;
+}
+// Allow scroll inside modal content; block background scroll only
 document.addEventListener('touchmove', (e) => {
-  if (!txModal.classList.contains('hidden')) e.preventDefault();
+  if (!anyModalOpen()) return;
+  const target = e.target;
+  if (isInScrollableModal(target)) return; // allow natural scroll in modal
+  e.preventDefault();
 }, { passive: false });
 document.addEventListener('wheel', (e) => {
-  if (!txModal.classList.contains('hidden')) e.preventDefault();
+  if (!anyModalOpen()) return;
+  const target = e.target;
+  if (isInScrollableModal(target)) return; // allow wheel inside modal
+  e.preventDefault();
 }, { passive: false });
+
+// iOS 26: detectar teclado via VisualViewport, mas só ajustar botões inferiores
+(function setupKbOffsets(){
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+  const THRESH = 140; // px
+  const update = () => {
+    const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
+    const isKb = gap > THRESH && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isKb) {
+      root.dataset.vvKb = '1';
+      root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
+    } else {
+      delete root.dataset.vvKb;
+      root.style.removeProperty('--kb-offset-bottom');
+    }
+  };
+  update();
+  vv.addEventListener('resize', update);
+  window.addEventListener('orientationchange', () => setTimeout(update, 50));
+  window.addEventListener('focusin', () => setTimeout(update, 0));
+  window.addEventListener('focusout', () => setTimeout(update, 50));
+})();
 
 
 
@@ -807,7 +1251,9 @@ function updateStickyMonth() {
   }
 }
 
-window.addEventListener('scroll', updateStickyMonth);
+// Atualiza stickyMonth ao rolar o container principal
+if (wrapperEl) wrapperEl.addEventListener('scroll', updateStickyMonth);
+else window.addEventListener('scroll', updateStickyMonth);
 
 // --- Date helpers ---
 /**
@@ -826,6 +1272,10 @@ function formatToISO(date) {
 const todayISO = () => formatToISO(new Date());
 // expose todayISO to global for inline scripts
 window.todayISO = todayISO;
+
+// Ensure end-pad is computed on first render as well
+// Keep end-pad in sync with toolbar/viewport changes (iOS/Safari)
+// End‑pad fixado via CSS: sem atualizações dinâmicas
 
 // Função para calcular o postDate de cartões corretamente (nova lógica)
 const post = (iso, m) => {
@@ -922,8 +1372,16 @@ if (addBtn && !addBtn.dataset.toastSaveHook) {
     }, 0);
   }, { capture: true });
 }
+// Ensure numeric keypad and proper formatting on mobile
+try {
+  // Prefer 'tel' to trigger numeric keypad on iOS; keep inputmode for Android/Chromium
+  if (val.type !== 'tel') val.type = 'tel';
+  val.setAttribute('inputmode', 'decimal');
+  val.setAttribute('enterkeyhint', 'done');
+  val.setAttribute('pattern', '[0-9.,]*');
+} catch (_) {}
+
 // Auto-format value input as BRL currency while typing
-val.type = 'text';  // ensure it's text for formatting
 val.addEventListener('input', () => {
   // Remove all non-digit characters
   const digits = val.value.replace(/\D/g, '');
@@ -1055,33 +1513,11 @@ recurrence.onchange = () => {
 let isEditing = null;
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
-// Enable and handle the "Limpar tudo" button
+// Oculta o botão "Limpar tudo" em produção
 if (resetBtn) {
-  resetBtn.hidden = false;
-  resetBtn.addEventListener('click', () => {
-    if (!confirm('Atenção: ao limpar todos os dados, serão apagadas todas as transações, cartões e o saldo inicial permanentemente. Deseja continuar?')) return;
-
-    // Clear all data
-    transactions = [];
-    cards = [{ name: 'Dinheiro', close: 0, due: 0 }];
-    startBalance = null;
-
-    // Clear caches
-    cacheSet('tx', transactions);
-    cacheSet('cards', cards);
-    cacheSet('startBal', startBalance);
-
-    // Persist
-    save('tx', transactions);
-    save('cards', cards);
-    save('startBal', startBalance);
-
-    // UI
-    if (typeof refreshMethods === 'function') refreshMethods();
-    if (typeof renderCardList === 'function') renderCardList();
-    if (typeof initStart === 'function') initStart();
-    renderTable();
-  });
+  resetBtn.hidden = true;
+  resetBtn.style.display = 'none';
+  // Em produção, não anexamos o handler de limpeza.
 }
 // Auto-format initial balance input as BRL currency
 if (startInput) {
@@ -1129,7 +1565,7 @@ const notify = (msg, type = 'error') => {
   }, 5000);
 };
 
-const togglePlanned = (id, iso) => {
+const togglePlanned = async (id, iso) => {
   const master = transactions.find(x => x.id === id);
   // ← memoriza quais faturas estavam abertas
   const openInvoices = Array.from(
@@ -1141,6 +1577,17 @@ const togglePlanned = (id, iso) => {
     master.exceptions = master.exceptions || [];
     if (!master.exceptions.includes(iso)) {
       master.exceptions.push(iso);
+      // Pergunta se deve mover para hoje
+      const today = todayISO();
+      const fmt = (s) => `${s.slice(8,10)}/${s.slice(5,7)}`;
+      // Pergunta somente para operações em Dinheiro; cartão sempre vai para a fatura
+      let execIso = iso;
+      try {
+        if (master.method === 'Dinheiro' && iso !== today) {
+          const move = await askMoveToToday();
+          if (move) execIso = today;
+        }
+      } catch (_) {}
       // Create a standalone executed transaction for this occurrence
       const execTx = {
         id: Date.now(),
@@ -1148,8 +1595,8 @@ const togglePlanned = (id, iso) => {
         desc: master.desc,
         val: master.val,
         method: master.method,
-        opDate: iso,
-        postDate: post(iso, master.method),
+        opDate: execIso,
+        postDate: post(execIso, master.method),
         recurrence: '',
         installments: 1,
         planned: false,
@@ -1167,17 +1614,25 @@ const togglePlanned = (id, iso) => {
     // If un-planning an expired transaction, adjust based on method
     if (master.planned) {
       const today = todayISO();
+      // Somente Dinheiro pergunta para mover; Cartão não pergunta e não altera opDate
       if (master.method === 'Dinheiro') {
-        // cash payments move to today
-        master.opDate = today;
-        master.postDate = today;
+        try {
+          if (iso !== today) {
+            const move = await askMoveToToday();
+            if (move) {
+              master.opDate = today;
+              master.postDate = today;
+            }
+          }
+        } catch (_) {}
       }
       // update timestamp of payment to today
       master.ts = new Date().toISOString();
     }
     master.planned = !master.planned;
     if (!master.planned && master.method !== 'Dinheiro') {
-      master.postDate = post(master.opDate, master.method);      // move para a fatura
+      // Para cartões, calcula a fatura com base na opDate (possivelmente movida)
+      master.postDate = post(master.opDate, master.method);
       const [, mm, dd] = master.postDate.split('-');
       toastMsg = `Movida para fatura de ${dd}/${mm}`;
     }
@@ -1198,7 +1653,12 @@ const openCardBtn=document.getElementById('openCardModal');
 const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
 
-function refreshMethods(){met.innerHTML='';cards.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});}
+function refreshMethods(){
+  if (!met) return;
+  met.innerHTML='';
+  const list = Array.isArray(cards) && cards.length ? cards : [{name:'Dinheiro',close:0,due:0}];
+  list.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;met.appendChild(o);});
+}
 // --- Card List Rendering (Refatorado) ---
 function createCardSwipeActions(card) {
   const actions = document.createElement('div');
@@ -1272,25 +1732,30 @@ function createCardSwipeActions(card) {
 function createCardContent(card) {
   const content = document.createElement('div');
   content.className = 'card-content card-line';
+  // Desired layout:
+  // [centered] Card name
+  // [calendar icon] Fechamento          DD
+  // [clock icon]    Vencimento         DD
+  // SVGs use currentColor so they render in black/white depending on CSS.
   content.innerHTML = `
-    <b>${card.name}</b>
-    <div class="card-detail">
-      <span class="card-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+    <div class="card-name" style="text-align:center;margin:6px 0; font-weight:700">${escHtml(card.name)}</div>
+    <div class="card-detail" style="display:flex;align-items:center;gap:8px;padding:4px 0;color:currentColor">
+      <span class="card-icon" style="width:20px;display:inline-flex;align-items:center;color:currentColor">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden>
           <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1 .9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1 -.9-2-2-2zm0 16H5V9h14v11z"/>
         </svg>
       </span>
-      <span class="card-label">Fechamento</span>
-      <span class="card-value">${card.close}</span>
+      <span class="card-label" style="flex:0 0 auto">Fechamento</span>
+      <span class="card-value" style="margin-left:auto;font-weight:600">${escHtml(String(card.close))}</span>
     </div>
-    <div class="card-detail">
-      <span class="card-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+    <div class="card-detail" style="display:flex;align-items:center;gap:8px;padding:4px 0;color:currentColor">
+      <span class="card-icon" style="width:20px;display:inline-flex;align-items:center;color:currentColor">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden>
           <path d="M12 20c4.41 0 8-3.59 8-8s-3.59-8 -8-8 -8 3.59 -8 8 3.59 8 8 8zm0-14c3.31 0 6 2.69 6 6s-2.69 6 -6 6 -6-2.69 -6-6 2.69-6 6-6zm.5 3H11v5l4.25 2.52 .75-1.23 -3.5-2.04V9z"/>
         </svg>
       </span>
-      <span class="card-label">Vencimento</span>
-      <span class="card-value">${card.due}</span>
+      <span class="card-label" style="flex:0 0 auto">Vencimento</span>
+      <span class="card-value" style="margin-left:auto;font-weight:600">${escHtml(String(card.due))}</span>
     </div>
   `;
   return content;
@@ -1311,14 +1776,29 @@ function createCardListItem(card) {
 }
 
 function renderCardList() {
-  cardList.innerHTML = '';
-  cards
-    .filter(card => card.name !== 'Dinheiro')
-    .forEach(card => {
+  // Resolve list element at call time in case modal DOM is created later.
+  let ul = document.getElementById('cardList') || cardList || null;
+  if (!ul && cardModal) ul = cardModal.querySelector('#cardList');
+  if (!ul) return; // no DOM to render into yet
+
+  try { console.debug && console.debug('renderCardList called, ul=', ul, 'cardsCount=', (cards||[]).length); } catch(_) {}
+
+  ul.innerHTML = '';
+  const visibleCards = cards.filter(card => card.name !== 'Dinheiro');
+  if (!visibleCards.length) {
+    // Show a clear empty state so it's obvious the list is empty (data issue)
+    const emptyLi = document.createElement('li');
+    emptyLi.className = 'card-empty';
+    emptyLi.textContent = 'Nenhum cartão cadastrado';
+    ul.appendChild(emptyLi);
+  } else {
+    visibleCards.forEach(card => {
       const li = createCardListItem(card);
-      cardList.appendChild(li);
+      ul.appendChild(li);
     });
-  // swipe-init for cards is now handled via initSwipe at the end of the file.
+  }
+  // Ensure swipe is initialized for this root (safe guard)
+  try { if (ul) initSwipe(ul, '.swipe-wrapper', '.swipe-actions', '.card-line', 'cardsSwipeInit'); } catch (_) {}
 }
 // Helper: returns true if this record is a detached (single‑edited) occurrence
 function isDetachedOccurrence(tx) {
@@ -1364,8 +1844,6 @@ function makeLine(tx, disableSwipe = false) {
       pendingEditTxId  = t.id;
       pendingEditTxIso = t.opDate;
       editRecurrenceModal.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-      wrapperEl.style.overflow     = 'hidden';
       return;
     }
     if (isDetachedOccurrence(t)) {
@@ -1577,6 +2055,109 @@ function makeLine(tx, disableSwipe = false) {
 function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
 
 
+// ---------- Pay Invoice Modal (reuse txModal) ----------
+const invoiceParcelCheckbox = document.getElementById('invoiceParcel');
+const invoiceParcelRow = document.getElementById('invoiceParcelRow');
+
+function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjustedBefore) {
+  // Open first (to avoid reset wiping our prefill), then prefill
+  const wasHidden = txModal.classList.contains('hidden');
+  if (wasHidden) toggleTxModal();
+  isPayInvoiceMode = true;
+  pendingInvoiceCtx = { card: cardName, dueISO, remaining, totalAbs, adjustedBefore };
+  if (txModal) txModal.dataset.mode = 'pay-invoice';
+  // Prefill form
+  const today = todayISO();
+  desc.value = `Pagamento fatura – ${cardName}`;
+  // Set expense toggle active and format value as BRL (negative)
+  document.querySelectorAll('.value-toggle button').forEach(b => b.classList.remove('active'));
+  const expBtn = document.querySelector('.value-toggle button[data-type="expense"]');
+  if (expBtn) expBtn.classList.add('active');
+  const rem = Number(remaining) || 0;
+  val.value = (-rem).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  date.value = today;
+  // Lock method to Dinheiro
+  hiddenSelect.value = 'Dinheiro';
+  const methodSwitch = document.querySelector('.method-switch');
+  if (methodSwitch) methodSwitch.dataset.selected = 'Dinheiro';
+  methodButtons.forEach(b => { b.classList.toggle('active', b.dataset.method === 'Dinheiro'); });
+  // Show parcel option (off by default)
+  if (invoiceParcelRow) invoiceParcelRow.style.display = '';
+  // Fix label content/order: [text span] ..... [checkbox]
+  if (invoiceParcelRow && invoiceParcelCheckbox) {
+    const cb = invoiceParcelCheckbox;
+    // Preserve checkbox, rebuild label content
+    invoiceParcelRow.textContent = '';
+    const textSpan = document.createElement('span');
+    textSpan.textContent = 'Parcelar fatura';
+    invoiceParcelRow.appendChild(textSpan);
+    invoiceParcelRow.appendChild(cb);
+  }
+  if (invoiceParcelCheckbox) invoiceParcelCheckbox.checked = false;
+  installments.disabled = true;
+  parcelasBlock.classList.add('hidden');
+  recurrence.value = '';
+  // Title and button
+  txModalTitle.textContent = 'Pagar fatura';
+  addBtn.textContent = 'Pagar';
+}
+
+// Toggle parcel block only in pay-invoice mode
+if (invoiceParcelCheckbox) {
+  invoiceParcelCheckbox.addEventListener('change', () => {
+    if (!isPayInvoiceMode) return;
+    if (invoiceParcelCheckbox.checked) {
+      // Populate installments if not yet
+      const sel = document.getElementById('installments');
+      if (sel && !sel.dataset.populated) {
+        sel.innerHTML = '';
+        for (let i = 2; i <= 24; i++) {
+          const o = document.createElement('option');
+          o.value = String(i);
+          o.textContent = `${i}x`;
+          sel.appendChild(o);
+        }
+        sel.dataset.populated = '1';
+      }
+      parcelasBlock.classList.remove('hidden');
+      installments.disabled = false;
+      recurrence.value = 'M';
+      // Default to 2x on (re)enable if previous value was 1 or empty
+      if (!installments.value || installments.value === '1') installments.value = '2';
+      // Set value field to per‑installment amount (negative)
+      const ctx = pendingInvoiceCtx || {};
+      const base = Math.abs(Number(ctx.remaining) || 0);
+      const n = Math.max(2, parseInt(installments.value || '2', 10) || 2);
+      installments.value = String(n);
+      const per = n > 0 ? base / n : base;
+      val.value = (-per).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+      parcelasBlock.classList.add('hidden');
+      installments.disabled = true;
+      recurrence.value = '';
+      installments.value = '1';
+      // Restore full remaining amount to value field
+      const ctx = pendingInvoiceCtx || {};
+      const base = Math.abs(Number(ctx.remaining) || 0);
+      val.value = (-base).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  });
+}
+
+// Update value when installments count changes (pay‑invoice mode only)
+if (installments) {
+  installments.addEventListener('change', () => {
+    if (!isPayInvoiceMode) return;
+    if (!invoiceParcelCheckbox || !invoiceParcelCheckbox.checked) return;
+    const ctx = pendingInvoiceCtx || {};
+    const base = Math.abs(Number(ctx.remaining) || 0);
+    const n = parseInt(installments.value, 10) || 1;
+    const per = n > 0 ? base / n : base;
+    val.value = (-per).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  });
+}
+
+
 // Localized addTx and helpers
 async function addTx() {
   // Edit mode
@@ -1709,6 +2290,122 @@ async function addTx() {
   }
 
   // Adição normal
+  // Modo especial: pagamento/parcelamento de fatura
+  if (isPayInvoiceMode && pendingInvoiceCtx) {
+    const ctx = pendingInvoiceCtx;
+    const rawVal = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
+    const amount = Math.abs(rawVal); // valor informado, sempre positivo
+    if (amount <= 0) { showToast('Informe um valor válido.'); return; }
+    const remaining = Number(ctx.remaining) || 0;
+    const payVal = Math.min(amount, remaining);
+    const payDate = date.value || todayISO();
+    const nowIso = new Date().toISOString();
+
+    if (invoiceParcelCheckbox && invoiceParcelCheckbox.checked && (parseInt(installments.value,10) || 1) > 1) {
+      // Parcelamento: criar ajuste no dueISO e parcelas futuras (recorrência mensal)
+      const n = Math.min(24, Math.max(2, parseInt(installments.value, 10) || 2));
+      const perParcel = +(payVal / n).toFixed(2);
+      // 1) Ajuste que neutraliza parte da fatura no vencimento (somente o valor pago)
+      transactions.push({
+        id: Date.now(),
+        desc: `Ajuste fatura – ${ctx.card}`,
+        val: 0,
+        method: 'Dinheiro',
+        opDate: ctx.dueISO,
+        postDate: ctx.dueISO,
+        planned: false,
+        invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: payVal },
+        ts: nowIso,
+        modifiedAt: nowIso
+      });
+      // 2) Série mensal de parcelas (Dinheiro) que impactam o saldo nas datas das parcelas
+      transactions.push({
+        id: Date.now()+1,
+        desc: `Parcela fatura – ${ctx.card}`,
+        val: -perParcel,
+        method: 'Dinheiro',
+        opDate: payDate,
+        postDate: payDate,
+        recurrence: 'M',
+        installments: n,
+        planned: payDate > todayISO(),
+        invoiceParcelOf: { card: ctx.card, dueISO: ctx.dueISO },
+        ts: nowIso,
+        modifiedAt: nowIso
+      });
+  } else {
+      // Pagamento sem parcelar
+      // a) Ajuste no vencimento atual que zera o impacto da fatura
+      const totalAbs = Number(ctx.totalAbs) || 0;
+      const adjustedBefore = Number(ctx.adjustedBefore) || 0;
+      const adjustAmount = Math.max(0, totalAbs - adjustedBefore);
+      transactions.push({
+        id: Date.now(),
+        desc: `Ajuste fatura – ${ctx.card}`,
+        val: 0,
+        method: 'Dinheiro',
+        opDate: ctx.dueISO,
+        postDate: ctx.dueISO,
+        planned: false,
+        invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: adjustAmount },
+        ts: nowIso,
+        modifiedAt: nowIso
+      });
+      // b) Registro de pagamento (confirmação)
+      transactions.push({
+        id: Date.now()+1,
+        desc: `Pagamento fatura – ${ctx.card}`,
+        val: -payVal,
+        method: 'Dinheiro',
+        opDate: payDate,
+        postDate: payDate,
+        planned: payDate > todayISO(),
+        invoicePayment: { card: ctx.card, dueISO: ctx.dueISO },
+        ts: nowIso,
+        modifiedAt: nowIso
+      });
+      // c) Se pagamento parcial, rola o restante para a próxima fatura
+      const remainingAfter = Math.max(0, remaining - payVal);
+      if (remainingAfter > 0) {
+        // Calcula próximo vencimento (mesmo dia do mês, ajustando para o último dia se necessário)
+        const base = new Date(ctx.dueISO + 'T00:00:00');
+        const y = base.getFullYear();
+        const m = base.getMonth(); // 0-based
+        const d = base.getDate();
+        const lastNext = new Date(y, m + 2, 0).getDate(); // last day of next month
+        const nextDue = new Date(y, m + 1, Math.min(d, lastNext));
+        const nextDueISO = nextDue.toISOString().slice(0,10);
+        // Rollover para a próxima fatura com rótulo amigável (ex.: "Pendente da fatura de Setembro")
+        const monthName = base.toLocaleDateString('pt-BR', { month: 'long' });
+        const monthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        transactions.push({
+          id: Date.now()+2,
+          desc: `Pendente da fatura de ${monthLabel}`,
+          val: -remainingAfter,
+          method: ctx.card,
+          opDate: ctx.dueISO,      // operação "executada"; não aparece no dia (cartão executado)
+          postDate: nextDueISO,    // impacta a fatura do próximo vencimento
+          planned: false,
+          invoiceRolloverOf: { card: ctx.card, fromDueISO: ctx.dueISO },
+          ts: nowIso,
+          modifiedAt: nowIso
+        });
+      }
+    }
+    // Persist & UI
+    save('tx', transactions);
+    renderTable();
+    toggleTxModal();
+    // reset pay mode state
+    isPayInvoiceMode = false;
+    pendingInvoiceCtx = null;
+    if (txModal && txModal.dataset && txModal.dataset.mode) delete txModal.dataset.mode;
+    addBtn.textContent = 'Adicionar';
+    txModalTitle.textContent = 'Lançar operação';
+    showToast('Pagamento registrado', 'success');
+    return;
+  }
+
   if (startBalance === null) {
     showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
@@ -1891,14 +2588,10 @@ function delTx(id, iso) {
   pendingDeleteTxId = id;
   pendingDeleteTxIso = iso || t.opDate;
   deleteRecurrenceModal.classList.remove('hidden');
-  if (document.body) document.body.style.overflow = 'hidden';
-  if (wrapperEl) wrapperEl.style.overflow = 'hidden';
 }
 
 function closeDeleteModal() {
   deleteRecurrenceModal.classList.add('hidden');
-  if (document.body) document.body.style.overflow = '';
-  if (wrapperEl) wrapperEl.style.overflow = '';
   pendingDeleteTxId = null;
   pendingDeleteTxIso = null;
 }
@@ -1908,28 +2601,69 @@ closeDeleteRecurrenceModal.onclick = closeDeleteModal;
 cancelDeleteRecurrence.onclick = closeDeleteModal;
 deleteRecurrenceModal.onclick = e => { if (e.target === deleteRecurrenceModal) closeDeleteModal(); };
 
+// Helper: find the master recurring rule for a given tx/iso
+function findMasterRuleFor(tx, iso) {
+  if (!tx) return null;
+  if (tx.recurrence && tx.recurrence.trim() !== '') return tx;
+  if (tx.parentId) {
+    const parent = transactions.find(p => p.id === tx.parentId);
+    if (parent) return parent;
+  }
+  // Heuristic: find a rule that occurs on the same date and looks like this tx
+  for (const p of transactions) {
+    if (!p.recurrence || !p.recurrence.trim()) continue;
+    if (!occursOn(p, iso)) continue;
+    const sameMethod = (p.method || '') === (tx.method || '');
+    const sameDesc   = (p.desc || '') === (tx.desc || '');
+    const sameVal    = Math.abs(Number(p.val || 0) - Number(tx.val || 0)) < 0.005;
+    if (sameMethod && (sameDesc || sameVal)) return p;
+  }
+  return null;
+}
+
 deleteSingleBtn.onclick = () => {
   const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  const iso = pendingDeleteTxIso;
   if (!tx) { closeDeleteModal(); return; }
-  tx.exceptions = tx.exceptions || [];
-  tx.exceptions.push(pendingDeleteTxIso);
+  const master = findMasterRuleFor(tx, iso);
+  if (master) {
+    master.exceptions = master.exceptions || [];
+    if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
+    showToast('Ocorrência excluída!', 'success');
+  } else {
+    // fallback: not a recurrence → hard delete
+    transactions = transactions.filter(x => x.id !== tx.id);
+    showToast('Operação excluída.', 'success');
+  }
   save('tx', transactions);
   renderTable();
   closeDeleteModal();
-  showToast('Ocorrência excluída!', 'success');
 };
+
 deleteFutureBtn.onclick = () => {
   const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  const iso = pendingDeleteTxIso;
   if (!tx) { closeDeleteModal(); return; }
-  tx.recurrenceEnd = pendingDeleteTxIso;
+  const master = findMasterRuleFor(tx, iso);
+  if (master) {
+    master.recurrenceEnd = iso;
+    showToast('Esta e futuras excluídas!', 'success');
+  } else {
+    // fallback: not a recurrence → delete only this occurrence
+    transactions = transactions.filter(x => x.id !== tx.id);
+    showToast('Operação excluída.', 'success');
+  }
   save('tx', transactions);
   renderTable();
   closeDeleteModal();
-  showToast('Esta e futuras excluídas!', 'success');
 };
+
 deleteAllBtn.onclick = () => {
+  const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  if (!tx) { closeDeleteModal(); return; }
+  const master = findMasterRuleFor(tx, pendingDeleteTxIso) || tx;
   // Remove both master rule and any occurrences with parentId
-  transactions = transactions.filter(t => t.id !== pendingDeleteTxId && t.parentId !== pendingDeleteTxId);
+  transactions = transactions.filter(t => t.id !== master.id && t.parentId !== master.id);
   save('tx', transactions);
   renderTable();
   closeDeleteModal();
@@ -1939,8 +2673,6 @@ deleteAllBtn.onclick = () => {
 // Modal Editar Recorrência handlers
 function closeEditModal() {
   editRecurrenceModal.classList.add('hidden');
-  if (document.body) document.body.style.overflow = '';
-  if (wrapperEl) wrapperEl.style.overflow = '';
 }
 closeEditRecurrenceModal.onclick = closeEditModal;
 cancelEditRecurrence.onclick = closeEditModal;
@@ -2049,8 +2781,6 @@ document.addEventListener('click', (e) => {
   if (t.recurrence || t.parentId) {
     // recorrente → abre modal de escopo de edição
     editRecurrenceModal.classList.remove('hidden');
-    if (document.body) document.body.style.overflow = 'hidden';
-    if (wrapperEl) wrapperEl.style.overflow = 'hidden';
   } else {
     // não recorrente → vai direto para edição
     editTx(id);
@@ -2064,6 +2794,17 @@ function renderTable() {
   clearTableContent();
   const groups = groupTransactionsByMonth();
   renderTransactionGroups(groups);
+}
+
+// Defensive render: avoids silent failures leaving the UI empty
+function safeRenderTable(attempt = 1) {
+  try {
+    renderTable();
+  } catch (err) {
+    console.error('renderTable failed (attempt ' + attempt + '):', err);
+    try { showToast('Erro ao renderizar. Tentando novamente…', 'error', 2500); } catch (_) {}
+    if (attempt < 3) setTimeout(() => safeRenderTable(attempt + 1), 300);
+  }
 }
 
 // 1. NÃO limpe o #accordion aqui para preservar estado; apenas zere o tableBody (legacy).
@@ -2080,8 +2821,10 @@ function groupTransactionsByMonth() {
   const groups = new Map();
   sortTransactions();
   for (const tx of transactions) {
-    // Usa postDate para agrupamento por mês
-    const key = tx.postDate.slice(0, 7); // YYYY-MM
+    // Usa postDate para agrupamento por mês, com fallback seguro
+    const pd = tx.postDate || (tx.opDate && tx.method ? post(tx.opDate, tx.method) : tx.opDate);
+    if (!pd || typeof pd.slice !== 'function') continue; // ignora itens malformados
+    const key = pd.slice(0, 7); // YYYY-MM
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(tx);
   }
@@ -2109,32 +2852,54 @@ function renderTransactionGroups(groups) {
 function renderAccordion() {
   const acc = document.getElementById('accordion');
   if (!acc) return;
-  // Salva quais <details> estão abertos antes de recriar
+  const hydrating = acc.dataset && acc.dataset.state === 'skeleton';
+  // Salva quais <details> estão abertos
   const openKeys = Array.from(acc.querySelectorAll('details[open]'))
                         .map(d => d.dataset.key || '');
   // Preserve which invoice panels are open
   const openInvoices = Array.from(
     acc.querySelectorAll('details.invoice[open]')
   ).map(d => d.dataset.pd);
-  acc.innerHTML = '';
+  if (!hydrating) acc.innerHTML = '';
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const currency = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   const curMonth = new Date().getMonth();   // 0‑based
 
   // Helper para criar o header da fatura do cartão
-  function createCardInvoiceHeader(cardName, cardTotalAmount) {
+  function createCardInvoiceHeader(cardName, cardTotalAmount, dueISO) {
     const invSum = document.createElement('summary');
-    // Ajuste de formatação: se valor negativo, exibe como R$ -valor
-    let formattedTotal;
-    if (cardTotalAmount < 0) {
-      formattedTotal = `R$ -${Math.abs(cardTotalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-    } else {
-      formattedTotal = `R$ ${cardTotalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    invSum.classList.add('invoice-header-line');
+    // Formatação do total original da fatura (valor bruto)
+    const formattedTotal = cardTotalAmount < 0
+      ? `R$ -${Math.abs(cardTotalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : `R$ ${cardTotalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+    // Metadados: pagamentos (dinheiro), ajustes e parcelamento
+    const paidAbs = transactions
+      .filter(t => t.invoicePayment && t.invoicePayment.card === cardName && t.invoicePayment.dueISO === dueISO)
+      .reduce((s, t) => s + Math.abs(Number(t.val) || 0), 0);
+    const parcel = transactions.find(t => t.invoiceParcelOf && t.invoiceParcelOf.card === cardName && t.invoiceParcelOf.dueISO === dueISO);
+    const totalAbs = Math.abs(cardTotalAmount);
+
+    // Regras de exibição: só marcar como pago/strike após uma ação do usuário (pagamento ou parcelamento)
+    const struck = (paidAbs > 0) || !!parcel;
+    let note = '';
+    if (parcel) {
+      const n = parseInt(parcel.installments, 10) || 0;
+      const per = Math.abs(Number(parcel.val) || 0);
+      const perFmt = `R$ ${per.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      note = `<small class="note">Parcelada em ${n} vezes de ${perFmt}</small>`;
+    } else if (paidAbs >= totalAbs - 0.005) { // tolerância de centavos
+      note = `<small class="note">Paga</small>`;
+    } else if (paidAbs > 0) {
+      const remaining = Math.max(0, totalAbs - paidAbs);
+      note = `<small class="note">Restante - R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>`;
     }
+
     invSum.innerHTML = `
       <span class="invoice-label">Fatura – ${cardName}</span>
-      <span class="invoice-total">${formattedTotal}</span>
+      <span class="invoice-total"><span class="amount${struck ? ' struck' : ''}">${formattedTotal}</span>${note}</span>
     `;
     return invSum;
   }
@@ -2206,6 +2971,8 @@ function renderAccordion() {
   transactions.forEach(t => {
     if (t.recurrence) return;            // só não-recorrentes aqui
     if (t.opDate !== iso) return;        // renderiza sempre no opDate
+    // Oculta movimentos internos da fatura (pagamento/ajuste)
+    if (t.invoicePayment || t.invoiceAdjust) return;
 
     if (t.method !== 'Dinheiro') {
       // CARTÃO
@@ -2245,16 +3012,16 @@ function renderAccordion() {
           // executada → NÃO aparece no dia; vai só para a fatura no postDate
         }
       } else {
-        // DINHEIRO recorrente → sempre aparece no opDate (planejada/executada)
-        list.push({
-          ...master,
-          opDate: iso,
-          postDate: post(iso, 'Dinheiro'),
-          planned: plannedFlag,
-          recurrence: ''
-        });
-      }
-    });
+      // DINHEIRO recorrente → sempre aparece no opDate (planejada/executada)
+      list.push({
+        ...master,
+        opDate: iso,
+        postDate: post(iso, 'Dinheiro'),
+        planned: plannedFlag,
+        recurrence: ''
+      });
+    }
+  });
 
   // Ordem cronológica estável (por opDate e ts)
   list.sort((a, b) => {
@@ -2269,19 +3036,45 @@ function renderAccordion() {
   let runningBalance = startBalance || 0;          // saldo acumulado
   for (let mIdx = 0; mIdx < 12; mIdx++) {
     const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
-    // Build month container
-    const mDet = document.createElement('details');
-    mDet.className = 'month';
-    mDet.dataset.key = `m-${mIdx}`;   // identifica o mês
-    const isOpen = mIdx >= curMonth;
-    mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
+    // Build or reuse month container
+    let mDet;
+    if (hydrating) {
+      mDet = acc.querySelector(`details.month[data-key="m-${mIdx}"]`) || document.createElement('details');
+      mDet.className = 'month';
+      mDet.dataset.key = `m-${mIdx}`;
+      const isOpen = mIdx >= curMonth;
+      mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
+      if (!mDet.parentElement) acc.appendChild(mDet);
+      // Ensure summary exists and is in final structure
+      let mSum = mDet.querySelector('summary.month-divider');
+      if (!mSum) {
+        mSum = document.createElement('summary');
+        mSum.className = 'month-divider';
+        mDet.prepend(mSum);
+      }
+      // Update header content (month name; meta updated later)
+      mSum.innerHTML = `
+        <div class="month-row">
+          <span class="month-name">${nomeMes.toUpperCase()}</span>
+        </div>
+        <div class="month-meta">
+          <span class="meta-label"></span>
+          <span class="meta-value"></span>
+        </div>`;
+    } else {
+      mDet = document.createElement('details');
+      mDet.className = 'month';
+      mDet.dataset.key = `m-${mIdx}`;   // identifica o mês
+      const isOpen = mIdx >= curMonth;
+      mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
+    }
     // Month total = sum of all tx in that month
     const monthTotal = transactions
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     // Cabeçalho flutuante dos meses
-    const mSum = document.createElement('summary');
-    mSum.className = 'month-divider';
+    let mSum = mDet.querySelector('summary.month-divider');
+    if (!mSum) { mSum = document.createElement('summary'); mSum.className = 'month-divider'; }
 
     const monthActual = transactions
       .filter(t => {
@@ -2320,7 +3113,7 @@ function renderAccordion() {
         <span class="meta-value">${metaValue}</span>
       </div>`;
 
-    mDet.appendChild(mSum);
+    if (!hydrating) mDet.appendChild(mSum);
 
     // Garante o número correto de dias em cada mês
     const daysInMonth = new Date(2025, mIdx + 1, 0).getDate();
@@ -2364,30 +3157,59 @@ for (const master of transactions.filter(t => t.recurrence && t.method !== 'Dinh
   }
 }
 
-// 1) Dinheiro impacta o saldo no dia da operação
-const cashImpact = dayTx
-  .filter(t => t.method === 'Dinheiro')
-  .reduce((s, t) => s + t.val, 0);
+// 1) Dinheiro impacta o saldo no dia da operação (inclui invoicePayment; exclui invoiceAdjust)
+//    Agora considera também as ocorrências de recorrências em Dinheiro no dia
+const cashNonRecurring = transactions
+  .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso)
+  .filter(t => !t.invoiceAdjust) // ajustes da fatura têm val=0 e não devem afetar caixa
+  .reduce((s, t) => s + (Number(t.val) || 0), 0);
 
-// 2) Cartões impactam somente via total da fatura no vencimento
+// Soma das recorrências de Dinheiro que ocorrem neste dia
+const cashRecurring = transactions
+  .filter(t => t.method === 'Dinheiro' && t.recurrence)
+  .filter(t => occursOn(t, iso))
+  .reduce((s, t) => s + (Number(t.val) || 0), 0);
+
+const cashImpact = cashNonRecurring + cashRecurring;
+
+// 2) Cartões impactam via total da fatura no vencimento, menos ajustes (parcelamentos/rollovers)
 const invoiceTotals = {};
 Object.keys(invoicesByCard).forEach(card => {
   invoiceTotals[card] = invoicesByCard[card].reduce((s, t) => s + t.val, 0);
 });
-const cardImpact = Object.values(invoiceTotals).reduce((s, v) => s + v, 0);
+// Soma ajustes positivos que deslocam parte da fatura deste dueISO
+const sumAdjustFor = (cardName, dueISO) => transactions
+  .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
+  .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
+let cardImpact = 0;
+Object.keys(invoiceTotals).forEach(card => {
+  const adj = sumAdjustFor(card, iso);
+  // Ajustes positivos reduzem o impacto da fatura no dia
+  cardImpact += (invoiceTotals[card] + adj);
+});
 
 const dayTotal = cashImpact + cardImpact;
       runningBalance += dayTotal;                           // atualiza saldo acumulado
       const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
-      const dDet = document.createElement('details');
-      dDet.dataset.has = String(dayTx.length > 0);
-      dDet.className = 'day';
-      dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
-      dDet.open = openKeys.includes(dDet.dataset.key);
+      let dDet;
+      if (hydrating) {
+        dDet = mDet.querySelector(`details.day[data-key="d-${iso}"]`) || document.createElement('details');
+        dDet.className = 'day';
+        dDet.dataset.key = `d-${iso}`;
+        dDet.open = openKeys.includes(dDet.dataset.key);
+        dDet.dataset.has = String(dayTx.length > 0);
+        if (!dDet.parentElement) mDet.appendChild(dDet);
+      } else {
+        dDet = document.createElement('details');
+        dDet.dataset.has = String(dayTx.length > 0);
+        dDet.className = 'day';
+        dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
+        dDet.open = openKeys.includes(dDet.dataset.key);
+      }
       const today = todayISO();
       if (iso === today) dDet.classList.add('today');
-      const dSum = document.createElement('summary');
-      dSum.className = 'day-summary';
+      let dSum = dDet.querySelector('summary.day-summary');
+      if (!dSum) { dSum = document.createElement('summary'); dSum.className = 'day-summary'; }
       const saldoFormatado = runningBalance < 0
         ? `R$ -${Math.abs(runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -2404,7 +3226,8 @@ const dayTotal = cashImpact + cardImpact;
       const labelWithDue = labelParts.join('');
       dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
       if (runningBalance < 0) dDet.classList.add('negative');
-      dDet.appendChild(dSum);
+      // Replace or append summary
+      if (!hydrating) dDet.appendChild(dSum); else if (!dDet.contains(dSum)) dDet.prepend(dSum);
 
       // Seção de planejados (apenas se houver planejados)
       const plannedOps = dayTx
@@ -2417,15 +3240,56 @@ const dayTotal = cashImpact + cardImpact;
 
       // === INVOICE UI (vencendo hoje) ===
       // Remove restos de render anteriores
-      (dDet.querySelectorAll && dDet.querySelectorAll('details.invoice').forEach(n => n.remove()));
+      if (!hydrating) { (dDet.querySelectorAll && dDet.querySelectorAll('details.invoice').forEach(n => n.remove())); }
 
-      Object.keys(invoicesByCard).forEach(cardName => {
+      if (!hydrating) Object.keys(invoicesByCard).forEach(cardName => {
         const det = document.createElement('details');
-        det.className = 'invoice';
+        det.className = 'invoice swipe-wrapper';
         det.dataset.pd = iso; // YYYY-MM-DD (vencimento)
+        // id de swipe para localizar ações fora do <details>
+        det.dataset.swipeId = `inv_${cardName.replace(/[^a-z0-9]/gi,'')}_${iso.replace(/-/g,'')}_${Math.random().toString(36).slice(2,7)}`;
 
         // Cabeçalho padrão da fatura
-        det.appendChild(createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0));
+        const invHeader = createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0, iso);
+        det.appendChild(invHeader);
+
+        // Ações do swipe como irmã de <details>, para não serem ocultadas quando colapsado
+        const headerActions = document.createElement('div');
+        headerActions.className = 'swipe-actions';
+        headerActions.dataset.for = det.dataset.swipeId;
+        const payBtn = document.createElement('button');
+        payBtn.className = 'icon';
+        const payIcon = document.createElement('div');
+        payIcon.className = 'icon-action icon-pay';
+        payBtn.appendChild(payIcon);
+        headerActions.appendChild(payBtn);
+        // Posiciona sobre o header usando o container do dia
+        dDet.style.position = dDet.style.position || 'relative';
+        Object.assign(headerActions.style, {
+          position:'absolute',
+          right:'0',            // fica colado à direita; visibilidade controlada por opacity
+          background:'transparent',
+          zIndex: 3,
+          pointerEvents: 'none' // habilita somente quando revelado pelo swipe
+        });
+        requestAnimationFrame(() => {
+          const top = det.offsetTop + invHeader.offsetTop;
+          headerActions.style.top = top + 'px';
+          headerActions.style.height = invHeader.getBoundingClientRect().height + 'px';
+        });
+        dDet.appendChild(headerActions);
+        // Não empurra para fora da tela; usamos opacity/pointer-events
+        // Ao clicar em pagar, abrir modal de pagamento com valor restante
+        payBtn.addEventListener('click', () => {
+          const dueISO = iso;
+          const total = invoiceTotals[cardName] || 0;
+          const paid = transactions.filter(t => t.invoicePayment && t.invoicePayment.card===cardName && t.invoicePayment.dueISO===dueISO)
+            .reduce((s,t)=> s + Math.abs(t.val||0), 0);
+          const adjusted = transactions.filter(t => t.invoiceAdjust && t.invoiceAdjust.card===cardName && t.invoiceAdjust.dueISO===dueISO)
+            .reduce((s,t)=> s + Math.abs(Number(t.invoiceAdjust.amount)||0), 0);
+          const remaining = Math.max(0, Math.abs(total) - paid - adjusted);
+          openPayInvoiceModal(cardName, dueISO, remaining, Math.abs(total), adjusted);
+        });
 
         // Itens da fatura (apenas visual; o saldo usa somente o total)
         invoicesByCard[cardName]
@@ -2490,12 +3354,16 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
     if (valueEl) valueEl.textContent = currency(monthEndBalanceForHeader);
 
     // (month summary já foi adicionado no topo; não adicionar novamente)
-    acc.appendChild(mDet);
+    if (!hydrating || !mDet.parentElement) acc.appendChild(mDet);
 
     // Cria linha meta como elemento independente
-    const metaLine = document.createElement('div');
-    metaLine.className = 'month-meta';
     const previewLabel = (mIdx < curMonth) ? 'Saldo final:' : 'Saldo planejado:';
+    let metaLine = mDet.nextSibling;
+    const isMetaLine = node => node && node.nodeType === 1 && node.classList && node.classList.contains('month-meta');
+    if (!isMetaLine(metaLine)) {
+      metaLine = document.createElement('div');
+      metaLine.className = 'month-meta';
+    }
     metaLine.innerHTML = `<span>| ${previewLabel}</span><strong>${currency(monthEndBalanceForHeader)}</strong>`;
     // Clique em "Saldo final" também expande/colapsa o mês
     metaLine.addEventListener('click', () => {
@@ -2504,7 +3372,10 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
 
     // Se o mês estiver fechado (collapsed), exibe metaLine abaixo de mDet
     if (!mDet.open) {
-      acc.appendChild(metaLine);
+      if (!isMetaLine(mDet.nextSibling)) acc.appendChild(metaLine);
+    } else {
+      // se estiver aberto, garanta que a linha meta não fique sobrando
+      if (isMetaLine(mDet.nextSibling)) acc.removeChild(mDet.nextSibling);
     }
 
     // Atualiza visibilidade ao expandir/fechar
@@ -2522,6 +3393,7 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
   openInvoices.forEach(pd => {
     acc.querySelectorAll(`details.invoice[data-pd="${pd}"]`).forEach(inv => inv.open = true);
   });
+  if (hydrating && acc.dataset) delete acc.dataset.state;
   updateStickyMonth();
 }
 
@@ -2558,23 +3430,9 @@ setStartBtn.addEventListener('click', () => {
 });
 
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
-openCardBtn.onclick = () => {
-  if (document.body) document.body.style.overflow = 'hidden';   // bloqueia scroll de fundo
-  if (wrapperEl) wrapperEl.style.overflow = 'hidden';      // bloqueia scroll no container principal
-  cardModal.classList.remove('hidden');
-};
-closeCardModal.onclick = () => {
-  if (document.body) document.body.style.overflow = '';
-  if (wrapperEl) wrapperEl.style.overflow = '';
-  cardModal.classList.add('hidden');
-};
-cardModal.onclick = e => {
-  if (e.target === cardModal) {
-    if (document.body) document.body.style.overflow = '';
-    if (wrapperEl) wrapperEl.style.overflow = '';
-    cardModal.classList.add('hidden');
-  }
-};
+openCardBtn.onclick = () => { cardModal.classList.remove('hidden'); updateModalOpenState(); setTimeout(() => { try { renderCardList(); } catch(_) {} }, 0); };
+closeCardModal.onclick = () => { cardModal.classList.add('hidden'); updateModalOpenState(); };
+cardModal.onclick = e => { if (e.target === cardModal) { cardModal.classList.add('hidden'); updateModalOpenState(); } };
 
  (async () => {
     // Instancia todos os botões “Adicionar” a partir do template
@@ -2590,37 +3448,95 @@ cardModal.onclick = e => {
   refreshMethods();
   renderCardList();
   initStart();
-  renderTable();
+  safeRenderTable();
   // exibe conteúdo após carregar dados localmente
-  document.querySelector('.wrapper').classList.remove('app-hidden');
+  const wrap = document.querySelector('.wrapper');
+  wrap.classList.remove('app-hidden');
+  // Remove skeleton flag so start-balance obeys real logic
+  try { document.documentElement.classList.remove('skeleton-boot'); } catch (_) {}
+  // iOS/Safari: force layout settle so bottom extent is correct
+  // tiny scroll nudge prevents initial underflow that hides last days
+  try {
+    const y = wrap.scrollTop;
+    wrap.scrollTop = y + 1;
+    wrap.scrollTop = y;
+  } catch {}
 
-  const [liveTx, liveCards, liveBal] = await Promise.all([
-    load('tx', []),
-    load('cards', cards),
-    load('startBal', startBalance)
-  ]);
+  // Watchdog: se o acordeão não montar, tenta novamente sem travar a UI
+  const ensureAccordion = () => {
+    const hasMonths = document.querySelector('#accordion details.month');
+    if (!hasMonths) {
+      console.warn('Accordion still empty; retrying render…');
+      safeRenderTable();
+    }
+  };
+  // duas tentativas espaçadas
+  setTimeout(ensureAccordion, 1200);
+  setTimeout(ensureAccordion, 4000);
 
-  const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
-  const hasLiveCards = Array.isArray(liveCards) ? liveCards.length > 0 : liveCards && Object.keys(liveCards).length > 0;
+  // Spacer dinâmico no fim: só aparece quando o usuário encosta o fim
+  // para permitir que o último divider passe sob o pseudo‑footer
+  try {
+    let endSpacer = document.getElementById('endScrollSpacer');
+    if (!endSpacer) {
+      endSpacer = document.createElement('div');
+      endSpacer.id = 'endScrollSpacer';
+      Object.assign(endSpacer.style, {
+        height: '0px', width: '100%', pointerEvents: 'none'
+      });
+      wrap.appendChild(endSpacer);
+    }
+    const targetSpacer = () => {
+      const btn = document.querySelector('.floating-add-button');
+      const h = btn ? (btn.getBoundingClientRect().height || 64) : 64;
+      return Math.max(72, Math.round(h + 12));
+    };
+    const updateEndSpacer = () => {
+      const nearBottom = (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 2);
+      endSpacer.style.height = nearBottom ? (targetSpacer() + 'px') : '0px';
+    };
+    wrap.addEventListener('scroll', updateEndSpacer);
+    window.addEventListener('resize', updateEndSpacer);
+    if (window.visualViewport) visualViewport.addEventListener('resize', updateEndSpacer);
+    updateEndSpacer();
+  } catch (_) {}
 
-  // Converte objeto → array se necessário
-  const fixedTx = Array.isArray(liveTx) ? liveTx : Object.values(liveTx || {});
+  if (typeof PATH === 'string') {
+    try {
+      const [liveTx, liveCards, liveBal] = await Promise.all([
+        load('tx', []),
+        load('cards', cards),
+        load('startBal', startBalance)
+      ]);
 
-  if (hasLiveTx && JSON.stringify(fixedTx) !== JSON.stringify(transactions)) {
-    transactions = fixedTx;
-    cacheSet('tx', transactions);
-    renderTable();
-  }
-  if (hasLiveCards && JSON.stringify(liveCards) !== JSON.stringify(cards)) {
-    cards = liveCards;
-    if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
-    cacheSet('cards', cards);
-    refreshMethods(); renderCardList(); renderTable();
-  }
-  if (liveBal !== startBalance) {
-    startBalance = liveBal;
-    cacheSet('startBal', startBalance);
-    initStart(); renderTable();
+      const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
+      const hasLiveCards = Array.isArray(liveCards) ? liveCards.length > 0 : liveCards && Object.keys(liveCards).length > 0;
+
+      // Converte objeto → array se necessário
+      const fixedTx = Array.isArray(liveTx) ? liveTx : Object.values(liveTx || {});
+
+      if (hasLiveTx) {
+        // Sanitize and persist if needed (one-time migration path on boot)
+        const s = sanitizeTransactions(fixedTx);
+        if (JSON.stringify(s.list) !== JSON.stringify(transactions)) {
+          transactions = s.list;
+          cacheSet('tx', transactions);
+          if (s.changed) { try { save('tx', transactions); } catch (_) {} }
+          renderTable();
+        }
+      }
+      if (hasLiveCards && JSON.stringify(liveCards) !== JSON.stringify(cards)) {
+        cards = liveCards;
+        if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
+        cacheSet('cards', cards);
+        refreshMethods(); renderCardList(); renderTable();
+      }
+      if (liveBal !== startBalance) {
+        startBalance = liveBal;
+        cacheSet('startBal', startBalance);
+        initStart(); renderTable();
+      }
+    } catch (_) { /* ignore boot fetch when not logged yet */ }
   }
   // exibe versão
   const verEl = document.getElementById('version');
@@ -2631,7 +3547,62 @@ cardModal.onclick = e => {
 
 // Service Worker registration and sync event (disabled in mock mode)
 if (!USE_MOCK && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
+  // Helper: non-intrusive update banner
+  function showUpdateBanner(onUpdateClick) {
+    let banner = document.getElementById('updateBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'updateBanner';
+      banner.className = 'update-banner';
+      const label = document.createElement('div');
+      label.textContent = 'Nova versão disponível';
+      const btn = document.createElement('button');
+      btn.textContent = 'Atualizar';
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        btn.textContent = 'Atualizando…';
+        try { onUpdateClick && onUpdateClick(); } catch (_) {}
+      });
+      banner.appendChild(label);
+      banner.appendChild(btn);
+      document.body.appendChild(banner);
+    }
+    return banner;
+  }
+
+  navigator.serviceWorker.register('sw.js?v=1.4.8(a19)').then(reg => {
+    // Only reload when user explicitly accepts the update
+    let requestedUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!requestedUpdate) return;
+      try { window.location.reload(); } catch (_) {}
+    });
+
+    const promptUpdate = (postMsgTarget) => {
+      const banner = showUpdateBanner(() => {
+        requestedUpdate = true;
+        try { postMsgTarget && postMsgTarget.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+      });
+      return banner;
+    };
+
+    // If an update is already waiting, show prompt
+    if (reg.waiting) {
+      promptUpdate(reg.waiting);
+    }
+
+    // Detect updates while the page is open
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      if (!sw) return;
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          // New version ready → let user choose when to update
+          promptUpdate(sw);
+        }
+      });
+    });
+  });
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'sync-tx') flushQueue();
   });
@@ -2679,6 +3650,11 @@ function preparePlannedList() {
       const iso = typeof formatToISO === 'function' ? formatToISO(d) : d.toISOString().slice(0,10);
       if (!occursOn(master, iso)) continue;
 
+      // Respect explicit exceptions on the master rule
+      if (master.exceptions && Array.isArray(master.exceptions) && master.exceptions.includes(iso)) continue;
+      // Respect recurrenceEnd: occurrences on or after recurrenceEnd should not be projected
+      if (master.recurrenceEnd && iso >= master.recurrenceEnd) continue;
+
       // evita duplicata se já houver planejado nesse dia
       const dup = (plannedByDate[iso] || []).some(t =>
         (t.parentId && t.parentId === master.id) ||
@@ -2686,6 +3662,17 @@ function preparePlannedList() {
          Math.abs(Number(t.val||0))===Math.abs(Number(master.val||0)))
       );
       if (dup) continue;
+
+      // If there is already a recorded transaction (planned or executed) for this date
+      // that matches this master (by parentId or desc/method/val), skip projection.
+      const exists = transactions.some(t =>
+        t && t.opDate === iso && (
+          (t.parentId && t.parentId === master.id) ||
+          ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
+           Math.abs(Number(t.val||0))===Math.abs(Number(master.val||0)))
+        )
+      );
+      if (exists) continue;
 
       add({
         ...master,
@@ -2730,26 +3717,17 @@ function renderPlannedModal() {
 // Ensure Planejados modal open/close handlers exist exactly once
 if (!window.plannedHandlersInit) {
   openPlannedBtn.onclick = () => {
-    document.body.style.overflow = 'hidden';
-    if (wrapperEl) wrapperEl.style.overflow = 'hidden';
     plannedModal.classList.remove('hidden');
     renderPlannedModal();         // Atualiza sempre ao abrir
+    updateModalOpenState();
   };
-  closePlannedModal.onclick = () => {
-    document.body.style.overflow = '';
-    if (wrapperEl) wrapperEl.style.overflow = '';
-    plannedModal.classList.add('hidden');
-  };
-  plannedModal.onclick = e => {
-    if (e.target === plannedModal) {
-      document.body.style.overflow = '';
-      if (wrapperEl) wrapperEl.style.overflow = '';
-      plannedModal.classList.add('hidden');
-    }
-  };
+  closePlannedModal.onclick = () => { plannedModal.classList.add('hidden'); updateModalOpenState(); };
+  plannedModal.onclick = e => { if (e.target === plannedModal) { plannedModal.classList.add('hidden'); updateModalOpenState(); } };
   window.plannedHandlersInit = true;
 }
 // Initialize swipe for operations (op-line)
 initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.op-line', 'opsSwipeInit');
-// Initialize swipe for card list (card-line)
-initSwipe(cardList,      '.swipe-wrapper', '.swipe-actions', '.card-line', 'cardsSwipeInit');
+// Initialize swipe for card list (card-line) only if the list root exists
+if (cardList) initSwipe(cardList, '.swipe-wrapper', '.swipe-actions', '.card-line', 'cardsSwipeInit');
+// Initialize swipe for invoice headers (summary)
+initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.invoice-header-line', 'invoiceSwipeInit');

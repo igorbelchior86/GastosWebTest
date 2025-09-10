@@ -1,4 +1,6 @@
-const CACHE = 'v8';   // bump para nova versão
+// Cache principal. Mantemos um único bucket e confiamos em URLs versionadas
+// e estratégias de atualização para evitar precisar "bump" manual a cada release.
+const CACHE = 'app-cache-1.4.8-a20';
 const RUNTIME = { pages: 'pages-v1', assets: 'assets-v1', cdn: 'cdn-v1' };
 const ASSETS = [
   './',
@@ -22,9 +24,13 @@ function urlBase64ToUint8Array(base64String) {
 
 // Instalação e pré-cache
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // Força busca de rede para não recachear versões antigas controladas pelo SW anterior
+    const requests = ASSETS.map(u => new Request(u, { cache: 'reload' }));
+    await cache.addAll(requests);
+  })());
+  // Ativa imediatamente o novo SW
   self.skipWaiting();
 });
 
@@ -42,48 +48,49 @@ self.addEventListener('activate', event => {
 // Intercepta requisições
 self.addEventListener('fetch', event => {
   const { request } = event;
+  if (request.method !== 'GET') return; // não cachear POST/PUT
 
-  // Only handle GETs here
-  if (request.method !== 'GET') {
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  // App-Shell: navigation requests → Cache-First index.html
+  // Navegações (HTML): network-first com fallback para cache
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const cache = await caches.open(CACHE);
-        const cachedShell = await cache.match('./index.html', { ignoreSearch: true });
-        if (cachedShell) return cachedShell;
-        const fresh = await fetch('./index.html', { cache: 'no-store' });
-        cache.put('./index.html', fresh.clone());
+        const fresh = await fetch(request);
+        const c = await caches.open(CACHE);
+        c.put(request, fresh.clone());
         return fresh;
       } catch (_) {
-        // As a last resort, try cache again (in case fetch failed mid-flight)
-        const fallback = await caches.match('./index.html', { ignoreSearch: true });
-        return fallback || Response.error();
+        const cached = await caches.match(request);
+        return cached || caches.match('./index.html');
       }
     })());
     return;
   }
 
-  // Static assets & other GETs → Cache-First with background fill
+  // Demais recursos: stale-while-revalidate e respeita query string (sem ignoreSearch)
   event.respondWith((async () => {
-    const cached = await caches.match(request, { ignoreSearch: true });
-    if (cached) return cached;
+    const cached = await caches.match(request);
+    if (cached) {
+      // Atualiza em background sem bloquear resposta
+      fetch(request).then(resp => {
+        if (!resp || resp.status !== 200) return;
+        caches.open(CACHE).then(c => c.put(request, resp.clone()));
+      }).catch(() => {});
+      return cached;
+    }
     try {
-      const response = await Promise.race([
-        fetch(request),
-        new Promise((_, rej) => setTimeout(() => rej('timeout'), 10000))
-      ]);
-      const cache = await caches.open(CACHE);
-      cache.put(request, response.clone());
-      return response;
-    } catch (err) {
-      return cached || Response.error();
+      const resp = await fetch(request);
+      const c = await caches.open(CACHE);
+      c.put(request, resp.clone());
+      return resp;
+    } catch (_) {
+      return Response.error();
     }
   })());
+});
+
+// Permite que a página force a ativação imediata de um SW recém-instalado
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Improved Background Sync handler: if no client is open, re‑register the sync to try again later

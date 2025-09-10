@@ -206,6 +206,9 @@
   --txt-main:#fff;
   --txt-muted:#B3B3B3;
   --timestamp:#6b7280;
+  /* Keyboard-aware offsets (aplicados só quando data-vv-kb=1) */
+  --kb-offset-top: 0px;
+  --kb-offset-bottom: 0px;
 }
 
 h1,h2,h3,h4,
@@ -221,8 +224,11 @@ summary.month-divider,
 html,body {
   background-color: #1e1e1e;
   background-image: none !important;
-  background-attachment: fixed;
+  /* iOS 26: evitar background-attachment: fixed quebra o anchor do fixed */
+  /* background-attachment: fixed;  REMOVIDO */
   isolation: isolate;
+  height: 100%;
+  overflow: hidden; /* rolagem no container principal (.wrapper) */
   max-width:100%;
   overflow-x:hidden;
   font-family:'SF Pro Display',system-ui,sans-serif;
@@ -252,12 +258,84 @@ border-radius: 0 !important;
 .hidden{opacity:0!important;pointer-events:none!important;}
 body{display:block;}
 .wrapper{
+  position: relative;
   width:100%;
   max-width:100%;
-  /* fallback antigo (iOS 11): */
-  margin-top: calc(80px + constant(safe-area-inset-top));
-  /* padrão atual: */
-  margin-top: calc(80px + env(safe-area-inset-top));
+  /* Use small viewport to avoid initial iOS toolbar shrink clipping */
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* evita bounce do body */
+  /* espaço do header fixo */
+  padding-top: calc(80px + constant(safe-area-inset-top));
+  padding-top: calc(80px + env(safe-area-inset-top));
+  /* espaço para os botões flutuantes na base (permite o divider passar) */
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+  /* scroll-padding-bottom removido para não alterar scrollIntoView/Home */
+}
+
+/* Spacer real no final do conteúdo do acordeão: mantém
+   o último dia visível acima do pseudo‑footer SEM depender
+   de reflows disparados pelo botão Home 
+#accordion::after{
+  content: '';
+  display: block;
+  height: calc(10px + env(safe-area-inset-bottom));
+}*/
+
+/* Divider no rodapé do conteúdo: sem grande espaçamento extra */
+hr.divider{
+  margin: 8px 0 2px;
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  position: sticky;
+  bottom: calc(70px + env(safe-area-inset-bottom)); /* segura ligeiramente acima do pseudo-footer */
+  z-index: 5;
+  background: transparent;
+}
+/* Esconde divider e footer quando um modal está aberto para evitar sobreposição com o teclado */
+html.modal-open hr.divider { display: none !important; }
+html.modal-open .app-footer { visibility: hidden; }
+
+/* Floating bottom pill (Home/Ajustes) */
+.floating-pill{
+  position:fixed;
+  left:24px;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  z-index:1201;
+  display:inline-flex; align-items:center; gap:0;
+  height:50px; padding:6px; /* igual ao botão "+" */
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.15);
+  box-shadow:0 10px 24px rgba(0,0,0,.35), inset 0 -2px 0 rgba(0,0,0,.18);
+  border-radius:32px; /* metade de 64 para a mesma curvatura */
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
+}
+.floating-pill .pill-option{
+  position:relative;
+  appearance:none; border:none; background:transparent; color:#fff; font-weight:700;
+  height:100%; padding:0 18px; border-radius:32px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color: transparent; outline: none;
+}
+.floating-pill .pill-highlight{
+  position:absolute; left:6px; top:6px; height:calc(100% - 12px); width:50%; border-radius:9999px;
+  background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.10));
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+  transition: transform .22s cubic-bezier(.22,1,.36,1), width .22s ease;
+  pointer-events:none;
+}
+.floating-pill[data-selected="settings"] .pill-highlight{ transform: translateX(100%); }
+
+/* Icons for pill */
+.pill-icon{width:22px;height:22px;background:#fff;display:inline-block;}
+.pill-icon.icon-home{mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>') no-repeat center/100%;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>') no-repeat center/100%;}
+.pill-icon.icon-gear{mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M19.14,12.94a7.43,7.43,0,0,0,.05-1l2-1.55a.5.5,0,0,0,.12-.65l-1.9-3.29a.5.5,0,0,0-.6-.22l-2.35.95a7.1,7.1,0,0,0-1.73-1L14.4,3.5a.5.5,0,0,0-.5-.5H10.1a.5.5,0,0,0-.5.5L9.3,5.18a7.1,7.1,0,0,0-1.73,1l-2.35-.95a.5.5,0,0,0-.6.22L2.72,8.74a.5.5,0,0,0,.12.65l2,1.55a7.43,7.43,0,0,0,0,2l-2,1.55a.5.5,0,0,0-.12.65l1.9,3.29a.5.5,0,0,0,.6.22l2.35-.95a7.1,7.1,0,0,0,1.73,1l.3,1.68a.5.5,0,0,0,.5.5h3.8a.5.5,0,0,0,.5-.5l.3-1.68a7.1,7.1,0,0,0,1.73-1l2.35.95a.5.5,0,0,0,.6-.22l1.9-3.29a.5.5,0,0,0-.12-.65ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>') no-repeat center/100%;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M19.14,12.94a7.43,7.43,0,0,0,.05-1l2-1.55a.5.5,0,0,0,.12-.65l-1.9-3.29a.5.5,0,0,0-.6-.22l-2.35.95a7.1,7.1,0,0,0-1.73-1L14.4,3.5a.5.5,0,0,0-.5-.5H10.1a.5.5,0,0,0-.5.5L9.3,5.18a7.1,7.1,0,0,0-1.73,1l-2.35-.95a.5.5,0,0,0-.6.22L2.72,8.74a.5.5,0,0,0,.12.65l2,1.55a7.43,7.43,0,0,0,0,2l-2,1.55a.5.5,0,0,0-.12.65l1.9,3.29a.5.5,0,0,0,.6.22l2.35-.95a7.1,7.1,0,0,0,1.73,1l.3,1.68a.5.5,0,0,0,.5.5h3.8a.5.5,0,0,0,.5-.5l.3-1.68a7.1,7.1,0,0,0,1.73-1l2.35.95a.5.5,0,0,0,.6-.22l1.9-3.29a.5.5,0,0,0-.12-.65ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>') no-repeat center/100%;}
+
+/* Prefer 100svh where supported (stable initial viewport on iOS Safari) */
+@supports (height: 100svh) {
+  .wrapper { height: 100svh; }
 }
 input,select,textarea{font-size:16px!important;box-sizing:border-box;}
 .value{white-space:nowrap;}
@@ -298,6 +376,14 @@ input,select,textarea{font-size:16px!important;box-sizing:border-box;}
 .icon-delete{
   mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>');
   -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>');
+}
+
+/* Ícone "home" para o botão flutuante esquerdo */
+.icon-home{
+  mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 3l9 8h-3v9h-4v-6H10v6H6v-9H3l9-8z"/></svg>');
+  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 3l9 8h-3v9h-4v-6H10v6H6v-9H3l9-8z"/></svg>');
+  width:28px;
+  height:28px;
 }
 
 /* ==== Category icons (monocromáticos via mask-image) ==== */
@@ -492,7 +578,13 @@ summary.day-summary .icon-invoice::before{
 }
 .logo-title{display:flex;align-items:center;gap:8px;margin-right:auto;}
 .logo-text{font-weight:700;font-size:32pt;letter-spacing:.5pt;color:#fff;text-shadow:0 0 6px #00FF0040;margin-right:auto;}
-.app-footer{text-align:center;font-size:.75rem;color:#666;margin-top:32px;}
+.app-footer{
+  text-align:center;
+  font-size:.75rem;
+  color:#666;
+  margin-top: 80px;
+  padding-bottom: calc(64px + env(safe-area-inset-bottom)); /* ligeiro ajuste para exibir a versão acima */
+}
 .logo-test-tag{font-family:'Caveat',cursive;font-size:1rem;margin-left:4px;}
 
 #syncNowBtn,#offlineIndicator{position:absolute;top:21px;z-index:1100;background:none;border:none;cursor:pointer;}
@@ -885,8 +977,9 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   align-items: center;
   gap: 24px;
   padding: 0 24px;
-  background: #2a2a2c;
-  z-index: 0;
+  /* Match container by default: reveal only icons */
+  background: transparent !important;
+  z-index: 2;
   opacity: 0;
   transition: opacity .15s linear;
 }
@@ -902,6 +995,11 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   background-color:#fff;
   display:block;
 }
+/* Pay icon */
+.icon-pay{
+  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M21 7H3V5h18v2zm0 2H3v10h18V9zM5 15h6v2H5v-2zm12.59-4.41L16 12.17l-1.59-1.58L13 12l3 3 4-4-1.41-1.41z"/></svg>');
+          mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M21 7H3V5h18v2zm0 2H3v10h18V9zM5 15h6v2H5v-2zm12.59-4.41L16 12.17l-1.59-1.58L13 12l3 3 4-4-1.41-1.41z"/></svg>');
+}
 
 /* Offset swipe‑actions inside invoice items so they reveal fully despite 12 px padding */
 .invoice .executed-list li .swipe-actions{
@@ -909,6 +1007,10 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   padding: 0 24px;         /* same inner padding */
   background: transparent !important;   /* let container's glass-bg show through */
 }
+/* Swipe actions for invoice header summary */
+.invoice-header-line{ position: relative; overflow: hidden; }
+.invoice-header-line .invoice-label,
+.invoice-header-line .invoice-total{ position: relative; z-index:1; }
 
 /* ===================== INVOICE ===================== */
 .invoice{
@@ -960,6 +1062,9 @@ details.invoice[open] > summary::after{
 
 .invoice > summary .invoice-total{
   margin: 0 0 0 auto; /* override bottom margin so it doesn't push down */
+  display: inline-flex;            /* stack amount + note vertically */
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .invoice > summary::before{
@@ -980,6 +1085,19 @@ details.invoice[open] > summary::after{
   text-align:right;
   color:var(--red);
   margin-bottom:8px;
+}
+
+/* Visual for post-payment states on invoice header */
+.invoice-total .amount.struck{
+  text-decoration: line-through;
+  opacity:.75;
+}
+.invoice-total .note{
+  display:block;
+  margin-top:2px;
+  font-size:10pt;
+  font-weight:500;
+  color:#e5e7eb;
 }
 
 .invoice.positive .invoice-total{color:var(--green-soft);}
@@ -1107,6 +1225,218 @@ details.invoice[open] > summary::after{
     transform .16s cubic-bezier(.22,1,.36,1),
     opacity   .16s ease;
 }
+
+/* ===================== SETTINGS (Ajustes) ===================== */
+#settingsModal .modal-content{padding:0 0 0 0;}
+/* Settings modal – alignment and avatar fallback */
+#settingsModal .settings-card{ padding:14px; }
+#settingsModal .settings-list{ margin-top:12px; }
+#settingsModal .settings-profile{ align-items:center; gap:12px; }
+#settingsModal .settings-names{ min-width:0; }
+#settingsModal .settings-name, 
+#settingsModal .settings-sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Hide IMG alt text when the network image fails to avoid layout shift */
+#settingsModal .settings-avatar img{ font-size:0; line-height:0; display:block; width:100%; height:100%; object-fit:cover; }
+.settings-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:12px;margin:6px 0 14px 0;box-shadow:0 6px 16px rgba(0,0,0,.3);}
+.settings-profile{display:flex;align-items:center;gap:12px;}
+.settings-avatar{width:56px;height:56px;border-radius:50%;background:#333;flex:0 0 auto;overflow:hidden;border:1px solid rgba(255,255,255,.15);}
+.settings-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+.settings-names{display:flex;flex-direction:column;}
+.settings-name{font-weight:800;font-size:1.05rem;color:#fff;}
+.settings-sub{font-size:.9rem;color:#c9c9c9;opacity:.9;}
+.settings-list{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;overflow:hidden;}
+.settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-top:1px solid rgba(255,255,255,.06);} 
+.settings-item:first-child{border-top:none;}
+
+/* Theme selector card (iOS-like group) */
+.settings-theme-card{
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  /* Remove all lateral and bottom padding for flush selector row */
+  padding: 0 !important;
+  margin: 6px 0 14px 0;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+.settings-theme-card #themeButtons{display:flex;gap:0;}
+.settings-theme-card .theme-header{
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  height:48px;
+  font-weight:700;
+  color:var(--txt-main);
+  /* Divider removido */
+}
+.settings-theme-card .theme-row{
+  display:flex;
+  width:100%;
+  height:48px;
+  overflow:hidden;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 0 18px 18px;
+  box-sizing: border-box;
+  border-top: none !important;
+}
+.settings-theme-card .theme-row .theme-btn{
+  flex:1 1 33%;
+  border: none;
+  margin:0 !important;
+  padding:0 !important;
+  text-align:center;
+  background:transparent;
+  color:var(--txt-main);
+  font-size:1.05rem;
+  position:relative;
+  display:flex; align-items:center; justify-content:center; height:100%;
+}
+.settings-theme-card .theme-row .theme-btn + .theme-btn::before{
+  content:''; position:absolute; left:-0.5px; top:0; bottom:0; width:1px; background:rgba(15,23,34,0.06);
+}
+.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]{
+  background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
+  color:var(--txt-main);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
+  transform: translateY(4px);
+}
+.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{
+  content:''; position:absolute; left:0; right:0; bottom:-6px; height:10px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.24), rgba(0,0,0,0)); filter: blur(6px); pointer-events:none;
+  border-radius: 0 0 18px 18px;
+}
+.settings-theme-card .theme-row .theme-btn:active{
+  /* O efeito de afundar só aparece para o botão pressionado, mas não interfere no selecionado */
+  transform: translateY(4px);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
+}
+/* Prevent selected button from returning to normal on pointer up */
+.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]:active {
+  /* Remove esta regra para evitar conflito e erro de sintaxe */
+}
+
+/* Theme row: three equal sections with thin separators */
+.settings-theme-card .theme-row{
+  display:flex;
+  width:100%;
+  border-top:1px solid rgba(255,255,255,0.03);
+  border-bottom-left-radius:10px;
+  border-bottom-right-radius:10px;
+  overflow:hidden;
+}
+.settings-theme-card .theme-row .theme-btn{
+  flex:1 1 0;
+  border: none; /* separators drawn by pseudo elements */
+  margin:0; padding:0; text-align:center; background:transparent; color:var(--txt-main); font-size:1.05rem;
+  position:relative;
+}
+.settings-theme-card .theme-row .theme-btn + .theme-btn::before{
+  content:''; position:absolute; left:-0.5px; top:0; bottom:0; width:1px; background:rgba(15,23,34,0.06);
+}
+
+/* Selected / pressed state with stronger depth */
+.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]{
+  background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
+  color:var(--txt-main);
+  box-shadow: 0 10px 28px rgba(2,6,23,0.28), inset 0 2px 6px rgba(255,255,255,0.02);
+  transform: translateY(-4px);
+}
+.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{
+  content:''; position:absolute; left:0; right:0; bottom:-8px; height:12px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.28), rgba(0,0,0,0)); filter: blur(8px); pointer-events:none;
+}
+
+/* Active press (pointer down) */
+.settings-theme-card .theme-row .theme-btn:active{
+  transform: translateY(0);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
+}
+.settings-item .left{display:inline-flex;align-items:center;gap:10px;color:#fff;font-weight:700;}
+.settings-item .settings-cta{color:#fff;font-weight:800;}
+.settings-item.danger .settings-cta{color:#ff6b6b;}
+.settings-item.danger .settings-icon{background:#ff6b6b;}
+.settings-item .right{color:#cfcfcf;}
+.settings-item.danger .left{color:#ff6b6b;}
+.settings-icon{width:22px;height:22px;background:#fff;display:inline-block;border-radius:6px;}
+.settings-icon.icon-logout{mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4v-2H6V5h4V3zm9.707 8.293-4-4-1.414 1.414L16.586 11H11v2h5.586l-2.293 2.293 1.414 1.414 4-4a1 1 0 0 0 0-1.414z"/></svg>') no-repeat center/100%;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4v-2H6V5h4V3zm9.707 8.293-4-4-1.414 1.414L16.586 11H11v2h5.586l-2.293 2.293 1.414 1.414 4-4a1 1 0 0 0 0-1.414z"/></svg>') no-repeat center/100%;}
+.settings-cta{appearance:none;border:none;background:transparent;color:inherit;font:inherit;display:flex;align-items:center;gap:10px;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+/* Restrict fields when paying an invoice */
+#txModal[data-mode="pay-invoice"] .method-switch,
+#txModal[data-mode="pay-invoice"] #cardSelector,
+#txModal[data-mode="pay-invoice"] #recurrence,
+#txModal[data-mode="pay-invoice"] .value-toggle {
+  display: none !important;
+}
+
+/* Parcelamento – toggle bonito e compatível (Chrome/Safari) */
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow{
+  display:flex !important;
+  flex-direction: row;                 /* texto à esquerda, toggle à direita */
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 2px 0 2px;
+  color:#e5e7eb;
+  font-weight:700;
+  font-size:12pt;
+}
+/* Garante alinhamento vertical perfeito entre label e toggle */
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow > span:first-child{
+  display: inline-flex;
+  align-items: center;
+  height: 30px;               /* igual ao trilho do toggle */
+  line-height: 30px;
+}
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow input[type="checkbox"]{
+  -webkit-appearance: none;
+  appearance: none;
+  width: 52px; height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #3a3a3c, #2b2b2d);
+  border: 1px solid rgba(0,0,0,.45);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.4);
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: background .2s ease;
+  flex: 0 0 auto;
+  overflow: hidden;
+  vertical-align: middle;
+  margin: 0;                  /* evita desníveis por margens default do iOS */
+}
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow input[type="checkbox"]::before{
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,.35);
+  transition: transform .2s ease;
+}
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow input[type="checkbox"]:checked{
+  background: linear-gradient(180deg, var(--green-soft), #22c55e);
+}
+#txModal[data-mode="pay-invoice"] #invoiceParcelRow input[type="checkbox"]:checked::before{
+  transform: translateX(22px);
+}
+
+/* Select de parcelas em estilo pill */
+#txModal[data-mode="pay-invoice"] #parcelasBlock{ margin-top: 6px; }
+#txModal[data-mode="pay-invoice"] #parcelasBlock select{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  -webkit-appearance: none;
+  appearance: none;
+}
+#txModal[data-mode="pay-invoice"] #parcelasBlock select:focus{
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,.2);
+}
 .bottom-modal:not(.hidden) .bottom-modal-box {
   transform: translateY(0) scale(1);
   opacity: 1;
@@ -1140,7 +1470,7 @@ details.invoice[open] > summary::after{
   color: rgba(255,255,255,0.7);
 }
 .modal-drag{width:40px;height:4px;background:#ccc;border-radius:2px;margin:0 auto 12px;} 
-.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;} 
+.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;} 
 .modal-close-btn{
   position:absolute;
   top:16px;
@@ -1284,7 +1614,7 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 
 /* ===================== FLOATING BUTTONS ===================== */
 .floating-add-button{
-  position:fixed;bottom:24px;right:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));right:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
@@ -1292,7 +1622,20 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
   clip-path: circle(50% at 50% 50%);
   -webkit-tap-highlight-color: transparent;
 }
+/* Espelho do botão flutuante de adicionar: leva ao dia atual */
+.floating-home-button{
+  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
+  border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
+  animation:pulse 4s ease-in-out infinite;
+  clip-path: circle(50% at 50% 50%);
+  -webkit-tap-highlight-color: transparent;
+}
 .floating-add-button:hover{
+  transform:scale(.97);
+  box-shadow:0 6px 16px rgba(0,0,0,.6), 0 0 12px #00FF0080;
+}
+.floating-home-button:hover{
   transform:scale(.97);
   box-shadow:0 6px 16px rgba(0,0,0,.6), 0 0 12px #00FF0080;
 }
@@ -1300,7 +1643,25 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
   transform:scale(.97);
   box-shadow:0 3px 8px rgba(0,0,0,.4);
 }
+.floating-home-button:active{
+  transform:scale(.97);
+  box-shadow:0 3px 8px rgba(0,0,0,.4);
+}
+
+/* Ajustes quando o teclado estiver aberto (iOS 26):
+   apenas eleva os botões, sem mexer no header */
+html[data-vv-kb="1"] .floating-add-button{
+  bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
+}
+html[data-vv-kb="1"] .floating-home-button{
+  bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
+}
 .floating-add-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
+.floating-home-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
+/* Oculta botões flutuantes quando um modal está aberto (ficariam acima do modal) */
+html.modal-open .floating-add-button,
+html.modal-open .floating-home-button,
+html.modal-open .floating-pill { display: none !important; }
 
 .floating-planned-button,.floating-card-button{
   position:absolute;top:18px;width:44px;height:44px;border-radius:50%;background:linear-gradient(to bottom,#00CFFF,#007AFF);
@@ -1373,6 +1734,39 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 @keyframes fadeSlideOut{from{opacity:1;transform:translateY(0);}to{opacity:0;transform:translateY(-10px);}}
 
 details.month[open] > details.day{animation:fadeSlideIn .5s ease-out;}
+
+/* ===================== UPDATE BANNER ===================== */
+.update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(30,30,30,.92);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  z-index: 1400;
+  backdrop-filter: blur(8px) saturate(150%);
+}
+.update-banner button {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #00C853, #00A94F);
+  color: #fff;
+  padding: 8px 12px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.update-banner button:disabled {
+  opacity: .75;
+}
 details.month:not([open]) > details.day{animation:fadeSlideOut .5s ease-in;}
 details.day[open] > .swipe-wrapper,
 details.day[open] > .planned-cash,
@@ -1405,6 +1799,11 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 #cardModal .card-list li {
   margin-bottom: 12px;
 }
+#cardModal .card-list li {
+  /* ensure children (swipe actions / shadows) are clipped to rounded corners */
+  overflow: hidden;
+  border-radius: 12px; /* match .card-line radius */
+}
 #cardModal .card-list .swipe-wrapper {
   background: transparent !important;
   padding: 0 !important;
@@ -1412,6 +1811,11 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 #cardModal .card-list .swipe-actions {
   /* keep actions hidden until swipe, no background here */
   background: transparent !important;
+}
+#cardModal .card-list .swipe-wrapper {
+  /* clip any absolutely positioned actions behind the card line */
+  overflow: hidden;
+  border-radius: 12px;
 }
 #cardModal .card-list .card-line {
   background: rgba(42, 44, 44, 0.8);
@@ -1449,6 +1853,22 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 }
 .card-content b {
   color: #fff;
+}
+
+/* Hide scrollbars (app and modals) */
+.wrapper,
+.modal-content,
+.bottom-modal,
+.bottom-modal-box {
+  -ms-overflow-style: none;     /* IE/Edge legacy */
+  scrollbar-width: none;        /* Firefox */
+}
+.wrapper::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar,
+.bottom-modal::-webkit-scrollbar,
+.bottom-modal-box::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
 }
 /* Mensagem de ajuda abaixo do botão Adicionar */
 .bottom-modal-box small {
@@ -1582,8 +2002,23 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 .toast {
   white-space: nowrap;
 }
-/* —— FIX: header icons overlapping the segmented control —— */
+/* —— FIXCorrija o sinal do ajuste no saldo do dia;
+Implemente o pagamento parcial sem parcelar criando um invoiceAdjust do valor pago e uma transação “Rollover fatura – <cartão>” para o próximo vencimento com o restante (como transação do cartão, para compor a próxima fatura);
+Opcional: atualizar o header da fatura para mostrar “total líquido” (total − ajustes) e/ou um badge com restante?: header icons overlapping the segmented control —— */
 #enablePushBtn{ position: static !important; right: auto; top: auto; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.18); border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,.45); }
 #offlineIndicator{ position: static !important; right: auto; top: auto; width:40px; height:40px; display:flex; align-items:center; justify-content:center; }
 /* keep the segmented control from pushing over icons */
 .header-seg{ margin-left: 0; margin-right: 0; }
+/* ===================== SKELETON (light shimmer) ===================== */
+@keyframes skeletonShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton{position:relative;display:inline-block;background:linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,.18), rgba(255,255,255,.10));background-size:200% 100%;animation:skeletonShimmer 1.2s ease-in-out infinite;border-radius:8px;color:transparent;}
+.skeleton-pill{height:16px;min-width:80px;border-radius:9999px;}
+.skeleton-line{height:12px;width:120px;border-radius:6px;}
+.skeleton-small{height:10px;width:80px;border-radius:6px;}
+#accordion .month-divider .s-meta .skeleton-pill{margin-left:auto;}
+#accordion .day-summary .skeleton-pill{margin-left:auto;}
+
+/* Hide start-balance box only during skeleton boot */
+html.skeleton-boot #startGroup,
+html.skeleton-boot .start-container,
+html.skeleton-boot #dividerSaldo { display: none !important; }
