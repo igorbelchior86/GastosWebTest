@@ -103,7 +103,7 @@ function renderSettingsModal(){
       </div>
     </div>
 
-    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1.15rem;font-weight:700;color:var(--txt-main);">Tema</h2>
+  <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Tema</h2>
     <div class="settings-card settings-theme-card">
       <div class="theme-row" id="themeButtons">
         <button type="button" class="theme-btn" data-theme="light">Claro</button>
@@ -2792,8 +2792,11 @@ document.addEventListener('click', (e) => {
 
 function renderTable() {
   clearTableContent();
+  const acc = document.getElementById('accordion');
+  if (acc) acc.dataset.state = 'skeleton';
   const groups = groupTransactionsByMonth();
   renderTransactionGroups(groups);
+  if (acc) delete acc.dataset.state;
 }
 
 // Defensive render: avoids silent failures leaving the UI empty
