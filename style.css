@@ -1,3 +1,229 @@
+/* ===================== HEADER MODO CLARO ===================== */
+html[data-theme="light"] .app-header {
+  background: #fff !important;
+  color: #222;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  border: 1px solid #e0e0e0;
+}
+html[data-theme="light"] .app-header::after {
+  background: linear-gradient(90deg, transparent, #00FF80 30%, transparent 60%) !important;
+}
+html[data-theme="light"] .logo-text {
+  color: #000 !important;
+  text-shadow: 0 0 8px #00FF8080, 0 0 2px #00FF8040 !important;
+}
+html[data-theme="light"] .header-seg{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0;
+  height: 44px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  margin-left: auto;
+  margin-right: 8px;
+}
+html[data-theme="light"] .header-seg .seg-highlight{
+  display: none;
+  position: absolute;
+  top: 2px; bottom: 2px; left: 2px;
+  width: calc(50% - 2px);
+  background: rgba(0,0,0,0.04);
+  border-radius: 20px;
+  will-change: transform;
+  transition: transform .28s cubic-bezier(.5,1.5,.5,1);
+  pointer-events: none;
+}
+html[data-theme="light"] .header-seg[data-selected="cards"] .seg-highlight{ transform: translateX(100%); }
+html[data-theme="light"] .header-seg .seg-option{
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 1;
+}
+html[data-theme="light"] .header-seg .seg-option:focus-visible{ outline: none; box-shadow: 0 0 0 2px rgba(0,207,255,0.12); border-radius: 18px; }
+html[data-theme="light"] .header-seg .seg-option::before{
+  content: '';
+  width: 22px; height: 22px;
+  background-color: #111; /* dark icons on light buttons */
+  mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
+  mask-position: center;  -webkit-mask-position: center;
+  mask-size: 100% 100%;   -webkit-mask-size: 100% 100%;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
+}
+html[data-theme="light"] .header-seg .seg-option.active{
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 18px rgba(0,207,255,0.12);
+}
+html[data-theme="light"] .header-seg .seg-option.active::before{
+  background-color: #fff; /* white icon on accent */
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
+}
+
+/* ===================== MODO CLARO ===================== */
+html[data-theme="light"] {
+  --bg-main: #f7f7f7;
+  --bg-card: #fff;
+  --txt-main: #222;
+  --txt-muted: #888;
+  --accent: #00cfff;
+  --divider: #e0e0e0;
+}
+
+html[data-theme="light"] html,
+html[data-theme="light"] body {
+  /* Force a light app background when the light theme is enabled.
+     Keep dark-theme defaults untouched by scoping this rule to the
+     html[data-theme="light"] root only. */
+  background-color: var(--bg-main) !important;
+  background-image: none !important;
+  color: var(--txt-main);
+}
+
+/* Ensure the fixed backdrop used for the app background follows the
+   light theme as well (doesn't change the dark default). */
+html[data-theme="light"] #backdrop-base {
+  background-color: var(--bg-main) !important;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .month-divider,
+html[data-theme="light"] .month-meta {
+  background: var(--bg-card);
+  color: var(--txt-main);
+  border-color: var(--divider);
+}
+
+/* Fix clipped shadows for month headers in light theme only.
+   Allow their immediate containers to show overflow (shadows), and
+   ensure month dividers are painted above neighboring cards so their
+   shadows are visible. This preserves spacing and alignment. */
+html[data-theme="light"] #accordion,
+html[data-theme="light"] #accordion details,
+html[data-theme="light"] details.month {
+  overflow: visible !important;
+}
+
+html[data-theme="light"] summary.month-divider {
+  position: relative !important;
+  z-index: 3; /* float above adjacent siblings so shadow isn't hidden */
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 8px 22px rgba(0,0,0,0.18);
+}
+
+/* Ensure following day cards don't create a higher stacking context */
+html[data-theme="light"] details.day,
+html[data-theme="light"] .executed-cash,
+html[data-theme="light"] .planned-list > li {
+  position: relative; z-index: 1;
+}
+
+/* Month headers in light theme should be dark/primary text, not accent green */
+html[data-theme="light"] .month-name,
+html[data-theme="light"] summary.month-divider,
+html[data-theme="light"] summary.month-divider .month-name,
+html[data-theme="light"] .month-divider .month-name {
+  color: var(--txt-main) !important;
+  text-shadow: none !important; /* remove neon/green glow used in dark theme */
+}
+
+/* Balance (saldo) text adjustments for light theme only */
+html[data-theme="light"] summary.month-divider::before,
+html[data-theme="light"] summary.month-divider .month-row,
+html[data-theme="light"] summary.month-divider .month-row::after,
+html[data-theme="light"] summary.month-divider .month-meta,
+html[data-theme="light"] summary.month-divider .month-meta::before,
+html[data-theme="light"] summary.month-divider .meta-label,
+html[data-theme="light"] summary.month-divider .meta-value {
+  text-shadow: none !important; /* remove dark-mode neon glow */
+}
+
+html[data-theme="light"] summary.month-divider .meta-label {
+  color: var(--txt-muted) !important;
+  font-weight: 500;
+}
+
+html[data-theme="light"] summary.month-divider .meta-value {
+  color: var(--txt-main) !important;
+  font-weight: 700; /* slightly heavier for clear contrast */
+  font-size: 12pt;
+}
+html[data-theme="light"] summary.month-divider .meta-value,
+html[data-theme="light"] summary.month-divider .month-meta,
+html[data-theme="light"] summary.month-divider .meta-value *,
+html[data-theme="light"] summary.month-divider .meta-value::before,
+html[data-theme="light"] summary.month-divider .meta-value::after,
+html[data-theme="light"] .month-meta .meta-value,
+html[data-theme="light"] .month-meta .meta-value * {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: var(--txt-main) !important;
+  overflow: visible !important;
+}
+
+/* Keep the balance aligned to the right as in original layout */
+html[data-theme="light"] summary.month-divider .meta-value {
+  margin-left: auto !important; /* preserve flex alignment */
+}
+
+html[data-theme="light"] .meta-label {
+  color: var(--txt-muted);
+}
+
+html[data-theme="light"] .floating-add-button,
+html[data-theme="light"] .floating-home-button {
+  background-color: rgba(0,0,0,.05);
+  color: var(--accent);
+}
+
+html[data-theme="light"] .toast {
+  background: #fff;
+  color: var(--txt-main);
+  border: 1px solid var(--divider);
+}
+
+/* Day header (expanded) typography fixes for light theme only */
+html[data-theme="light"] summary.day-summary {
+  /* keep the existing background/spacing, only fix text colors */
+  color: var(--txt-main) !important;
+  text-shadow: none !important;
+}
+
+html[data-theme="light"] summary.day-summary > span:first-child {
+  color: var(--txt-muted) !important;
+  font-weight: 500 !important;
+}
+
+html[data-theme="light"] summary.day-summary .day-balance,
+html[data-theme="light"] summary.day-summary > span:last-child {
+  color: var(--txt-main) !important;
+  font-weight: 600 !important;
+}
+
+/* Ensure any decorative pseudo-elements don't add neon glow in light mode */
+html[data-theme="light"] summary.day-summary::before,
+html[data-theme="light"] summary.day-summary *::before,
+html[data-theme="light"] summary.day-summary *::after {
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+/* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
 /* Planned modal layout (grid without DOM changes)
    Row 1: [Descrição] .......... [Valor]
    Row 2: [Método de pagamento] (left, under descrição)
@@ -420,10 +646,20 @@ input,select,textarea{font-size:16px!important;box-sizing:border-box;}
   display:inline-block;
   width:24px;
   height:24px;
-  background:#fff;
-  filter:drop-shadow(0 1px 2px #0008);
-  -webkit-mask-repeat:no-repeat;
-          mask-repeat:no-repeat;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 1;
+  color: #111;
   -webkit-mask-position:center;
           mask-position:center;
   -webkit-mask-size:100%;
@@ -746,6 +982,9 @@ summary.day-summary{
   background:var(--glass-bg);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.45);
   display:flex;justify-content:space-between;align-items:center;
   transition:transform .2s,box-shadow .2s;font-weight:500!important;color:#333!important;
+  /* Clip any overlay/pseudo-elements to the rounded corners */
+  overflow: hidden;
+  position: relative;
 }
 summary.day-summary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.55);} 
 summary.day-summary::before{
@@ -755,6 +994,9 @@ summary.day-summary::before{
   font-size:1.2em;
   transition:transform .2s ease;
   top:1px;
+  /* ensure the marker/pseudo doesn't produce sharp corners when overlaid */
+  border-radius: inherit;
+  box-sizing: border-box;
 }
 
 .details.day[open] > summary.day-summary,
@@ -780,6 +1022,49 @@ details.month:not([open]) > details.day{border-left:none!important;}
 details.month:not([open]) > details.day::before{display:none!important;}
 details.day[data-has="true"] > summary.day-summary::before{color:var(--green-soft)!important;}
 
+/* ===================== DAY HEADER ACCENTS - LIGHT THEME ===================== */
+/* Mirror dark-mode mechanics but use darker, readable shades on white */
+html[data-theme="light"] details.day[data-has="true"]{
+  border-left: 4px solid #1f6f48 !important; /* darker green suited for light bg */
+  border-radius: 3px;
+}
+
+html[data-theme="light"] details.day[data-has="true"] > summary.day-summary::before{
+  color: #1f6f48 !important; /* triangle */
+  filter: drop-shadow(0 2px 6px rgba(31,111,72,0.10)) !important;
+}
+
+html[data-theme="light"] details.day[data-has="true"] > summary.day-summary{
+  /* keep original sizing/padding; only adjust highlight visuals */
+  background: var(--bg-card) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06), 0 0 10px rgba(31,111,72,0.06) !important;
+}
+
+html[data-theme="light"] summary.day-summary:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08), 0 0 12px rgba(31,111,72,0.08) !important;
+}
+
+/* ensure the rotated/open state triangle stays visible and colored */
+html[data-theme="light"] details.day[open] > summary.day-summary::before{
+  color: #1f6f48 !important;
+  filter: drop-shadow(0 2px 6px rgba(31,111,72,0.12)) !important;
+}
+
+/* Replicate the dark-mode 'open' glow for day headers but toned for light bg */
+html[data-theme="light"] details.day[open] > summary.day-summary,
+html[data-theme="light"] summary.day-summary.active{
+  border: 2px solid rgba(31,111,72,0.14) !important;
+  background: var(--bg-card) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08), 0 0 22px rgba(31,111,72,0.12) !important;
+}
+
+/* Slightly stronger glow when the open summary is hovered (keeps interaction feedback) */
+html[data-theme="light"] details.day[open] > summary.day-summary:hover,
+html[data-theme="light"] summary.day-summary.active:hover{
+  box-shadow: 0 10px 28px rgba(0,0,0,0.10), 0 0 28px rgba(31,111,72,0.14) !important;
+}
+
 .today-row{background:linear-gradient(90deg,#3c3c3e 0%,#4a4a4c 100%);font-weight:600;letter-spacing:-.3px;box-shadow:0 0 6px rgba(255,255,255,.1);border-radius:8px;}
 
 /* ===================== MONTH HEADER / STICKY ===================== */
@@ -790,11 +1075,23 @@ summary.month-divider{
   box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.45);border-radius:12px;
   font-weight:700;font-size:18pt;text-transform:uppercase;letter-spacing:.5pt;color:#348461;text-shadow:0 0 6px #00FF0040;
 }
-summary.month-divider::before{content:'';position:absolute;inset:0;border-radius:12px;border:1px solid #5a5a5a;opacity:.35;pointer-events:none;text-shadow:0 0 6px #00FF0040;}
+summary.month-divider::before{content:'';position:absolute;inset:0;border-radius:12px;border:1px solid #5a5a5a;opacity:.35;pointer-events:none;text-shadow:0 0 6px #00FF0040;box-sizing:border-box;}
+/* Ensure the month divider container clips any overlay pseudo-elements to its rounded corners */
+summary.month-divider{overflow:hidden;}
 summary.month-divider .month-row{display:flex;align-items:center;width:100%;font-weight:700;font-size:18pt;text-transform:uppercase;letter-spacing:.5pt;position:relative;gap:12px;text-shadow:0 0 6px #00FF0040;}
 summary.month-divider .month-row::after{content:"";flex-grow:1;height:1px;background-color:#3e3e40;text-shadow:0 0 6px #00FF0040;}
 .month-header-title{position:relative;display:flex;align-items:center;}
-.month-header-title::after{content:"";flex-grow:1;height:1px;background-color:#3e3e40;margin-left:12px;}
+.month-header-title::after{content:"";flex-grow:1;height:1px;background-color:#3e3e40;margin-left:12px;border-radius:999px;box-sizing:border-box;}
+/* Round the thin divider in month row so its ends are not sharp */
+summary.month-divider .month-row::after{
+  content:"";
+  flex-grow:1;
+  height:1px;
+  background-color:#3e3e40;
+  text-shadow:0 0 6px #00FF0040;
+  border-radius:999px;
+  box-sizing:border-box;
+}
 summary.month-divider .month-meta{display:flex!important;justify-content:space-between;align-items:center;width:100%;font-size:12pt;font-weight:500;text-shadow:0 0 6px #00FF0040;}
 summary.month-divider .month-meta::before{content:'|';margin-right:6px;opacity:.7;text-shadow:0 0 6px #00FF0040;}
 summary.month-divider .meta-label{text-transform:none;font-size:12pt;color:rgba(255,255,255,.7);font-weight:400;text-shadow:0 0 6px #00FF0040;}
@@ -806,6 +1103,7 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   position:fixed;top:80px;left:0;width:100%;padding:0 24px 4px;box-sizing:border-box;font-weight:bold;font-size:14pt;color:#348461;
   background:var(--glass-bg-light);backdrop-filter:blur(30px) saturate(180%);
   box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.45);z-index:900;display:flex;align-items:flex-end;height:52px;border-radius:12px;
+  overflow: hidden; -webkit-clip-path: inset(0 round 12px); clip-path: inset(0 round 12px);
   opacity:0;transform:translateY(-100%);transition:transform .25s ease,opacity .25s ease;pointer-events:none;text-shadow:0 0 6px #00FF0040;
 }
 .sticky-month.visible{opacity:1;transform:translateY(0);pointer-events:auto;}

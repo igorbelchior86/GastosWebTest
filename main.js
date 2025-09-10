@@ -26,6 +26,14 @@ const closeConfirmMove = document.getElementById('closeConfirmMove');
 const confirmMoveText  = document.getElementById('confirmMoveText');
 // Settings modal – refs
 const settingsModalEl = document.getElementById('settingsModal');
+const toggleThemeBtn = document.getElementById('toggleThemeBtn');
+if (toggleThemeBtn) {
+  toggleThemeBtn.onclick = () => {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+  };
+}
 const closeSettingsModalBtn = document.getElementById('closeSettingsModal');
 
 // Pay-invoice mode state
