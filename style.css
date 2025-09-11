@@ -6,7 +6,12 @@ html[data-theme="light"] .app-header {
   border: 1px solid #e0e0e0;
 }
 html[data-theme="light"] .app-header::after {
-  background: linear-gradient(90deg, transparent, #00FF80 30%, transparent 60%) !important;
+  /* Higher-contrast green on white and restore sliding animation */
+  background: linear-gradient(90deg, transparent, #16A34A 35%, transparent 65%) !important;
+  background-repeat: no-repeat !important;          /* avoid tiling that can look static */
+  background-size: 200% 100% !important;   /* was reset by background shorthand */
+  animation: headerBar 8s linear infinite !important; /* ensure it slides in light too */
+  will-change: background-position;                 /* hint smoother animation */
 }
 html[data-theme="light"] .logo-text {
   color: #000 !important;
@@ -215,6 +220,19 @@ html[data-theme="light"] summary.day-summary > span:last-child {
   font-weight: 600 !important;
 }
 
+/* Light theme: ensure executed/planned headers are readable on white */
+html[data-theme="light"] .executed-header,
+html[data-theme="light"] .planned-header {
+  color: var(--txt-main) !important;
+  text-shadow: none !important;
+}
+html[data-theme="light"] .executed-header::after {
+  background: rgba(31,111,72,0.5) !important; /* soft green underline */
+}
+html[data-theme="light"] .planned-header::after {
+  background: var(--blue) !important; /* keep blue but remove glow */
+}
+
 /* Ensure any decorative pseudo-elements don't add neon glow in light mode */
 html[data-theme="light"] summary.day-summary::before,
 html[data-theme="light"] summary.day-summary *::before,
@@ -222,6 +240,140 @@ html[data-theme="light"] summary.day-summary *::after {
   text-shadow: none !important;
   filter: none !important;
 }
+
+/* ===================== ACCORDION – LIGHT THEME ===================== */
+/* Month header: lighter borders and dividers on white */
+html[data-theme="light"] summary.month-divider{
+  /* subtle contour to separate from white background */
+  border: 1px solid rgba(0,0,0,0.08) !important;
+}
+html[data-theme="light"] summary.month-divider::before{
+  border-color: rgba(0,0,0,0.14) !important;
+  opacity: 1 !important; /* ensure the border is visible on white */
+}
+html[data-theme="light"] summary.month-divider .month-row::after,
+html[data-theme="light"] .month-header-title::after{
+  background-color: var(--divider) !important;
+}
+
+/* Executed block container and lines */
+html[data-theme="light"] .executed-cash{
+  background: var(--bg-card) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+          backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--divider) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
+}
+html[data-theme="light"] .executed-cash .op-line{
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+  color: var(--txt-main) !important;
+}
+
+/* Fine tuning: executed items typography and value colors for light theme */
+html[data-theme="light"] .executed-cash .op-left {
+  color: var(--txt-main) !important; /* description */
+  font-weight: 600;
+}
+html[data-theme="light"] .executed-cash .timestamp {
+  color: var(--txt-muted) !important; /* time */
+  opacity: 1 !important;
+}
+html[data-theme="light"] .executed-cash .op-right .value {
+  color: var(--txt-main) !important; /* default value color (fallback) */
+  font-weight: 700;
+}
+/* Use explicit colors for negative/positive amounts on white background */
+html[data-theme="light"] .executed-cash .op-right .value.negative {
+  color: #dc2626 !important; /* red-600 */
+  background: transparent !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+}
+html[data-theme="light"] .executed-cash .op-right .value.positive {
+  color: #16a34a !important; /* green-600 */
+  background: transparent !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+/* Invoice card */
+html[data-theme="light"] .invoice{
+  background: var(--bg-card) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+          backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--divider) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
+}
+html[data-theme="light"] .invoice > summary{ color: var(--txt-main) !important; }
+html[data-theme="light"] .invoice > summary::before{ background-color:#111 !important; }
+
+/* Light theme: status icons (salary, invoice, recurrence) as black glyphs */
+html[data-theme="light"] .icon-salary,
+html[data-theme="light"] .icon-invoice,
+html[data-theme="light"] .icon-repeat{
+  background-color: #111 !important; /* glyph color via mask */
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
+}
+html[data-theme="light"] .invoice .executed-list li .op-line{
+  background:#fff !important;
+  border:1px solid rgba(0,0,0,0.06) !important;
+  box-shadow:0 1px 4px rgba(0,0,0,0.10) !important;
+  color:var(--txt-main) !important;
+}
+
+/* Swipe action icons on light bg: darker glyphs */
+html[data-theme="light"] .swipe-actions .icon-action{ background-color:#111 !important; }
+
+/* Sticky month header – light theme glass, colors and shadows */
+html[data-theme="light"] .sticky-month{
+  background: rgba(255,255,255,0.56) !important; /* more translucent */
+  -webkit-backdrop-filter: saturate(180%) blur(34px);
+    backdrop-filter: saturate(180%) blur(34px);
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  /* remove drop shadow below; keep only subtle inner outline */
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18) !important;
+  color: var(--txt-main) !important;           /* no green tint in light */
+  text-shadow: none !important;                /* remove neon glow */
+  /* Let the soft drop shadow render past rounded corners */
+  -webkit-clip-path: inset(-12px round 12px) !important;
+          clip-path: inset(-12px round 12px) !important;
+}
+html[data-theme="light"] .sticky-month .month-row,
+html[data-theme="light"] .sticky-month .month-meta,
+html[data-theme="light"] .sticky-month .meta-label,
+html[data-theme="light"] .sticky-month .meta-value{
+  color: var(--txt-main) !important;
+  text-shadow: none !important;
+}
+html[data-theme="light"] .sticky-month .meta-label{ color: var(--txt-muted) !important; font-weight:500; }
+html[data-theme="light"] .sticky-month .month-row::after{ background-color: var(--divider) !important; }
+/* Light theme: thin month meta separator pipe */
+html[data-theme="light"] summary.month-divider .month-meta::before{
+  color: var(--divider) !important;
+  opacity: 1 !important;
+}
+
+/* Generic swipe rows inside accordion (outside invoice), readable on light bg */
+html[data-theme="light"] .swipe-wrapper .op-line{
+  background: #fff !important;
+  color: var(--txt-main) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+}
+
+/* Planned rows inside accordion: align visuals with executed */
+html[data-theme="light"] .planned-list li .op-line{
+  background: #fff !important;
+  color: var(--txt-main) !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+}
+html[data-theme="light"] #accordion .plan-check{ border-color: var(--txt-muted) !important; }
+html[data-theme="light"] #accordion .plan-check:checked{ background: var(--blue) !important; border-color: var(--blue) !important; }
 
 /* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
 /* Planned modal layout (grid without DOM changes)
@@ -1011,6 +1163,29 @@ summary.day-summary .day-balance, summary.day-summary > span:last-child{font-fam
 details.day{border:none!important;border-radius:0!important;padding-left:8px!important;margin:12px 0!important;background:transparent!important;}
 details.day.today summary.day-summary{width:calc(100% - 24px)!important;margin:4px 12px 4px 0!important;padding:8px 12px!important;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.06) 100%)!important;border:4px solid #fff;border-radius:12px!important;box-shadow:0 0 12px 2px rgba(255,255,255,.4);} 
 details.day.negative summary.day-summary{width:calc(100% - 24px)!important;margin:4px 12px 4px 0!important;padding:8px 12px!important;background:var(--glass-bg)!important;box-shadow:0 0 8px 0 rgba(255,64,64,.6)!important;border:2px solid rgba(255,64,64,.5);border-radius:6px!important;}
+
+/* Light theme: mirror the red negative highlight for day headers */
+html[data-theme="light"] details.day.negative summary.day-summary{
+  width: calc(100% - 24px) !important;
+  margin: 4px 12px 4px 0 !important;
+  padding: 8px 12px !important;
+  background: var(--bg-card) !important;
+  /* stronger blood-red highlight for negative days on light bg */
+  box-shadow: 0 0 10px 0 rgba(153, 27, 27, 0.50) !important; /* #991b1b @ 50% */
+  border: 2px solid #991b1b !important;
+  border-radius: 6px !important;
+}
+
+/* Light theme: distinctive highlight for today's day header (mirrors dark intent) */
+html[data-theme="light"] details.day.today summary.day-summary{
+  width: calc(100% - 24px) !important;
+  margin: 4px 12px 4px 0 !important;
+  padding: 8px 12px !important;
+  background: var(--bg-card) !important;
+  border: 3px solid rgba(31, 111, 72, 0.45) !important; /* green accent for clarity */
+  border-radius: 12px !important;
+  box-shadow: 0 0 12px 2px rgba(31, 111, 72, 0.25), 0 8px 24px rgba(0,0,0,0.08) !important;
+}
 details.day:not(.today):not(.negative) summary.day-summary{width:calc(100% - 24px)!important;margin:4px 12px 4px 0!important;padding:8px 12px!important;}
 
 /* Neon bar */
@@ -1074,6 +1249,7 @@ summary.month-divider{
   background:var(--glass-bg-light);backdrop-filter:blur(30px) saturate(180%);
   box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.45);border-radius:12px;
   font-weight:700;font-size:18pt;text-transform:uppercase;letter-spacing:.5pt;color:#348461;text-shadow:0 0 6px #00FF0040;
+
 }
 summary.month-divider::before{content:'';position:absolute;inset:0;border-radius:12px;border:1px solid #5a5a5a;opacity:.35;pointer-events:none;text-shadow:0 0 6px #00FF0040;box-sizing:border-box;}
 /* Ensure the month divider container clips any overlay pseudo-elements to its rounded corners */
@@ -1551,8 +1727,7 @@ details.invoice[open] > summary::after{
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 18px;
-  /* Remove all lateral and bottom padding for flush selector row */
-  padding: 0 !important;
+  padding: 0 !important; /* flush selector row */
   margin: 6px 0 14px 0;
   box-shadow: 0 6px 16px rgba(0,0,0,0.3);
 }
@@ -1564,22 +1739,21 @@ details.invoice[open] > summary::after{
   height:48px;
   font-weight:700;
   color:var(--txt-main);
-  /* Divider removido */
 }
 .settings-theme-card .theme-row{
   display:flex;
   width:100%;
   height:48px;
-  overflow:hidden;
-  margin: 0 !important;
-  padding: 0 !important;
-  border-radius: 0 0 18px 18px;
-  box-sizing: border-box;
-  border-top: none !important;
+  margin:0 !important;
+  padding:0 !important;
+  box-sizing:border-box;
+  border-top:1px solid rgba(255,255,255,0.03);
+  border-radius:0 0 18px 18px;
+  overflow:hidden; /* clip inner pressed highlight to rounded container */
 }
 .settings-theme-card .theme-row .theme-btn{
-  flex:1 1 33%;
-  border: none;
+  flex:1 1 0;
+  border:none;
   margin:0 !important;
   padding:0 !important;
   text-align:center;
@@ -1588,75 +1762,52 @@ details.invoice[open] > summary::after{
   font-size:1.05rem;
   position:relative;
   display:flex; align-items:center; justify-content:center; height:100%;
+  -webkit-tap-highlight-color:transparent;
 }
 .settings-theme-card .theme-row .theme-btn + .theme-btn::before{
-  content:''; position:absolute; left:-0.5px; top:0; bottom:0; width:1px; background:rgba(15,23,34,0.06);
-}
-.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]{
-  background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02));
-  color:var(--txt-main);
-  box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
-  transform: translateY(4px);
-}
-.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{
-  content:''; position:absolute; left:0; right:0; bottom:-6px; height:10px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.24), rgba(0,0,0,0)); filter: blur(6px); pointer-events:none;
-  border-radius: 0 0 18px 18px;
-}
-.settings-theme-card .theme-row .theme-btn:active{
-  /* O efeito de afundar só aparece para o botão pressionado, mas não interfere no selecionado */
-  transform: translateY(4px);
-  box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
-}
-/* Prevent selected button from returning to normal on pointer up */
-
-/* Theme row: three equal sections with thin separators */
-.settings-theme-card .theme-row{
-  display:flex;
-  width:100%;
-  border-top:1px solid rgba(255,255,255,0.03);
-  border-bottom-left-radius:10px;
-  border-bottom-right-radius:10px;
-  overflow:hidden;
-}
-.settings-theme-card .theme-row .theme-btn{
-  flex:1 1 0;
-  border: none; /* separators drawn by pseudo elements */
-  margin:0; padding:0; text-align:center; background:transparent; color:var(--txt-main); font-size:1.05rem;
-  position:relative;
-}
-.settings-theme-card .theme-row .theme-btn + .theme-btn::before{
-  content:''; position:absolute; left:-0.5px; top:0; bottom:0; width:1px; background:rgba(15,23,34,0.06);
+  content:""; position:absolute; left:-0.5px; top:0; bottom:0; width:1px; background:rgba(15,23,34,0.06);
 }
 
-/* Selected / pressed state with stronger depth */
+/* Selected state (no jump), pressed state sinks; both keep rounded outer corners */
 .settings-theme-card .theme-row .theme-btn[aria-pressed="true"]{
   background: linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.04));
   color:var(--txt-main);
   box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
-  transform: none;
-  border-radius: 0 !important;
-/* Claro: canto esquerdo arredondado */
-.settings-theme-card .theme-row .theme-btn:first-child[aria-pressed="true"] {
-  border-radius: 18px 0 0 18px !important;
+  transform:none;
 }
-/* Escuro: todos cantos sharp */
-.settings-theme-card .theme-row .theme-btn:nth-child(2)[aria-pressed="true"] {
-  border-radius: 0 !important;
-}
-/* Sistema: canto direito arredondado */
-.settings-theme-card .theme-row .theme-btn:last-child[aria-pressed="true"] {
-  border-radius: 0 18px 18px 0 !important;
-}
-}
-.settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{
-  content:''; position:absolute; left:0; right:0; bottom:-8px; height:12px; background: radial-gradient(ellipse at center, rgba(0,0,0,0.28), rgba(0,0,0,0)); filter: blur(8px); pointer-events:none;
-}
-
-/* Active press (pointer down) */
 .settings-theme-card .theme-row .theme-btn:active{
   transform: translateY(4px);
   box-shadow: 0 6px 18px rgba(2,6,23,0.22) inset;
 }
+
+/* Ensure outer corners follow the card when pressed/selected */
+.settings-theme-card .theme-row .theme-btn:first-child:is([aria-pressed="true"], :active){
+  border-radius: 18px 0 0 18px !important; /* full left side */
+}
+.settings-theme-card .theme-row .theme-btn:last-child:is([aria-pressed="true"], :active){
+  border-radius: 0 18px 18px 0 !important; /* full right side */
+}
+
+/* Feather under the pressed/selected button, clipped to the row */
+.settings-theme-card .theme-row .theme-btn:is([aria-pressed="true"], :active)::after{
+  content:""; position:absolute; left:0; right:0; bottom:-8px; height:12px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.28), rgba(0,0,0,0));
+  filter: blur(8px); pointer-events:none;
+}
+.settings-theme-card .theme-row .theme-btn:first-child:is([aria-pressed="true"], :active)::after{
+  border-radius: 0 0 0 18px;
+}
+.settings-theme-card .theme-row .theme-btn:last-child:is([aria-pressed="true"], :active)::after{
+  border-radius: 0 0 18px 0;
+}
+
+/* Accessible focus ring that follows rounded corners */
+.settings-theme-card .theme-row .theme-btn:focus{ outline: none; }
+.settings-theme-card .theme-row .theme-btn:focus-visible{
+  box-shadow: inset 0 0 0 2px var(--focus-ring, #f59e0b);
+}
+.settings-theme-card .theme-row .theme-btn:first-child:focus-visible{ border-radius: 18px 0 0 18px; }
+.settings-theme-card .theme-row .theme-btn:last-child:focus-visible{ border-radius: 0 18px 18px 0; }
 .settings-item .left{display:inline-flex;align-items:center;gap:10px;color:#fff;font-weight:700;}
 .settings-item .settings-cta{color:#fff;font-weight:800;}
 .settings-item.danger .settings-cta{color:#ff6b6b;}
@@ -1956,6 +2107,47 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
   box-shadow:0 3px 8px rgba(0,0,0,.4);
 }
 
+/* Light theme: pseudo-footer buttons tuning (glass, borders, icons, shadows) */
+html[data-theme="light"] .floating-add-button,
+html[data-theme="light"] .floating-home-button{
+  background: rgba(255,255,255,0.78) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+          backdrop-filter: blur(12px) saturate(180%) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12) !important;
+  color: var(--accent) !important; /* plus sign uses currentColor */
+}
+html[data-theme="light"] .floating-add-button::before,
+html[data-theme="light"] .floating-home-button::before{
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  opacity: 1 !important; /* visible contour on white */
+}
+/* Softer hover/press without neon glow */
+html[data-theme="light"] .floating-add-button:hover,
+html[data-theme="light"] .floating-home-button:hover{
+  box-shadow: 0 10px 24px rgba(0,0,0,0.16) !important;
+}
+html[data-theme="light"] .floating-add-button:active,
+html[data-theme="light"] .floating-home-button:active{
+  box-shadow: 0 6px 12px rgba(0,0,0,0.12) !important;
+}
+
+/* Light theme: bottom segmented pill (Home/Ajustes) */
+html[data-theme="light"] .floating-pill{
+  background: rgba(255,255,255,0.86) !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.16), inset 0 -2px 0 rgba(255,255,255,0.6) !important;
+}
+html[data-theme="light"] .floating-pill .pill-option{
+  color: #111 !important;
+}
+html[data-theme="light"] .floating-pill .pill-highlight{
+  background: linear-gradient(180deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02)) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10) !important;
+}
+/* Light theme: make masked glyphs dark */
+html[data-theme="light"] .pill-icon{ background:#111 !important; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important; }
+
 /* Ajustes quando o teclado estiver aberto (iOS 26):
    apenas eleva os botões, sem mexer no header */
 html[data-vv-kb="1"] .floating-add-button{
@@ -1978,6 +2170,261 @@ html.modal-open .floating-pill { display: none !important; }
   animation:pulse 4s ease-in-out infinite;
   clip-path: circle(50% at 50% 50%);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ===================== LIGHT THEME — TX MODAL ===================== */
+/* Froster light panel with subtle border/shadow; dark text only for TX modal */
+html[data-theme="light"] #txModal .bottom-modal-box {
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.78) 60%), rgba(255,255,255,0.78) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #txModal h2 { color: #111; text-shadow: none; }
+html[data-theme="light"] #txModal .modal-close-btn { color: #111; opacity: .7; }
+html[data-theme="light"] #txModal .modal-close-btn:hover { opacity: 1; }
+html[data-theme="light"] #txModal .modal-drag { background: #cfcfcf; }
+
+/* Inputs/selects/date: clear white fields with gentle focus ring */
+html[data-theme="light"] #txModal .form-grid input,
+html[data-theme="light"] #txModal .form-grid select,
+html[data-theme="light"] #txModal input[type="date"] {
+  background: #fff;
+  color: #111;
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] #txModal .form-grid input:focus,
+html[data-theme="light"] #txModal .form-grid select:focus,
+html[data-theme="light"] #txModal input[type="date"]:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
+}
+html[data-theme="light"] #txModal ::placeholder { color: #6b7280; opacity: 1; }
+
+/* Value +/- toggle in the amount field */
+html[data-theme="light"] #txModal .value-toggle button {
+  background: #f3f4f6;
+  border: 1px solid rgba(0,0,0,0.08);
+  color: #111;
+  box-shadow: none;
+}
+html[data-theme="light"] #txModal .value-toggle button:not(.active) { opacity: .8; }
+html[data-theme="light"] #txModal .value-toggle button[data-type="expense"] { background: #fee2e2; border-color: #fecaca; }
+html[data-theme="light"] #txModal .value-toggle button[data-type="income"] { background: #dcfce7; border-color: #bbf7d0; }
+html[data-theme="light"] #txModal .value-toggle button.active[data-type="expense"] { background: #fecaca; border-color: #ef4444; }
+html[data-theme="light"] #txModal .value-toggle button.active[data-type="income"] { background: #bbf7d0; border-color: #16a34a; }
+
+/* Method segmented control */
+html[data-theme="light"] #txModal .method-switch {
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+html[data-theme="light"] #txModal .method-switch .switch-option { color: #111; }
+html[data-theme="light"] #txModal .method-switch .switch-option.active { color: #111; }
+html[data-theme="light"] #txModal .method-switch .switch-highlight {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.10);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Card selector list in Cartão mode */
+html[data-theme="light"] #txModal #cardSelector label {
+  background: rgba(255,255,255,0.85);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: #111;
+}
+html[data-theme="light"] #txModal #cardSelector input[type="radio"] {
+  border-color: #6b7280;
+}
+html[data-theme="light"] #txModal #cardSelector input[type="radio"]:checked {
+  background-color: var(--blue);
+  border-color: var(--blue);
+}
+
+/* CTA button */
+html[data-theme="light"] #txModal #addBtn {
+  background: #16a34a; /* emerald-600 */
+  color: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 8px 18px rgba(22,163,74,0.22);
+}
+html[data-theme="light"] #txModal #addBtn:hover { filter: brightness(1.05); }
+html[data-theme="light"] #txModal #addBtn:active { filter: brightness(0.98); }
+
+/* Invoice parcel row label */
+html[data-theme="light"] #txModal #invoiceParcelRow { color: #111; }
+
+/* ===================== LIGHT THEME — SETTINGS (AJUSTES) ===================== */
+/* Panel */
+html[data-theme="light"] #settingsModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #settingsModal h2 { color:#111; text-shadow:none; }
+html[data-theme="light"] #settingsModal .modal-close-btn { color:#111; opacity:.7; }
+html[data-theme="light"] #settingsModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #settingsModal .modal-drag{ background:#cfcfcf; }
+
+/* Cards and list groups */
+html[data-theme="light"] #settingsModal .settings-card,
+html[data-theme="light"] #settingsModal .settings-list{
+  background: rgba(255,255,255,0.85);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.10);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+}
+html[data-theme="light"] #settingsModal .settings-item{ border-top:1px solid rgba(0,0,0,0.06); }
+html[data-theme="light"] #settingsModal .settings-name{ color:#111; }
+html[data-theme="light"] #settingsModal .settings-sub{ color:#4b5563; opacity:1; }
+html[data-theme="light"] #settingsModal .settings-avatar{ background:#e5e7eb; border-color: rgba(0,0,0,0.10); }
+
+/* Theme segmented control */
+html[data-theme="light"] #settingsModal .settings-theme-card{
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] #settingsModal .settings-theme-card .theme-row{ border-top: none; }
+html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-btn{ color:#111; }
+html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-btn + .theme-btn::before{ background: rgba(0,0,0,0.08); }
+html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-btn[aria-pressed="true"]{
+  background:#fff;
+  color:#111;
+  box-shadow: inset 0 3px 8px rgba(0,0,0,0.08);
+}
+html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{ background: radial-gradient(ellipse at center, rgba(0,0,0,0.10), rgba(0,0,0,0)); }
+
+/* Danger action */
+html[data-theme="light"] #settingsModal .settings-item .settings-cta{ color:#111; }
+html[data-theme="light"] #settingsModal .settings-item.danger .settings-cta{ color:#ef4444; }
+html[data-theme="light"] #settingsModal .settings-item.danger .settings-icon{ background:#ef4444; }
+
+/* ===================== LIGHT THEME — CARD MODAL ===================== */
+/* Panel */
+html[data-theme="light"] #cardModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #cardModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #cardModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #cardModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #cardModal .modal-drag{ background:#cfcfcf; }
+
+/* Inputs */
+html[data-theme="light"] #cardModal input,
+html[data-theme="light"] #cardModal select{
+  background:#fff;
+  color:#111;
+  border:1px solid rgba(0,0,0,0.12);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+html[data-theme="light"] #cardModal input:focus,
+html[data-theme="light"] #cardModal select:focus{
+  outline:none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
+}
+html[data-theme="light"] #cardModal ::placeholder{ color:#6b7280; opacity:1; }
+
+/* CTA */
+html[data-theme="light"] #cardModal #addCardBtn{
+  background:#16a34a; /* emerald-600 */
+  color:#fff;
+  border:1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 8px 18px rgba(22,163,74,0.22);
+}
+html[data-theme="light"] #cardModal #addCardBtn:hover{ filter: brightness(1.05); }
+html[data-theme="light"] #cardModal #addCardBtn:active{ filter: brightness(0.98); }
+
+/* Helper text */
+html[data-theme="light"] #cardModal small{ color:#6b7280; }
+
+/* Card list entries */
+html[data-theme="light"] #cardModal .card-list li .card-line{
+  background:#ffffffec; /* slightly translucent to keep frosted feel */
+  border:1px solid rgba(0,0,0,0.10);
+  border-radius:14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  color:#111;
+}
+html[data-theme="light"] #cardModal .card-list li .card-line .card-name{ color:#111; }
+html[data-theme="light"] #cardModal .card-list li .card-line .card-dates{ color:#374151; }
+
+/* If swipe wrapper is in use inside card modal */
+html[data-theme="light"] #cardModal .swipe-wrapper .card-line{
+  background:#ffffffec;
+  border:1px solid rgba(0,0,0,0.10);
+  border-radius:14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  color:#111;
+}
+/* Ensure detail labels/values are readable on white */
+html[data-theme="light"] #cardModal .card-detail{ color:#111; }
+html[data-theme="light"] #cardModal .card-label{ color:#4b5563; }
+html[data-theme="light"] #cardModal .card-value{ color:#111; }
+html[data-theme="light"] #cardModal .card-content b{ color:#111; }
+
+/* ===================== LIGHT THEME — PLANNED MODAL ===================== */
+/* Panel */
+html[data-theme="light"] #plannedModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #plannedModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #plannedModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #plannedModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #plannedModal .modal-drag{ background:#cfcfcf; }
+
+/* Headings and day labels */
+html[data-theme="light"] #plannedModal .subheader,
+html[data-theme="light"] #plannedModal .planned-date,
+html[data-theme="light"] #plannedModal .modal-content h3{ color:#111; text-shadow:none; }
+
+/* Cards: row visuals (already covered globally for .planned-list) + text colors */
+html[data-theme="light"] #plannedModal .planned-list > li .op-line{
+  background:#fff !important;
+  border:1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08) !important;
+}
+/* Description and method */
+html[data-theme="light"] #plannedModal .planned-list > li .op-left span:not(.method){ color:#111 !important; }
+html[data-theme="light"] #plannedModal .planned-list > li .op-left .method{ color:#6b7280 !important; }
+/* When a checkbox is present, ensure the adjacent description text is dark too */
+html[data-theme="light"] #plannedModal .planned-list .op-left input.plan-check + span { color:#111 !important; }
+
+/* Checkbox style in light */
+html[data-theme="light"] #plannedModal .planned-list .op-left input.plan-check{
+  background:#fff;
+  border-color:#9ca3af;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
+html[data-theme="light"] #plannedModal .planned-list .op-left input.plan-check:checked{
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+/* Values: flat colors (override gradient text) */
+html[data-theme="light"] #plannedModal .planned-list .op-right .value{ color:#111; background:none; -webkit-text-fill-color: initial; }
+html[data-theme="light"] #plannedModal .planned-list .op-right .value.negative{
+  background:none !important; -webkit-text-fill-color: initial !important; color:#dc2626 !important;
+}
+html[data-theme="light"] #plannedModal .planned-list .op-right .value.positive{
+  background:none !important; -webkit-text-fill-color: initial !important; color:#16a34a !important;
 }
 .floating-planned-button{right:90px;}
 .floating-card-button{right:20px;}
@@ -2325,6 +2772,31 @@ Opcional: atualizar o header da fatura para mostrar “total líquido” (total 
 .skeleton-small{height:10px;width:80px;border-radius:6px;}
 #accordion .month-divider .s-meta .skeleton-pill{margin-left:auto;}
 #accordion .day-summary .skeleton-pill{margin-left:auto;}
+
+/* Light theme: use subtle gray shimmer instead of white (better contrast on light bg) */
+html[data-theme="light"] .skeleton{
+  background: linear-gradient(90deg,
+    rgba(0,0,0,0.14),
+    rgba(0,0,0,0.24),
+    rgba(0,0,0,0.14)
+  );
+}
+
+/* Light theme: ensure shimmer is visible inside month headers/meta (overrides earlier resets) */
+html[data-theme="light"] summary.month-divider .skeleton,
+html[data-theme="light"] summary.month-divider .skeleton-pill,
+html[data-theme="light"] summary.month-divider .s-meta .skeleton,
+html[data-theme="light"] summary.month-divider .s-meta .skeleton-pill,
+html[data-theme="light"] .month-meta .skeleton,
+html[data-theme="light"] .month-meta .skeleton-pill,
+html[data-theme="light"] summary.month-divider .meta-value .skeleton,
+html[data-theme="light"] .month-meta .meta-value .skeleton{
+  background: linear-gradient(90deg, rgba(0,0,0,0.14), rgba(0,0,0,0.24), rgba(0,0,0,0.14)) !important;
+  background-size: 200% 100% !important;
+  animation: skeletonShimmer 1.2s ease-in-out infinite !important;
+  color: transparent !important;
+  border-radius: 9999px !important;
+}
 
 /* Hide start-balance box only during skeleton boot */
 html.skeleton-boot #startGroup,

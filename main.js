@@ -2864,6 +2864,8 @@ function renderAccordion() {
   const acc = document.getElementById('accordion');
   if (!acc) return;
   const hydrating = acc.dataset && acc.dataset.state === 'skeleton';
+  const noDataYet = (startBalance == null) && (!Array.isArray(transactions) || transactions.length === 0);
+  const keepSkeleton = hydrating || noDataYet; // keep shimmer if still no data
   // Salva quais <details> estão abertos
   const openKeys = Array.from(acc.querySelectorAll('details[open]'))
                         .map(d => d.dataset.key || '');
@@ -2871,7 +2873,7 @@ function renderAccordion() {
   const openInvoices = Array.from(
     acc.querySelectorAll('details.invoice[open]')
   ).map(d => d.dataset.pd);
-  if (!hydrating) acc.innerHTML = '';
+  if (!keepSkeleton) acc.innerHTML = '';
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const currency = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -3049,7 +3051,7 @@ function renderAccordion() {
     const nomeMes = new Date(2025, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
     // Build or reuse month container
     let mDet;
-    if (hydrating) {
+    if (keepSkeleton) {
       mDet = acc.querySelector(`details.month[data-key="m-${mIdx}"]`) || document.createElement('details');
       mDet.className = 'month';
       mDet.dataset.key = `m-${mIdx}`;
@@ -3063,15 +3065,22 @@ function renderAccordion() {
         mSum.className = 'month-divider';
         mDet.prepend(mSum);
       }
-      // Update header content (month name; meta updated later)
-      mSum.innerHTML = `
-        <div class="month-row">
-          <span class="month-name">${nomeMes.toUpperCase()}</span>
-        </div>
-        <div class="month-meta">
-          <span class="meta-label"></span>
-          <span class="meta-value"></span>
-        </div>`;
+      // Update month name without clobbering any pre-seeded skeleton pill
+      const hadSkeleton = !!mSum.querySelector('.skeleton');
+      if (noDataYet && hadSkeleton) {
+        const nameEl = mSum.querySelector('.month-name');
+        if (nameEl) nameEl.textContent = nomeMes.toUpperCase();
+      } else {
+        // Build minimal structure (values filled later below)
+        mSum.innerHTML = `
+          <div class="month-row">
+            <span class="month-name">${nomeMes.toUpperCase()}</span>
+          </div>
+          <div class="month-meta">
+            <span class="meta-label"></span>
+            <span class="meta-value"></span>
+          </div>`;
+      }
     } else {
       mDet = document.createElement('details');
       mDet.className = 'month';
@@ -3115,14 +3124,17 @@ function renderAccordion() {
       metaValue = currency(monthActual + monthPlanned);
     }
 
-    mSum.innerHTML = `
-      <div class="month-row">
-        <span class="month-name">${nomeMes.toUpperCase()}</span>
-      </div>
-      <div class="month-meta">
-        <span class="meta-label">${metaLabel}</span>
-        <span class="meta-value">${metaValue}</span>
-      </div>`;
+    // Only render values when we actually have some data
+    if (!noDataYet) {
+      mSum.innerHTML = `
+        <div class="month-row">
+          <span class="month-name">${nomeMes.toUpperCase()}</span>
+        </div>
+        <div class="month-meta">
+          <span class="meta-label">${metaLabel}</span>
+          <span class="meta-value">${metaValue}</span>
+        </div>`;
+    }
 
     if (!hydrating) mDet.appendChild(mSum);
 
@@ -3221,7 +3233,7 @@ const dayTotal = cashImpact + cardImpact;
       if (iso === today) dDet.classList.add('today');
       let dSum = dDet.querySelector('summary.day-summary');
       if (!dSum) { dSum = document.createElement('summary'); dSum.className = 'day-summary'; }
-      const saldoFormatado = runningBalance < 0
+  const saldoFormatado = runningBalance < 0
         ? `R$ -${Math.abs(runningBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         : `R$ ${runningBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
       const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
@@ -3235,10 +3247,16 @@ const dayTotal = cashImpact + cardImpact;
       if (hasSalary)  labelParts.push('<span class="icon-salary"></span>');
 
       const labelWithDue = labelParts.join('');
-      dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
+  dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${noDataYet ? '' : saldoFormatado}</span>`;
       if (runningBalance < 0) dDet.classList.add('negative');
       // Replace or append summary
       if (!hydrating) dDet.appendChild(dSum); else if (!dDet.contains(dSum)) dDet.prepend(dSum);
+
+      // In hydration mode, clear dynamic day sections to avoid duplication across renders
+      if (hydrating) {
+        (dDet.querySelectorAll && dDet.querySelectorAll('.planned-cash, .executed-cash'))
+          .forEach(n => n.remove());
+      }
 
       // Seção de planejados (apenas se houver planejados)
       const plannedOps = dayTx
@@ -3351,7 +3369,8 @@ const dayTotal = cashImpact + cardImpact;
         dDet.appendChild(executedCash);
       }
 
-      mDet.appendChild(dDet);
+  // Avoid re-appending existing day nodes during hydration (prevents reordering/reflow)
+  if (!hydrating || !dDet.parentElement) mDet.appendChild(dDet);
     }
 
 // --- Atualiza o preview do mês com base no último dia visível ---
@@ -3361,8 +3380,10 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
     // Atualiza o summary do mês (cabeçalho do accordion)
     const labelEl = mSum.querySelector('.meta-label');
     const valueEl = mSum.querySelector('.meta-value');
-    if (labelEl) labelEl.textContent = headerPreviewLabel + ':';
-    if (valueEl) valueEl.textContent = currency(monthEndBalanceForHeader);
+    if (!noDataYet) {
+      if (labelEl) labelEl.textContent = headerPreviewLabel + ':';
+      if (valueEl) valueEl.textContent = currency(monthEndBalanceForHeader);
+    }
 
     // (month summary já foi adicionado no topo; não adicionar novamente)
     if (!hydrating || !mDet.parentElement) acc.appendChild(mDet);
@@ -3375,7 +3396,7 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
       metaLine = document.createElement('div');
       metaLine.className = 'month-meta';
     }
-    metaLine.innerHTML = `<span>| ${previewLabel}</span><strong>${currency(monthEndBalanceForHeader)}</strong>`;
+  metaLine.innerHTML = noDataYet ? '' : `<span>| ${previewLabel}</span><strong>${currency(monthEndBalanceForHeader)}</strong>`;
     // Clique em "Saldo final" também expande/colapsa o mês
     metaLine.addEventListener('click', () => {
       mDet.open = !mDet.open;
@@ -3383,7 +3404,7 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
 
     // Se o mês estiver fechado (collapsed), exibe metaLine abaixo de mDet
     if (!mDet.open) {
-      if (!isMetaLine(mDet.nextSibling)) acc.appendChild(metaLine);
+      if (!noDataYet && !isMetaLine(mDet.nextSibling)) acc.appendChild(metaLine);
     } else {
       // se estiver aberto, garanta que a linha meta não fique sobrando
       if (isMetaLine(mDet.nextSibling)) acc.removeChild(mDet.nextSibling);
