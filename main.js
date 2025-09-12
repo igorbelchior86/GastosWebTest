@@ -1082,9 +1082,11 @@ if (homeBtn) homeBtn.addEventListener('click', scrollTodayIntoView);
     btn.addEventListener('click', () => {
       const action = btn.dataset.action;
       setSelected(action); updateHighlight();
-      if (action === 'home') scrollTodayIntoView();
-else if (action === 'settings') {
-        if (settingsModalEl) { renderSettings(); settingsModalEl.classList.remove('hidden'); }
+      if (action === 'home') {
+        scrollTodayIntoView();
+      } else if (action === 'settings') {
+        // Use openSettings() which renders the theme selector (renderSettingsModal)
+        openSettings();
         updateModalOpenState();
       }
     });
