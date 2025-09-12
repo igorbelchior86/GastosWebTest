@@ -1601,7 +1601,7 @@ details.invoice[open] > summary::after{
    gap:8px;
    font-weight:500;
    font-size:12pt;
-   color:#fff;
+   color:var(--op-left-color);
    flex:1 1 auto;
    min-width:0;
  }
@@ -1646,7 +1646,7 @@ details.invoice[open] > summary::after{
   gap:8px;
   font-weight:500;
   font-size:12pt;
-  color:#fff;
+  color:var(--op-left-color);
   flex:1 1 auto;
   min-width:0;
 }
@@ -2808,3 +2808,12 @@ html[data-theme="light"] .month-meta .meta-value .skeleton{
 html.skeleton-boot #startGroup,
 html.skeleton-boot .start-container,
 html.skeleton-boot #dividerSaldo { display: none !important; }
+
+/* ===================== THEME VARIABLES ===================== */
+:root {
+  --op-left-color: #1e1e1e;
+}
+
+html[data-theme="dark"] {
+  --op-left-color: #ffffff;
+}
