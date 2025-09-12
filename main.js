@@ -1813,7 +1813,7 @@ function isDetachedOccurrence(tx) {
   return !tx.recurrence && !!tx.parentId;
 }
 
-function makeLine(tx, disableSwipe = false) {
+function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   // Create swipe wrapper
   const wrap = document.createElement('div');
   wrap.className = 'swipe-wrapper';
@@ -2042,14 +2042,24 @@ function makeLine(tx, disableSwipe = false) {
   const [y, mo, da] = tx.opDate.split('-').map(Number);
   const dateObj = new Date(y, mo - 1, da);
   const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const methodLabel = tx.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${tx.method}`;
+  
+  // Melhor indicação visual para operações de cartão
+  let methodLabel = tx.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${tx.method}`;
+  
+  // Para operações de cartão executadas, indica que também vai para a fatura
+  // MAS APENAS quando NÃO estamos dentro da própria fatura
+  if (tx.method !== 'Dinheiro' && !tx.planned && tx.postDate !== tx.opDate && !isInvoiceContext) {
+    const [, pmm, pdd] = tx.postDate.split('-');
+    methodLabel += ` → Fatura ${pdd}/${pmm}`;
+  }
+  
   if (tx.planned) {
     ts.textContent = `${dateStr} - ${methodLabel}`;
   } else if (tx.opDate === todayISO()) {
     const timeStr = new Date(tx.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    ts.textContent = timeStr;
+    ts.textContent = `${timeStr} - ${methodLabel}`;
   } else {
-    ts.textContent = dateStr;
+    ts.textContent = `${dateStr} - ${methodLabel}`;
   }
   d.appendChild(ts);
 
@@ -2910,8 +2920,9 @@ function renderAccordion() {
       note = `<small class="note">Restante - R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>`;
     }
 
+    // Usa hífen simples para coincidir com a expectativa do usuário: "Fatura - Nome do Cartão"
     invSum.innerHTML = `
-      <span class="invoice-label">Fatura – ${cardName}</span>
+      <span class="invoice-label">Fatura - ${cardName}</span>
       <span class="invoice-total"><span class="amount${struck ? ' struck' : ''}">${formattedTotal}</span>${note}</span>
     `;
     return invSum;
@@ -2993,7 +3004,8 @@ function renderAccordion() {
         // planejada → aparece no dia lançado (opDate)
         list.push(t);
       } else {
-        // executada → NÃO aparece no dia; vai só para a fatura (postDate)
+        // executada → aparece no dia do lançamento E também na fatura (dupla visibilidade)
+        list.push(t);
       }
     } else {
       // DINHEIRO → aparece sempre no opDate (planejada ou executada)
@@ -3022,7 +3034,14 @@ function renderAccordion() {
             recurrence: ''
           });
         } else {
-          // executada → NÃO aparece no dia; vai só para a fatura no postDate
+          // executada → aparece no dia do lançamento E também na fatura (dupla visibilidade)
+          list.push({
+            ...master,
+            opDate: iso,
+            postDate: pd,
+            planned: false,
+            recurrence: ''
+          });
         }
       } else {
       // DINHEIRO recorrente → sempre aparece no opDate (planejada/executada)
@@ -3267,11 +3286,39 @@ const dayTotal = cashImpact + cardImpact;
           return (a.ts || '').localeCompare(b.ts || '');
         });
 
-      // === INVOICE UI (vencendo hoje) ===
-      // Remove restos de render anteriores
-      if (!hydrating) { (dDet.querySelectorAll && dDet.querySelectorAll('details.invoice').forEach(n => n.remove())); }
+  // === INVOICE UI (vencendo hoje) ===
+  // Sempre remover restos anteriores (mesmo em hydrating) para evitar duplicação
+  // Limpeza mais robusta das faturas antigas
+  try {
+    const existingInvoices = dDet.querySelectorAll('details.invoice');
+    existingInvoices.forEach(n => {
+      if (n && n.parentNode) {
+        n.parentNode.removeChild(n);
+      }
+    });
+  } catch (e) {
+    // Fallback: remove todos os filhos details que tenham classe invoice
+    const children = Array.from(dDet.children || []);
+    children.forEach(child => {
+      if (child.tagName === 'DETAILS' && child.classList && child.classList.contains('invoice')) {
+        try { child.remove(); } catch (ex) {}
+      }
+    });
+  }
 
-      if (!hydrating) Object.keys(invoicesByCard).forEach(cardName => {
+  // Renderiza sempre (também em hydrating) para garantir que o header apareça já no primeiro paint
+  // Track de faturas já criadas para este dia para evitar duplicação
+  const createdInvoicesForDay = new Set();
+  
+  Object.keys(invoicesByCard).forEach(cardName => {
+        // Verifica se já foi criada uma fatura para este cartão neste dia
+        const invoiceKey = `${cardName}_${iso}`;
+        if (createdInvoicesForDay.has(invoiceKey)) {
+          console.warn(`⚠️ Tentativa de criar fatura duplicada para ${cardName} em ${iso} - ignorando`);
+          return; // pula esta iteração
+        }
+        createdInvoicesForDay.add(invoiceKey);
+        
         const det = document.createElement('details');
         det.className = 'invoice swipe-wrapper';
         det.dataset.pd = iso; // YYYY-MM-DD (vencimento)
@@ -3281,6 +3328,11 @@ const dayTotal = cashImpact + cardImpact;
         // Cabeçalho padrão da fatura
         const invHeader = createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0, iso);
         det.appendChild(invHeader);
+        
+        // Log de debug para monitorar criação de faturas
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`📋 Fatura criada: ${cardName} em ${iso} com ${invoicesByCard[cardName].length} transações`);
+        }
 
         // Ações do swipe como irmã de <details>, para não serem ocultadas quando colapsado
         const headerActions = document.createElement('div');
@@ -3323,7 +3375,7 @@ const dayTotal = cashImpact + cardImpact;
         // Itens da fatura (apenas visual; o saldo usa somente o total)
         invoicesByCard[cardName]
           .filter(t => !t.planned)
-          .forEach(t => det.appendChild(makeLine(t)));
+          .forEach(t => det.appendChild(makeLine(t, false, true)));
         dDet.appendChild(det);
       });
       if (plannedOps.length) {
@@ -3347,26 +3399,26 @@ const dayTotal = cashImpact + cardImpact;
       }
 
 
-      // Seção de executados em dinheiro (apenas se houver)
-      const cashExec = dayTx.filter(t => t.method.toLowerCase() === 'dinheiro' && !t.planned);
-      if (cashExec.length) {
-        const executedCash = document.createElement('div');
-        executedCash.className = 'executed-cash';
+      // Seção de executados (dinheiro E cartão)
+      const allExec = dayTx.filter(t => !t.planned);
+      if (allExec.length) {
+        const executedSection = document.createElement('div');
+        executedSection.className = 'executed-cash';
         const execHeader = document.createElement('div');
         execHeader.className = 'executed-header';
         execHeader.textContent = 'Executados:';
-        executedCash.appendChild(execHeader);
+        executedSection.appendChild(execHeader);
         const execList = document.createElement('ul');
         execList.className = 'executed-list';
 
-        cashExec.forEach(t => {
+        allExec.forEach(t => {
           const li = document.createElement('li');
           li.appendChild(makeLine(t));
           execList.appendChild(li);
         });
 
-        executedCash.appendChild(execList);
-        dDet.appendChild(executedCash);
+        executedSection.appendChild(execList);
+        dDet.appendChild(executedSection);
       }
 
   // Avoid re-appending existing day nodes during hydration (prevents reordering/reflow)
