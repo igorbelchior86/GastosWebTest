@@ -104,6 +104,15 @@ html[data-theme="light"] #backdrop-base {
   background-color: var(--bg-main) !important;
 }
 
+/* Light theme: reduce bottom padding so no visible gap remains */
+html[data-theme="light"] .wrapper {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
+}
+/* Align sticky divider position with the reduced padding in light theme */
+html[data-theme="light"] hr.divider {
+  bottom: calc(56px + env(safe-area-inset-bottom));
+}
+
 html[data-theme="light"] .card,
 html[data-theme="light"] .month-divider,
 html[data-theme="light"] .month-meta {
@@ -381,6 +390,24 @@ html[data-theme="light"] .planned-list li .op-line{
 html[data-theme="light"] #accordion .plan-check{ border-color: var(--txt-muted) !important; }
 html[data-theme="light"] #accordion .plan-check:checked{ background: var(--blue) !important; border-color: var(--blue) !important; }
 
+/* Planned values inside accordion: match executed colors on light theme */
+html[data-theme="light"] .planned-list .op-right .value {
+  color: #111;                     /* default/fallback text color */
+  background: none !important;     /* disable gradient text */
+  -webkit-text-fill-color: initial !important;
+  font-weight: 700;                /* match Executados in light */
+}
+html[data-theme="light"] .planned-list .op-right .value.negative {
+  color: #dc2626 !important;       /* red-600, match Executados */
+  background: transparent !important;
+  -webkit-text-fill-color: initial !important;
+}
+html[data-theme="light"] .planned-list .op-right .value.positive {
+  color: #16a34a !important;       /* same green used in Executados */
+  background: transparent !important;
+  -webkit-text-fill-color: initial !important;
+}
+
 /* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
 /* Planned modal layout (grid without DOM changes)
    Row 1: [Descrição] .......... [Valor]
@@ -426,7 +453,8 @@ html[data-theme="light"] #accordion .plan-check:checked{ background: var(--blue)
   grid-row: 1;
   justify-self: end;
   text-align: right;
-  font-weight: 600;
+  font-weight: 600;   /* match Executados default */
+  font-size: 10pt;    /* match Executados */
 }
 /* Any other child inside .op-right (e.g., "Cartão Amex") becomes the method line under the description */
 #plannedModal .planned-list > li .op-right > :not(.value) {
@@ -1412,6 +1440,12 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   gap:8px;
   flex:1 1 auto;
   min-width:0;
+  font-weight:500;   /* match Executados */
+  font-size:12pt;    /* match Executados */
+}
+.planned-list .op-right .value{
+  font-weight:600;  /* match Executados default */
+  font-size:10pt;   /* match Executados */
 }
 .planned-list .op-left .icon-repeat{
   margin-left:4px;      /* tighter gap from checkbox */
@@ -2383,6 +2417,47 @@ html[data-theme="light"] #cardModal .card-value{ color:#111; }
 html[data-theme="light"] #cardModal .card-content b{ color:#111; }
 
 /* ===================== LIGHT THEME — PLANNED MODAL ===================== */
+/* ===================== LIGHT THEME — CONFIRM MOVE MODAL ===================== */
+html[data-theme="light"] #confirmMoveModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #confirmMoveModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #confirmMoveModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #confirmMoveModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #confirmMoveModal .modal-drag{ background:#cfcfcf; }
+/* Ensure body text inside confirm modal is dark on light glass */
+html[data-theme="light"] #confirmMoveModal #confirmMoveText{ color:#111 !important; text-shadow:none; }
+
+/* ===================== LIGHT THEME — DELETE RECURRENCE MODAL ===================== */
+html[data-theme="light"] #deleteRecurrenceModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #deleteRecurrenceModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #deleteRecurrenceModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #deleteRecurrenceModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #deleteRecurrenceModal .modal-drag{ background:#cfcfcf; }
+
+/* ===================== LIGHT THEME — EDIT RECURRENCE MODAL ===================== */
+html[data-theme="light"] #editRecurrenceModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #editRecurrenceModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #editRecurrenceModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #editRecurrenceModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #editRecurrenceModal .modal-drag{ background:#cfcfcf; }
+
 /* Panel */
 html[data-theme="light"] #plannedModal .bottom-modal-box{
   background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
@@ -2425,7 +2500,7 @@ html[data-theme="light"] #plannedModal .planned-list .op-left input.plan-check:c
 }
 
 /* Values: flat colors (override gradient text) */
-html[data-theme="light"] #plannedModal .planned-list .op-right .value{ color:#111; background:none; -webkit-text-fill-color: initial; }
+html[data-theme="light"] #plannedModal .planned-list .op-right .value{ color:#111; background:none; -webkit-text-fill-color: initial; font-weight:700; }
 html[data-theme="light"] #plannedModal .planned-list .op-right .value.negative{
   background:none !important; -webkit-text-fill-color: initial !important; color:#dc2626 !important;
 }

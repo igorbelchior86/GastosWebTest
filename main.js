@@ -2649,6 +2649,10 @@ deleteSingleBtn.onclick = () => {
   if (master) {
     master.exceptions = master.exceptions || [];
     if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
+    // Remove any materialized child occurrence for this exact date
+    // This covers cases where the occurrence was previously edited/created
+    // as a standalone item (with parentId) and would otherwise remain visible.
+    transactions = transactions.filter(x => !(x.parentId === master.id && x.opDate === iso));
     showToast('Ocorrência excluída!', 'success');
   } else {
     // fallback: not a recurrence → hard delete
