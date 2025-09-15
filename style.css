@@ -1374,6 +1374,11 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   min-width:0;
 }
 .executed-cash .timestamp{margin:0;font-weight:400;font-size:8pt;color:#bbbbbb;align-self:flex-start;}
+/* Place timestamp under description for Planned list */
+.planned-cash .timestamp{ margin:0; font-weight:400; font-size:8pt; color: var(--timestamp); }
+/* Layout for description + recurrence icon on one row */
+.op-left .left-text{ display:flex; flex-direction:column; min-width:0; }
+.op-left .left-title{ display:flex; align-items:center; gap:6px; min-width:0; }
 .executed-cash .op-right{
   display:flex;
   align-items:center;
@@ -1385,7 +1390,7 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
 
 /* Checkbox (planejados) */
 #plannedModal .planned-cash input[type="checkbox"], #plannedModal .planned-cash .plan-check{
-  width:24px;height:24px;border:2px solid var(--txt-muted);border-radius:50%;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;position:relative;
+  width:24px;height:24px;border:2px solid var(--txt-muted);border-radius:6px;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;position:relative;
 }
 #plannedModal .planned-cash input[type="checkbox"]:checked, #plannedModal .planned-cash .plan-check:checked{background-color:var(--blue);border-color:var(--blue);} 
 
@@ -1395,7 +1400,7 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   width: 24px;
   height: 24px;
   border: 2px solid var(--txt-muted);
-  border-radius: 50%;
+  border-radius: 6px;
   background: transparent;
   appearance: none;
   -webkit-appearance: none;
@@ -1420,7 +1425,7 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   width: 24px;
   height: 24px;
   border: 2px solid var(--txt-muted);
-  border-radius: 50%;
+  border-radius: 6px;
   background: transparent;
   -webkit-appearance: none;
           appearance: none;
@@ -1654,16 +1659,17 @@ details.invoice[open] > summary::after{
 
 /* --- ALIGNMENTS INSIDE CARD INVOICE OPERATIONS ---------------------------------- */
 /* Garantir: descrição à esquerda, valor numérico à direita, timestamp abaixo da descrição */
+.invoice .executed-list { list-style: none; padding: 0; margin: 8px 0 0 0; }
+.invoice .executed-list li { list-style: none; padding: 0; margin: 0; }
 .invoice .executed-list li .op-line{
   display: flex;
   flex-direction: column;
-  justify-content: center;  /* center vertically like Planned/Executed */
   gap: 2px;
-  height: 64px;
-  padding: 0 12px;
-  background: var(--card-bg);
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  height: auto;
+  padding: 8px 0;              /* mais respiro entre itens */
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   color: #fff;
   box-sizing: border-box;
 }
@@ -1696,9 +1702,25 @@ details.invoice[open] > summary::after{
   font-weight: 400;
   font-size: 8pt;
   color: var(--timestamp);
-  margin: 0 0 0 0;
+  margin: 0;
   display: block;
 }
+
+/* Group date heading inside invoice */
+.invoice .invoice-group-date{
+  margin: 10px 0 4px 0;
+  font-weight: 700;
+  font-size: .95rem;
+  color: var(--txt-main);
+}
+.invoice .invoice-divider{ height:1px; background: rgba(255,255,255,.12); margin: 6px 0 10px 0; }
+.invoice .invoice-divider.thin{ opacity:.9; }
+.invoice .invoice-divider.bold{ height:2px; opacity:.9; }
+
+/* Light theme adjustments for new flat invoice list */
+html[data-theme="light"] .invoice .executed-list li .op-line{ color: #111; }
+html[data-theme="light"] .invoice .invoice-divider{ background: var(--divider) !important; opacity: 1; }
+html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 
 /* Ensure the swipe wrapper fills the entire card width so the value can reach the right edge */
 .invoice .executed-list li .swipe-wrapper {
@@ -2431,6 +2453,20 @@ html[data-theme="light"] #confirmMoveModal .modal-close-btn:hover{ opacity:1; }
 html[data-theme="light"] #confirmMoveModal .modal-drag{ background:#cfcfcf; }
 /* Ensure body text inside confirm modal is dark on light glass */
 html[data-theme="light"] #confirmMoveModal #confirmMoveText{ color:#111 !important; text-shadow:none; }
+
+/* ===================== LIGHT THEME — CONFIRM LOGOUT MODAL ===================== */
+html[data-theme="light"] #confirmLogoutModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #confirmLogoutModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #confirmLogoutModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #confirmLogoutModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #confirmLogoutModal .modal-drag{ background:#cfcfcf; }
+html[data-theme="light"] #confirmLogoutModal #confirmLogoutText{ color:#111 !important; text-shadow:none; }
 
 /* ===================== LIGHT THEME — DELETE RECURRENCE MODAL ===================== */
 html[data-theme="light"] #deleteRecurrenceModal .bottom-modal-box{

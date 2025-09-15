@@ -26,9 +26,36 @@ function ensureOverlay() {
   const btn = el.querySelector('#googleBtn');
   if (btn) btn.addEventListener('click', async () => {
     btn.disabled = true;
-    try { await window.Auth?.signInWithGoogle(); }
+    
+    // iOS PWA specific handling
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
+    
+    if (isIOS && standalone) {
+      console.log('iOS PWA: Starting Google sign-in...');
+      btn.innerHTML = `
+        <span class="g-badge" aria-hidden>⟳</span>
+        <span>Autenticando...</span>
+      `;
+    }
+    
+    try { 
+      await window.Auth?.signInWithGoogle(); 
+      
+      // For iOS PWA, button will be re-enabled by auth state change
+      if (!(isIOS && standalone)) {
+        btn.disabled = false;
+      }
+    }
     catch (e) {
       btn.disabled = false;
+      btn.innerHTML = `
+        <span class="g-badge" aria-hidden>G</span>
+        <span>Continuar com Google</span>
+      `;
+      console.error('Login error:', e);
+      
       // Show inline error
       const msg = (e && e.code) ? e.code.replace('auth/','Auth: ') : 'Falha no login';
       showError(el, msg);
@@ -41,6 +68,7 @@ function show() {
   const el = ensureOverlay();
   el.classList.remove('hidden');
   requestAnimationFrame(() => el.classList.add('visible'));
+  console.log('LoginView: Login shown');
 }
 
 function hide() {
@@ -48,13 +76,34 @@ function hide() {
   if (!el) return;
   el.classList.remove('visible');
   setTimeout(() => el.classList.add('hidden'), 180);
+  console.log('LoginView: Login hidden');
 }
 
 // React to auth state
 function hookAuth() {
   const update = (user) => {
-    if (!user || user.isAnonymous) show(); else hide();
+    console.log('LoginView: Auth state update -', user ? user.email : 'signed out');
+    
+    if (!user || user.isAnonymous) {
+      show();
+      // Hide main app when no user
+      hideMainApp();
+    } else {
+      // User authenticated - reset button state and show main app
+      const btn = document.querySelector('#googleBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <span class="g-badge" aria-hidden>G</span>
+          <span>Continuar com Google</span>
+        `;
+      }
+      hide();
+      // Show main app after successful auth
+      showMainApp();
+    }
   };
+  
   if (window.Auth && typeof window.Auth.onReady === 'function') {
     window.Auth.onReady(update);
     update(window.Auth.currentUser);
@@ -69,6 +118,35 @@ function hookAuth() {
     };
     document.addEventListener('auth:init', onInit);
   }
+}
+
+// App visibility management
+function hideMainApp() {
+  const wrapper = document.querySelector('.wrapper');
+  const header = document.querySelector('header');
+  const floatingPill = document.querySelector('.floating-pill');
+  const floatingAddButton = document.querySelector('.floating-add-button');
+  
+  if (wrapper) wrapper.style.display = 'none';
+  if (header) header.style.display = 'none';
+  if (floatingPill) floatingPill.style.display = 'none';
+  if (floatingAddButton) floatingAddButton.style.display = 'none';
+  
+  console.log('LoginView: Main app hidden');
+}
+
+function showMainApp() {
+  const wrapper = document.querySelector('.wrapper');
+  const header = document.querySelector('header');
+  const floatingPill = document.querySelector('.floating-pill');
+  const floatingAddButton = document.querySelector('.floating-add-button');
+  
+  if (wrapper) wrapper.style.display = '';
+  if (header) header.style.display = '';
+  if (floatingPill) floatingPill.style.display = '';
+  if (floatingAddButton) floatingAddButton.style.display = '';
+  
+  console.log('LoginView: Main app shown');
 }
 
 // Offline hint: disable button when navigator.offLine
@@ -86,11 +164,35 @@ function hookOnline() {
 }
 
 // Public API
-window.LoginView = { show, hide };
+window.LoginView = { show, hide, showMainApp, hideMainApp };
 
-// Boot
+// Boot - Hide main app by default and show login
+hideMainApp(); // Hide app immediately on load
 hookAuth();
 hookOnline();
+
+// iOS PWA specific: Additional auth state check after page load
+const ua = navigator.userAgent.toLowerCase();
+const isIOS = /iphone|ipad|ipod/.test(ua);
+const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
+
+if (isIOS && standalone) {
+  console.log('LoginView: iOS PWA detected, setting up enhanced auth monitoring');
+  
+  // Listen for auth errors specifically
+  document.addEventListener('auth:error', (e) => {
+    console.error('LoginView: Auth error received:', e.detail);
+    const btn = document.querySelector('#googleBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `
+        <span class="g-badge" aria-hidden>G</span>
+        <span>Continuar com Google</span>
+      `;
+    }
+    show();
+  });
+}
 
 // Error helper
 function showError(root, text){

@@ -24,6 +24,12 @@ const confirmMoveYes   = document.getElementById('confirmMoveYes');
 const confirmMoveNo    = document.getElementById('confirmMoveNo');
 const closeConfirmMove = document.getElementById('closeConfirmMove');
 const confirmMoveText  = document.getElementById('confirmMoveText');
+// Modal Confirmar sair da conta - refs
+const confirmLogoutModal = document.getElementById('confirmLogoutModal');
+const confirmLogoutYes   = document.getElementById('confirmLogoutYes');
+const confirmLogoutNo    = document.getElementById('confirmLogoutNo');
+const closeConfirmLogout = document.getElementById('closeConfirmLogout');
+const confirmLogoutText  = document.getElementById('confirmLogoutText');
 // Settings modal – refs
 const settingsModalEl = document.getElementById('settingsModal');
 const toggleThemeBtn = document.getElementById('toggleThemeBtn');
@@ -59,6 +65,26 @@ function askMoveToToday() {
     if (closeConfirmMove) closeConfirmMove.onclick = () => { cleanup(); resolve(false); };
     confirmMoveModal.onclick = (e) => { if (e.target === confirmMoveModal) { cleanup(); resolve(false); } };
     confirmMoveModal.classList.remove('hidden');
+  });
+}
+
+function askConfirmLogout() {
+  if (!confirmLogoutModal || !confirmLogoutYes || !confirmLogoutNo) {
+    return Promise.resolve(window.confirm('Deseja mesmo desconectar?'));
+  }
+  return new Promise(resolve => {
+    const cleanup = () => {
+      confirmLogoutModal.classList.add('hidden');
+      confirmLogoutYes.onclick = null;
+      confirmLogoutNo.onclick = null;
+      if (closeConfirmLogout) closeConfirmLogout.onclick = null;
+      confirmLogoutModal.onclick = null;
+    };
+    confirmLogoutYes.onclick = () => { cleanup(); resolve(true); };
+    confirmLogoutNo.onclick  = () => { cleanup(); resolve(false); };
+    if (closeConfirmLogout) closeConfirmLogout.onclick = () => { cleanup(); resolve(false); };
+    confirmLogoutModal.onclick = (e) => { if (e.target === confirmLogoutModal) { cleanup(); resolve(false); } };
+    confirmLogoutModal.classList.remove('hidden');
   });
 }
 // Elements for Planejados modal
@@ -138,7 +164,12 @@ function renderSettingsModal(){
     img.onerror = () => { img.onerror = null; img.src = 'icons/icon-180x180.png'; };
   }
   const outBtn = box.querySelector('#logoutBtn');
-  if (outBtn) outBtn.onclick = async () => { try { await window.Auth?.signOut(); } catch(_) {} closeSettings(); };
+  if (outBtn) outBtn.onclick = async () => {
+    const ok = await askConfirmLogout();
+    if (!ok) return;
+    try { await window.Auth?.signOut(); } catch(_) {}
+    closeSettings();
+  };
   // Theme buttons wiring
   const themeButtons = box.querySelectorAll('.theme-btn');
   if (themeButtons && themeButtons.length) {
@@ -325,9 +356,9 @@ initThemeFromStorage();
 
 
 import { openDB } from 'https://unpkg.com/idb?module';
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
 
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.3.1/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
 // Configuração do Firebase de TESTE (arquivo separado)
 import { firebaseConfig } from './firebase.test.config.js';
@@ -434,6 +465,38 @@ document.addEventListener('click', (e) => {
   }
 }, true);
 
+// Debug info for iOS PWA troubleshooting
+const ua = navigator.userAgent.toLowerCase();
+const isIOSDebug = /iphone|ipad|ipod/.test(ua);
+const standaloneDebug = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
+
+if (isIOSDebug && standaloneDebug) {
+  console.log('🔧 iOS PWA Debug Info:');
+  console.log('- User Agent:', navigator.userAgent);
+  console.log('- Display Mode:', window.matchMedia ? window.matchMedia('(display-mode: standalone)').matches : 'unknown');
+  console.log('- Navigator Standalone:', navigator.standalone);
+  console.log('- Firebase Config:', firebaseConfig ? 'loaded' : 'missing');
+  console.log('- Auth State:', window.Auth ? 'initialized' : 'pending');
+  
+  // Monitor auth state changes
+  document.addEventListener('auth:state', (e) => {
+    const user = e.detail && e.detail.user;
+    console.log('🔧 iOS PWA Auth State:', user ? {
+      email: user.email,
+      uid: user.uid,
+      emailVerified: user.emailVerified
+    } : 'signed out');
+  });
+  
+  // Monitor network status
+  const logNetworkStatus = () => {
+    console.log('🔧 iOS PWA Network:', navigator.onLine ? 'online' : 'offline');
+  };
+  logNetworkStatus();
+  window.addEventListener('online', logNetworkStatus);
+  window.addEventListener('offline', logNetworkStatus);
+}
+
 let PATH;
 // Casa compartilhada (PROD atual) e e‑mails que devem enxergar esta Casa
 const WID_CASA = 'orcamento365_9b8e04c5';
@@ -441,14 +504,20 @@ const CASA_EMAILS = ['icmbelchior@gmail.com','sarargjesus@gmail.com'];
 function resolvePathForUser(user){
   if (!user) return null;
   const email = (user.email || '').toLowerCase();
-  if (CASA_EMAILS.includes(email)) return WID_CASA;
-  return `users/${user.uid}`;
+  console.log('Resolving path for user:', email);
+  if (CASA_EMAILS.includes(email)) {
+    console.log('User mapped to shared workspace:', WID_CASA);
+    return WID_CASA;
+  }
+  const personalPath = `users/${user.uid}`;
+  console.log('User mapped to personal workspace:', personalPath);
+  return personalPath;
 }
 
 // Flag for mocking data while working on UI.  
 // Switch to `false` to reconnect to production Firebase.
-const USE_MOCK = false;              // conectar ao Firebase PROD
-const APP_VERSION = '1.4.8(a20)';
+const USE_MOCK = false;              // conectar ao Firebase (TESTE via config import)
+const APP_VERSION = '1.4.9(a19)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
@@ -681,6 +750,45 @@ function sanitizeTransactions(list) {
   return { list: out, changed };
 }
 
+// Revalida postDate e normaliza método de cartão para dados legados
+function recomputePostDates() {
+  if (!Array.isArray(cards) || !cards.length) return false;
+  let changed = false;
+  const norm = (s) => (s==null?'' : String(s)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  const nonCash = cards.filter(c => c && c.name !== 'Dinheiro');
+  const singleCardName = nonCash.length === 1 ? nonCash[0].name : null;
+
+  const inferCardForTx = (tx) => {
+    const m = tx.method || '';
+    const mNorm = norm(m);
+    if (mNorm === 'dinheiro') return null; // dinheiro não precisa mapear
+    // se já corresponde a um cartão existente, retorna o nome canônico
+    const found = cards.find(c => c && norm(c.name) === mNorm);
+    if (found) return found.name;
+    // tenta inferir pelo postDate esperado: qual cartão gera esse postDate a partir do opDate?
+    if (tx.opDate && tx.postDate) {
+      const candidates = nonCash.filter(c => post(tx.opDate, c.name) === tx.postDate);
+      if (candidates.length === 1) return candidates[0].name;
+    }
+    // fallback seguro: se usuário só tem um cartão, assume-o apenas se método vier vazio/genérico
+    if (singleCardName && (!m || mNorm === 'cartao' || mNorm === 'cartão')) return singleCardName;
+    return null; // ambíguo: não altera
+  };
+
+  transactions = (transactions || []).map(t => {
+    if (!t) return t;
+    const nt = { ...t };
+    const inferred = inferCardForTx(nt);
+    if (inferred && nt.method !== inferred) { nt.method = inferred; changed = true; }
+    const isCash = norm(nt.method) === 'dinheiro';
+    const isKnownCard = !isCash && cards.some(c => c && c.name === nt.method);
+    const desired = isCash ? nt.opDate : (isKnownCard ? post(nt.opDate, nt.method) : nt.postDate);
+    if (desired && nt.postDate !== desired) { nt.postDate = desired; changed = true; }
+    return nt;
+  });
+  return changed;
+}
+
 // --- Toast helper ---
 const showToast = (msg, type = 'error', duration = 3000) => {
   const t = document.getElementById('toast');
@@ -726,7 +834,48 @@ function buildSaveToast(tx) {
 
 if (!USE_MOCK) {
   // Start realtime listeners only after user is authenticated
-  const startRealtime = () => {
+  const startRealtime = async () => {
+    console.log('Starting realtime listeners for PATH:', PATH);
+    
+    // Enhanced iOS PWA: Wait for redirect completion if needed
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
+    
+    if (isIOS && standalone && window.Auth && window.Auth.waitForRedirect) {
+      console.log('iOS PWA: Waiting for redirect completion before starting listeners');
+      await window.Auth.waitForRedirect();
+    }
+    
+    // Enhanced permission check with better fallback for iOS PWA
+    try {
+      const u = window.Auth && window.Auth.currentUser;
+      if (u && PATH) {
+        console.log('Testing access to PATH:', PATH, 'for user:', u.email);
+        const testRef = ref(firebaseDb, `${PATH}/startBal`);
+        try {
+          await get(testRef);
+          console.log('Access confirmed to PATH:', PATH);
+        } catch (err) {
+          console.error('Access denied to PATH:', PATH, 'Error:', err);
+          if (err && (err.code === 'PERMISSION_DENIED' || err.code === 'permission-denied')) {
+            const fallback = `users/${u.uid}`;
+            console.log('Falling back to personal workspace:', fallback);
+            if (PATH !== fallback) {
+              PATH = fallback;
+              console.log('PATH updated to fallback:', PATH);
+              // For iOS PWA, add small delay to ensure auth state is stable
+              if (isIOS && standalone) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error during PATH verification:', err);
+    }
+
     // Live listeners (Realtime DB)
     const txRef    = ref(firebaseDb, `${PATH}/tx`);
     const cardsRef = ref(firebaseDb, `${PATH}/cards`);
@@ -790,9 +939,11 @@ if (!USE_MOCK) {
     // Sanitize legacy/malformed items
     const s = sanitizeTransactions(transactions);
     transactions = s.list;
+    // Revalida postDate/método se cartões já conhecidos
+    const fixed = recomputePostDates();
     cacheSet('tx', transactions);
-    if (s.changed) {
-      // Persist sanitized data back to server (best-effort)
+    if (s.changed || fixed) {
+      // Persist best-effort somente quando algo mudou localmente
       try { save('tx', transactions); } catch (_) {}
     }
     sortTransactions();
@@ -816,6 +967,9 @@ if (!USE_MOCK) {
       cards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
     }
     cacheSet('cards', cards);
+    // Revalida transações à luz do cadastro de cartões atual
+    const fixed = recomputePostDates();
+    if (fixed) { try { save('tx', transactions); } catch (_) {} cacheSet('tx', transactions); }
     refreshMethods();
     renderCardList();
     renderTable();
@@ -833,11 +987,29 @@ if (!USE_MOCK) {
   };
 
   const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
-  if (readyUser) { PATH = resolvePathForUser(readyUser); startRealtime(); }
-  else {
+  if (readyUser) { 
+    console.log('User already ready:', readyUser.email);
+    PATH = resolvePathForUser(readyUser); 
+    startRealtime(); 
+    // Recalcula a altura do header para usuário já logado
+    setTimeout(() => recalculateHeaderOffset(), 100);
+  } else {
+    console.log('Waiting for auth state...');
+    
     const h = (e) => {
       const u = e.detail && e.detail.user;
-      if (u) { document.removeEventListener('auth:state', h); PATH = resolvePathForUser(u); startRealtime(); }
+      console.log('Auth state event received:', u ? u.email : 'signed out');
+      if (u) { 
+        document.removeEventListener('auth:state', h); 
+        PATH = resolvePathForUser(u); 
+        console.log('Starting realtime with PATH:', PATH);
+        startRealtime(); 
+        // Recalcula a altura do header agora que o usuário está logado e o header está visível
+        setTimeout(() => recalculateHeaderOffset(), 100);
+      } else {
+        console.log('User signed out, clearing PATH');
+        PATH = null;
+      }
     };
     document.addEventListener('auth:state', h);
   }
@@ -1228,20 +1400,50 @@ const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit
 // Sticky month header  (Safari/iOS não suporta <summary> sticky)
 // ---------------------------------------------------------------------------
 const headerEl      = document.querySelector('.app-header');
-const HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
+let HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
 const STICKY_VISIBLE = 18;
-const stickyMonth     = document.createElement('div');
-stickyMonth.className = 'sticky-month';
-stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
-document.body.appendChild(stickyMonth);
+let stickyMonth = null; // Não cria imediatamente
+
+// Função para criar o sticky header somente quando necessário
+function createStickyMonth() {
+  if (stickyMonth) return; // Já foi criado
+  
+  stickyMonth = document.createElement('div');
+  stickyMonth.className = 'sticky-month';
+  stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
+  document.body.appendChild(stickyMonth);
+}
+
+// Função para recalcular e atualizar a altura do header
+function recalculateHeaderOffset() {
+  if (!headerEl) return;
+  const h = headerEl.getBoundingClientRect().height;
+  
+  // Só cria e posiciona o sticky quando o header tiver altura real (> 30px)
+  if (h > 30) {
+    HEADER_OFFSET = h;
+    
+    // Cria o sticky se ainda não existir
+    if (!stickyMonth) {
+      createStickyMonth();
+    }
+    
+    // Atualiza a posição
+    if (stickyMonth) {
+      stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
+      // Atualiza o sticky imediatamente após recalcular
+      updateStickyMonth();
+    }
+  }
+}
 
 // Recalcula altura do header em rotação / resize
-window.addEventListener('resize', () => {
-  const h = headerEl.getBoundingClientRect().height;
-  stickyMonth.style.top = (h - STICKY_VISIBLE) + 'px';
-});
+window.addEventListener('resize', recalculateHeaderOffset);
 
 function updateStickyMonth() {
+  // Não faz nada se o sticky header ainda não foi criado
+  if (!stickyMonth) return;
+  
   let label = '';
   const divs = document.querySelectorAll('summary.month-divider');
   divs.forEach(div => {
@@ -1264,6 +1466,23 @@ function updateStickyMonth() {
 // Atualiza stickyMonth ao rolar o container principal
 if (wrapperEl) wrapperEl.addEventListener('scroll', updateStickyMonth);
 else window.addEventListener('scroll', updateStickyMonth);
+
+// Observer para detectar quando os elementos month-divider são adicionados ao DOM
+// e recalcular o header offset se necessário
+const observer = new MutationObserver(() => {
+  // Quando novos elementos são adicionados, o header pode ter mudado de tamanho
+  const hasMonthDividers = document.querySelectorAll('summary.month-divider').length > 0;
+  if (hasMonthDividers) {
+    setTimeout(() => recalculateHeaderOffset(), 50);
+  }
+});
+
+// Observa mudanças no container principal onde os meses são renderizados
+if (wrapperEl) {
+  observer.observe(wrapperEl, { childList: true, subtree: true });
+} else if (tbody) {
+  observer.observe(tbody.parentElement || document.body, { childList: true, subtree: true });
+}
 
 // --- Date helpers ---
 /**
@@ -1913,6 +2132,28 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const left = document.createElement('div');
   left.className = 'op-left';
 
+  // Build timestamp text so we can place it under the description
+  const ts = document.createElement('div');
+  ts.className = 'timestamp';
+  (function buildTimestamp(){
+    const [y, mo, da] = (tx.opDate || '').split('-').map(Number);
+    const dateObj = (isFinite(y) && isFinite(mo) && isFinite(da)) ? new Date(y, mo - 1, da) : new Date();
+    const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    let methodLabel = tx.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${tx.method}`;
+    if (tx.method !== 'Dinheiro' && !tx.planned && tx.postDate !== tx.opDate && !isInvoiceContext) {
+      const [, pmm, pdd] = (tx.postDate || '').split('-');
+      if (pdd && pmm) methodLabel += ` → Fatura ${pdd}/${pmm}`;
+    }
+    if (tx.planned) {
+      ts.textContent = `${dateStr} - ${methodLabel}`;
+    } else if (tx.opDate === todayISO() && tx.ts) {
+      const timeStr = new Date(tx.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      ts.textContent = `${timeStr} - ${methodLabel}`;
+    } else {
+      ts.textContent = `${dateStr} - ${methodLabel}`;
+    }
+  })();
+
   // --- Planned modal disables swipe, needs different structure ---
   if (disableSwipe === true) {
     // If planned, build checkbox and label
@@ -1924,13 +2165,26 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       checkbox.onchange = () => togglePlanned(tx.id, tx.opDate);
       const labelWrapper = document.createElement('span');
       labelWrapper.textContent = tx.desc;
-      // Patch: append checkbox then labelWrapper directly (no span wrapper)
+      const leftText = document.createElement('div');
+      leftText.className = 'left-text';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'left-title';
+      titleRow.appendChild(labelWrapper);
+      leftText.appendChild(titleRow);
+      leftText.appendChild(ts);
       left.appendChild(checkbox);
-      left.appendChild(labelWrapper);
+      left.appendChild(leftText);
     } else {
       const descNode = document.createElement('span');
       descNode.textContent = tx.desc;
-      left.appendChild(descNode);
+      const leftText = document.createElement('div');
+      leftText.className = 'left-text';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'left-title';
+      titleRow.appendChild(descNode);
+      leftText.appendChild(titleRow);
+      leftText.appendChild(ts);
+      left.appendChild(leftText);
     }
     // Recurrence icon
     const t = tx;
@@ -1953,7 +2207,8 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const recIcon = document.createElement('span');
       recIcon.className = 'icon-repeat';
       recIcon.title = 'Recorrência';
-      left.appendChild(recIcon);
+      const tgt = left.querySelector('.left-title') || left;
+      tgt.appendChild(recIcon);
     }
     if (!left.querySelector('.icon-repeat')) {
       const t = tx;
@@ -1967,7 +2222,8 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       if (hasRecurrenceFinal) {
         const recIc = document.createElement('span');
         recIc.className = 'icon-repeat';
-        left.insertBefore(recIc, left.firstChild);
+        const tgt = left.querySelector('.left-title') || left;
+        tgt.appendChild(recIc);
       }
     }
   } else {
@@ -1982,7 +2238,14 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     }
     const descNode = document.createElement('span');
     descNode.textContent = tx.desc;
-    left.appendChild(descNode);
+    const leftText = document.createElement('div');
+    leftText.className = 'left-text';
+    const titleRow = document.createElement('div');
+    titleRow.className = 'left-title';
+    titleRow.appendChild(descNode);
+    leftText.appendChild(titleRow);
+    leftText.appendChild(ts);
+    left.appendChild(leftText);
     // Recurrence icon
     const t = tx;
     const hasRecurrence = (() => {
@@ -2004,7 +2267,8 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const recIcon = document.createElement('span');
       recIcon.className = 'icon-repeat';
       recIcon.title = 'Recorrência';
-      left.appendChild(recIcon);
+      const tgt = left.querySelector('.left-title') || left;
+      tgt.appendChild(recIcon);
     }
     if (!left.querySelector('.icon-repeat')) {
       const t = tx;
@@ -2018,7 +2282,8 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       if (hasRecurrenceFinal) {
         const recIc = document.createElement('span');
         recIc.className = 'icon-repeat';
-        left.insertBefore(recIc, left.firstChild);
+        const tgt = left.querySelector('.left-title') || left;
+        tgt.appendChild(recIc);
       }
     }
   }
@@ -2038,32 +2303,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   topRow.appendChild(right);
   d.appendChild(topRow);
 
-  // Timestamp & method
-  const ts = document.createElement('div');
-  ts.className = 'timestamp';
-  const [y, mo, da] = tx.opDate.split('-').map(Number);
-  const dateObj = new Date(y, mo - 1, da);
-  const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  
-  // Melhor indicação visual para operações de cartão
-  let methodLabel = tx.method === 'Dinheiro' ? 'Dinheiro' : `Cartão ${tx.method}`;
-  
-  // Para operações de cartão executadas, indica que também vai para a fatura
-  // MAS APENAS quando NÃO estamos dentro da própria fatura
-  if (tx.method !== 'Dinheiro' && !tx.planned && tx.postDate !== tx.opDate && !isInvoiceContext) {
-    const [, pmm, pdd] = tx.postDate.split('-');
-    methodLabel += ` → Fatura ${pdd}/${pmm}`;
-  }
-  
-  if (tx.planned) {
-    ts.textContent = `${dateStr} - ${methodLabel}`;
-  } else if (tx.opDate === todayISO()) {
-    const timeStr = new Date(tx.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    ts.textContent = `${timeStr} - ${methodLabel}`;
-  } else {
-    ts.textContent = `${dateStr} - ${methodLabel}`;
-  }
-  d.appendChild(ts);
+  // Timestamp now lives under description inside left-text
 
   // Assemble wrapper and return
   wrap.appendChild(actions);
@@ -2821,6 +3061,9 @@ function renderTable() {
   const groups = groupTransactionsByMonth();
   renderTransactionGroups(groups);
   if (acc) delete acc.dataset.state;
+  
+  // Tenta criar o sticky header após renderizar conteúdo
+  setTimeout(() => recalculateHeaderOffset(), 100);
 }
 
 // Defensive render: avoids silent failures leaving the UI empty
@@ -2998,6 +3241,19 @@ function renderAccordion() {
   const today = todayISO();
 
   // ================= NON-RECURRING =================
+  // Helper to map legacy/invalid methods to a valid card name when possible
+  const nrm = s => (s==null?'' : String(s)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  const nonCashCards = (cards || []).filter(c => c && c.name !== 'Dinheiro');
+  const singleCard = nonCashCards.length === 1 ? nonCashCards[0].name : null;
+  const resolveCard = (m) => {
+    const mNorm = nrm(m);
+    if (!m || mNorm === 'dinheiro') return null;
+    const found = (cards || []).find(c => c && nrm(c.name) === mNorm);
+    if (found) return found.name;
+    // If exactly one card exists, use it as a safe fallback
+    if (singleCard) return singleCard;
+    return null;
+  };
   transactions.forEach(t => {
     if (t.recurrence) return;            // só não-recorrentes aqui
     if (t.opDate !== iso) return;        // renderiza sempre no opDate
@@ -3008,10 +3264,14 @@ function renderAccordion() {
       // CARTÃO
       if (t.planned) {
         // planejada → aparece no dia lançado (opDate)
-        list.push(t);
+        const em = resolveCard(t.method) || t.method;
+        const pd = post(t.opDate, em);
+        list.push({ ...t, method: em, postDate: pd });
       } else {
         // executada → aparece no dia do lançamento E também na fatura (dupla visibilidade)
-        list.push(t);
+        const em = resolveCard(t.method) || t.method;
+        const pd = post(t.opDate, em);
+        list.push({ ...t, method: em, postDate: pd });
       }
     } else {
       // DINHEIRO → aparece sempre no opDate (planejada ou executada)
@@ -3025,7 +3285,8 @@ function renderAccordion() {
     .forEach(master => {
       if (!occursOn(master, iso)) return; // materializa somente a ocorrência do dia
 
-      const pd = post(iso, master.method);
+      const em = resolveCard(master.method) || master.method;
+      const pd = post(iso, em);
       const plannedFlag = iso > today;    // futuro → planejada; passado/hoje → executada
 
       if (master.method !== 'Dinheiro') {
@@ -3035,6 +3296,7 @@ function renderAccordion() {
           list.push({
             ...master,
             opDate: iso,
+            method: em,
             postDate: pd,
             planned: true,
             recurrence: ''
@@ -3044,6 +3306,7 @@ function renderAccordion() {
           list.push({
             ...master,
             opDate: iso,
+            method: em,
             postDate: pd,
             planned: false,
             recurrence: ''
@@ -3181,6 +3444,9 @@ const addToGroup = (cardName, tx) => {
 // Não-recorrentes de cartão: vencem hoje
 transactions.forEach(t => {
   if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
+    // Garantir que o método refere-se a um cartão existente (evita fatura fantasma)
+    const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
+    if (!validCard) return;
     addToGroup(t.method, t);
   }
 });
@@ -3189,6 +3455,9 @@ transactions.forEach(t => {
 const _scanStart = new Date(iso);
 _scanStart.setDate(_scanStart.getDate() - 60);
 for (const master of transactions.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+  // Pula séries que apontam para um cartão inexistente
+  const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
+  if (!validCard) continue;
   for (let d2 = new Date(_scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
     const occIso = d2.toISOString().slice(0, 10);
     if (!occursOn(master, occIso)) continue;
@@ -3378,10 +3647,46 @@ const dayTotal = cashImpact + cardImpact;
           openPayInvoiceModal(cardName, dueISO, remaining, Math.abs(total), adjusted);
         });
 
-        // Itens da fatura (apenas visual; o saldo usa somente o total)
-        invoicesByCard[cardName]
+        // Itens da fatura (visual + swipe), agrupados por dia com divisores
+        // Limpa lista anterior, se houver
+        const oldList = det.querySelector('ul.executed-list');
+        if (oldList) { try { oldList.remove(); } catch(_) {} }
+        const execList = document.createElement('ul');
+        execList.className = 'executed-list';
+
+        const items = invoicesByCard[cardName]
           .filter(t => !t.planned)
-          .forEach(t => det.appendChild(makeLine(t, false, true)));
+          .slice()
+          .sort((a,b) => (a.opDate||'').localeCompare(b.opDate||'') || (a.ts||'').localeCompare(b.ts||''));
+
+        // Group by opDate
+        let currentDate = null;
+        const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+        for (let i = 0; i < items.length; i++) {
+          const t = items[i];
+          if (t.opDate !== currentDate) {
+            currentDate = t.opDate;
+            // Header de data
+            const headerLi = document.createElement('li');
+            const dObj = new Date(currentDate + 'T00:00:00');
+            const longLabel = cap(dObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' }));
+            const h = document.createElement('div');
+            h.className = 'invoice-group-date';
+            h.textContent = longLabel;
+            headerLi.appendChild(h);
+            // Hairline sutil logo após o título (mais limpo)
+            const thinDiv = document.createElement('div');
+            thinDiv.className = 'invoice-divider thin';
+            headerLi.appendChild(thinDiv);
+            execList.appendChild(headerLi);
+          }
+          // Linha da operação (mantém swipe)
+          const li = document.createElement('li');
+          li.appendChild(makeLine(t, false, true));
+          execList.appendChild(li);
+          // Sem divisores entre itens (visual minimalista)
+        }
+        det.appendChild(execList);
         dDet.appendChild(det);
       });
       if (plannedOps.length) {
