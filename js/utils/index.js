@@ -1,7 +1,7 @@
 /**
  * Utility modules index
  * Central export point for all utility functions
- * Part of FASE 1 refactoring - extracting utilities from main.js
+ * Part of FASE 3 refactoring - modular utilities from main.js
  */
 
 // Re-export all utilities for easy importing
@@ -10,7 +10,13 @@ export * from './format-utils.js';
 export * from './dom-utils.js';
 export * from './data-utils.js';
 
-// Named exports for specific imports
+// Phase 3 - New modular utilities
+export * from './formatters.js';
+export * from './calculations.js';
+export * from './validators.js';
+export * from './date-helpers.js';
+
+// Named exports for specific imports (legacy compatibility)
 export { 
   formatToISO, 
   todayISO, 
@@ -55,3 +61,36 @@ export {
   filterTransactionsByDateRange, 
   calculateTotal 
 } from './data-utils.js';
+
+// Phase 3 - New utility exports
+export {
+  Formatters,
+  escapeHtml,
+  formatMoney,
+  formatDate
+} from './formatters.js';
+
+export {
+  Calculations,
+  todayISO as todayISONew,
+  post as postNew,
+  formatToISO as formatToISONEw
+} from './calculations.js';
+
+export {
+  Validators,
+  sanitizeTransactions as sanitizeTransactionsNew,
+  isValidTransaction,
+  isValidNumber,
+  isValidISODate
+} from './validators.js';
+
+export {
+  DateHelpers,
+  getCurrentPeriod,
+  formatPeriod,
+  getPreviousPeriod,
+  getNextPeriod,
+  isInPeriod,
+  extractPeriod
+} from './date-helpers.js';
