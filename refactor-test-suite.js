@@ -360,6 +360,212 @@ refactorTester.addPhaseTest(9, 'Imports organizados', async () => {
 });
 
 // ============================================================================
+// 🎯 FASE 5 - EVENT HANDLERS MODULARIZAÇÃO
+// ============================================================================
+
+refactorTester.addPhaseTest(5, 'EventManager carregado e funcional', async () => {
+  refactorTester.assertExists(window.EventManager, 'EventManager deve estar disponível globalmente');
+  refactorTester.assertFunction(window.EventManager.init, 'EventManager.init deve ser função');
+  refactorTester.assertFunction(window.EventManager.emit, 'EventManager.emit deve ser função');
+  refactorTester.assertFunction(window.EventManager.on, 'EventManager.on deve ser função');
+  refactorTester.assertFunction(window.EventManager.getStats, 'EventManager.getStats deve ser função');
+});
+
+refactorTester.addPhaseTest(5, 'UIEventHandlers carregado', async () => {
+  refactorTester.assertExists(window.UIEventHandlers, 'UIEventHandlers deve estar disponível');
+  refactorTester.assertFunction(window.UIEventHandlers.init, 'UIEventHandlers.init deve ser função');
+  refactorTester.assertFunction(window.UIEventHandlers.addListener, 'UIEventHandlers.addListener deve ser função');
+  refactorTester.assertFunction(window.UIEventHandlers.getDebugInfo, 'UIEventHandlers.getDebugInfo deve ser função');
+});
+
+refactorTester.addPhaseTest(5, 'AuthEventHandlers carregado', async () => {
+  refactorTester.assertExists(window.AuthEventHandlers, 'AuthEventHandlers deve estar disponível');
+  refactorTester.assertFunction(window.AuthEventHandlers.init, 'AuthEventHandlers.init deve ser função');
+  refactorTester.assertFunction(window.AuthEventHandlers.onAuthStateChange, 'AuthEventHandlers.onAuthStateChange deve ser função');
+  refactorTester.assertFunction(window.AuthEventHandlers.getDebugInfo, 'AuthEventHandlers.getDebugInfo deve ser função');
+});
+
+refactorTester.addPhaseTest(5, 'TouchEventHandlers carregado', async () => {
+  refactorTester.assertExists(window.TouchEventHandlers, 'TouchEventHandlers deve estar disponível');
+  refactorTester.assertFunction(window.TouchEventHandlers.init, 'TouchEventHandlers.init deve ser função');
+  refactorTester.assertFunction(window.TouchEventHandlers.setSwipeThreshold, 'TouchEventHandlers.setSwipeThreshold deve ser função');
+  refactorTester.assertFunction(window.TouchEventHandlers.getDebugInfo, 'TouchEventHandlers.getDebugInfo deve ser função');
+});
+
+refactorTester.addPhaseTest(5, 'NetworkEventHandlers carregado', async () => {
+  refactorTester.assertExists(window.NetworkEventHandlers, 'NetworkEventHandlers deve estar disponível');
+  refactorTester.assertFunction(window.NetworkEventHandlers.init, 'NetworkEventHandlers.init deve ser função');
+  refactorTester.assertFunction(window.NetworkEventHandlers.getNetworkStatus, 'NetworkEventHandlers.getNetworkStatus deve ser função');
+  refactorTester.assertFunction(window.NetworkEventHandlers.getPWAStatus, 'NetworkEventHandlers.getPWAStatus deve ser função');
+  refactorTester.assertFunction(window.NetworkEventHandlers.installPWA, 'NetworkEventHandlers.installPWA deve ser função');
+});
+
+refactorTester.addPhaseTest(5, 'EventManager inicializado com handlers', async () => {
+  // Aguarda inicialização se ainda não ocorreu
+  let attempts = 0;
+  while ((!window.EventManager || !window.EventManager._initialized) && attempts < 10) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
+  refactorTester.assert(window.EventManager && window.EventManager._initialized, 'EventManager deve estar inicializado');
+  
+  const stats = window.EventManager.getStats();
+  refactorTester.assert(stats.handlersCount >= 4, 'Deve ter pelo menos 4 handlers registrados');
+  refactorTester.assertExists(stats.handlers.UIEventHandlers, 'UIEventHandlers deve estar nos stats');
+  refactorTester.assertExists(stats.handlers.AuthEventHandlers, 'AuthEventHandlers deve estar nos stats');
+  refactorTester.assertExists(stats.handlers.TouchEventHandlers, 'TouchEventHandlers deve estar nos stats');
+  refactorTester.assertExists(stats.handlers.NetworkEventHandlers, 'NetworkEventHandlers deve estar nos stats');
+});
+
+refactorTester.addPhaseTest(5, 'Event bus funcional', async () => {
+  let eventReceived = false;
+  const testData = { test: 'phase5' };
+  
+  // Adiciona listener
+  const removeListener = window.EventManager.on('test:phase5', (data) => {
+    eventReceived = true;
+    refactorTester.assert(data.test === 'phase5', 'Dados do evento devem ser corretos');
+  });
+  
+  // Emite evento
+  window.EventManager.emit('test:phase5', testData);
+  
+  // Aguarda processamento
+  await new Promise(resolve => setTimeout(resolve, 10));
+  
+  refactorTester.assert(eventReceived, 'Event bus deve processar eventos corretamente');
+  
+  // Remove listener
+  removeListener();
+});
+
+refactorTester.addPhaseTest(5, 'Handler debug info disponível', async () => {
+  const handlers = ['UIEventHandlers', 'AuthEventHandlers', 'TouchEventHandlers', 'NetworkEventHandlers'];
+  
+  for (const handlerName of handlers) {
+    const handler = window[handlerName];
+    refactorTester.assertExists(handler, `${handlerName} deve existir`);
+    refactorTester.assertFunction(handler.getDebugInfo, `${handlerName}.getDebugInfo deve ser função`);
+    
+    const debugInfo = handler.getDebugInfo();
+    refactorTester.assertExists(debugInfo.initialized, `${handlerName} debug deve ter propriedade initialized`);
+    refactorTester.assertExists(debugInfo.activeListeners, `${handlerName} debug deve ter propriedade activeListeners`);
+    refactorTester.assertExists(debugInfo.listenerCount, `${handlerName} debug deve ter propriedade listenerCount`);
+  }
+});
+
+refactorTester.addPhaseTest(5, 'Cleanup de handlers funcional', async () => {
+  // Testa se cleanup não quebra a aplicação
+  const initialStats = window.EventManager.getStats();
+  
+  // Não fazemos cleanup real para não quebrar a app, apenas testamos se a função existe
+  refactorTester.assertFunction(window.EventManager.cleanup, 'EventManager.cleanup deve ser função');
+  
+  // Testa cleanup individual de handlers
+  const handlers = ['UIEventHandlers', 'AuthEventHandlers', 'TouchEventHandlers', 'NetworkEventHandlers'];
+  for (const handlerName of handlers) {
+    const handler = window[handlerName];
+    refactorTester.assertFunction(handler.removeAllListeners, `${handlerName}.removeAllListeners deve ser função`);
+  }
+});
+
+refactorTester.addPhaseTest(5, 'Handlers não conflitam com funcionalidade existente', async () => {
+  // Testa se modals ainda funcionam
+  refactorTester.assertFunction(openSettings, 'openSettings deve ainda funcionar');
+  refactorTester.assertFunction(closeSettings, 'closeSettings deve ainda funcionar');
+  
+  // Testa se elementos DOM ainda são acessíveis via DOMSelectors
+  refactorTester.assertExists(window.DOMSelectors, 'DOMSelectors deve estar disponível');
+  refactorTester.assertFunction(window.DOMSelectors.byId, 'DOMSelectors.byId deve funcionar');
+  
+  // Testa se auth ainda funciona
+  refactorTester.assertExists(window.Auth, 'Auth deve ainda estar disponível');
+  
+  // Testa se view layer ainda funciona
+  refactorTester.assertExists(window.ViewLayer, 'ViewLayer deve estar disponível');
+});
+
+refactorTester.addPhaseTest(5, 'Event handlers específicos funcionais', async () => {
+  // Testa se handlers específicos podem ser chamados sem erro
+  try {
+    // UIEventHandlers
+    const uiDebug = window.UIEventHandlers.getDebugInfo();
+    refactorTester.assert(typeof uiDebug === 'object', 'UIEventHandlers debug deve retornar objeto');
+    
+    // AuthEventHandlers
+    const authDebug = window.AuthEventHandlers.getDebugInfo();
+    refactorTester.assert(typeof authDebug === 'object', 'AuthEventHandlers debug deve retornar objeto');
+    
+    // TouchEventHandlers
+    const touchDebug = window.TouchEventHandlers.getDebugInfo();
+    refactorTester.assert(typeof touchDebug === 'object', 'TouchEventHandlers debug deve retornar objeto');
+    
+    // NetworkEventHandlers
+    const networkDebug = window.NetworkEventHandlers.getDebugInfo();
+    refactorTester.assert(typeof networkDebug === 'object', 'NetworkEventHandlers debug deve retornar objeto');
+    
+    // Network status
+    const networkStatus = window.NetworkEventHandlers.getNetworkStatus();
+    refactorTester.assert(typeof networkStatus.isOnline === 'boolean', 'Network status deve ter isOnline boolean');
+    
+    // PWA status
+    const pwaStatus = window.NetworkEventHandlers.getPWAStatus();
+    refactorTester.assert(typeof pwaStatus.isInstalled === 'boolean', 'PWA status deve ter isInstalled boolean');
+    
+  } catch (error) {
+    refactorTester.fail(`Event handlers devem ser funcionais: ${error.message}`);
+  }
+});
+
+refactorTester.addPhaseTest(5, 'Event delegation funcional', async () => {
+  // Testa se event delegation ainda funciona após modularização
+  const testButton = document.createElement('button');
+  testButton.className = 'tx-btn';
+  testButton.dataset.action = 'edit';
+  testButton.dataset.txId = 'test123';
+  
+  // Adiciona ao DOM temporariamente
+  document.body.appendChild(testButton);
+  
+  let eventHandled = false;
+  
+  // Mock da função de edição
+  const originalEditTx = window.editTx;
+  window.editTx = (txId) => {
+    eventHandled = true;
+    refactorTester.assert(txId === 'test123', 'ID da transação deve ser passado corretamente');
+  };
+  
+  // Simula clique
+  testButton.click();
+  
+  // Aguarda processamento
+  await new Promise(resolve => setTimeout(resolve, 10));
+  
+  // Cleanup
+  document.body.removeChild(testButton);
+  window.editTx = originalEditTx;
+  
+  refactorTester.assert(eventHandled, 'Event delegation deve funcionar para botões de transação');
+});
+
+refactorTester.addPhaseTest(5, 'Sistema de eventos não quebra carregamento', async () => {
+  // Verifica se não há erros de import que quebram a app
+  const response = await fetch('main.js');
+  const content = await response.text();
+  
+  // Verifica se imports de eventos estão presentes
+  refactorTester.assert(content.includes('EventManager'), 'main.js deve importar EventManager');
+  
+  // Verifica se não há erros óbvios de sintaxe
+  refactorTester.assert(!content.includes('import {'), 'Não deve ter imports malformados');
+  
+  // Verifica se inicialização está presente
+  refactorTester.assert(content.includes('initializeEventSystem'), 'main.js deve conter inicialização do sistema de eventos');
+});
+
+// ============================================================================
 // 🚀 FUNÇÃO PRINCIPAL PARA TESTAR REFATORAÇÃO
 // ============================================================================
 

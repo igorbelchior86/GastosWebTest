@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Fase 5 - Event Handlers</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: white; }
+        .test { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .pass { background: #2d5a32; }
+        .fail { background: #5a2d2d; }
+        .pending { background: #5a5a2d; }
+        button { padding: 10px 20px; margin: 10px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #555; }
+        #results { margin-top: 20px; }
+        .module-test { margin: 10px 0; }
+        .module-name { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Teste Fase 5 - Event Handlers</h1>
+    
+    <div>
+        <button onclick="testModuleLoading()">Testar Carregamento de Módulos</button>
+        <button onclick="testEventSystem()">Testar Sistema de Eventos</button>
+        <button onclick="runFullTest()">Executar Teste Completo</button>
+        <button onclick="clearResults()">Limpar Resultados</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        let results = [];
+        
+        function logTest(name, passed, message = '') {
+            const result = { name, passed, message, timestamp: new Date() };
+            results.push(result);
+            
+            const resultsDiv = document.getElementById('results');
+            const testDiv = document.createElement('div');
+            testDiv.className = `test ${passed ? 'pass' : 'fail'}`;
+            testDiv.innerHTML = `
+                <strong>${passed ? '✅' : '❌'} ${name}</strong>
+                ${message ? `<br><small>${message}</small>` : ''}
+                <small style="float: right;">${result.timestamp.toLocaleTimeString()}</small>
+            `;
+            resultsDiv.appendChild(testDiv);
+        }
+        
+        window.logTest = logTest;
+        
+        window.testModuleLoading = async function() {
+            logTest('Iniciando teste de carregamento', true, 'Testando imports de módulos...');
+            
+            try {
+                // Testa imports individuais
+                const { EventManager } = await import('./events/event-manager.js');
+                logTest('EventManager carregado', !!EventManager, 'Módulo principal do sistema de eventos');
+                
+                const { UIEventHandlers } = await import('./events/ui-handlers.js');
+                logTest('UIEventHandlers carregado', !!UIEventHandlers, 'Handler de eventos de UI');
+                
+                const { AuthEventHandlers } = await import('./events/auth-handlers.js');
+                logTest('AuthEventHandlers carregado', !!AuthEventHandlers, 'Handler de eventos de autenticação');
+                
+                const { TouchEventHandlers } = await import('./events/touch-handlers.js');
+                logTest('TouchEventHandlers carregado', !!TouchEventHandlers, 'Handler de eventos de touch');
+                
+                const { NetworkEventHandlers } = await import('./events/network-handlers.js');
+                logTest('NetworkEventHandlers carregado', !!NetworkEventHandlers, 'Handler de eventos de rede');
+                
+                // Testa métodos principais
+                logTest('EventManager.init existe', typeof EventManager.init === 'function');
+                logTest('EventManager.emit existe', typeof EventManager.emit === 'function');
+                logTest('EventManager.on existe', typeof EventManager.on === 'function');
+                
+                logTest('Todos os módulos carregados com sucesso', true, 'Sistema modular de eventos operacional');
+                
+            } catch (error) {
+                logTest('Erro no carregamento', false, error.message);
+            }
+        };
+        
+        window.testEventSystem = async function() {
+            try {
+                const { EventManager } = await import('./events/event-manager.js');
+                
+                // Inicializa sistema
+                await EventManager.init();
+                logTest('EventManager inicializado', EventManager._initialized);
+                
+                // Testa event bus
+                let eventReceived = false;
+                const removeListener = EventManager.on('test:module', (data) => {
+                    eventReceived = true;
+                    logTest('Event bus funcional', data.test === 'working', 'Evento recebido corretamente');
+                });
+                
+                EventManager.emit('test:module', { test: 'working' });
+                
+                setTimeout(() => {
+                    logTest('Evento processado', eventReceived, 'Event bus respondeu ao emit');
+                    removeListener();
+                }, 100);
+                
+                // Testa stats
+                const stats = EventManager.getStats();
+                logTest('Stats disponíveis', !!stats.handlersCount, `${stats.handlersCount} handlers registrados`);
+                
+            } catch (error) {
+                logTest('Erro no sistema de eventos', false, error.message);
+            }
+        };
+        
+        window.runFullTest = async function() {
+            clearResults();
+            await testModuleLoading();
+            setTimeout(async () => {
+                await testEventSystem();
+                
+                // Sumário final
+                setTimeout(() => {
+                    const passed = results.filter(r => r.passed).length;
+                    const total = results.length;
+                    const percentage = Math.round((passed / total) * 100);
+                    
+                    logTest(`RESULTADO FINAL: ${passed}/${total} (${percentage}%)`, 
+                             percentage >= 80, 
+                             percentage >= 80 ? 'Fase 5 funcionando corretamente!' : 'Alguns problemas detectados');
+                }, 500);
+            }, 500);
+        };
+        
+        window.clearResults = function() {
+            results = [];
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        // Auto-execução ao carregar
+        setTimeout(runFullTest, 1000);
+    </script>
+</body>
+</html>

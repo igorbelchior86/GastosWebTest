@@ -1,10 +1,13 @@
 // ============================================================================
-// 📦 IMPORTS - FASE 4 REFATORAÇÃO - VIEW LAYER
+// 📦 IMPORTS - FASE 5 REFATORAÇÃO - EVENT HANDLERS
 // ============================================================================
 import { modalManager, askMoveToToday, askConfirmLogout } from './ui/modals.js';
 import { themeManager } from './components/theme-manager.js';
 import { stickyHeader } from './ui/sticky-header.js';
 import { appState, statePersistence, initializeState } from './js/state/index.js';
+
+// FASE 5 - Sistema de Event Handlers
+import { EventManager } from './events/event-manager.js';
 
 // FASE 4 - Módulos de View Layer
 import { 
@@ -94,8 +97,10 @@ const closePlannedModal = DOMSelectors.closePlannedModal;
 const plannedList = DOMSelectors.plannedList;
 
 // Header segmented control → delega para os botões originais
+// NOTA FASE 5: Este handler será migrado para UIEventHandlers
 const headerSeg = DOMSelectors.headerSeg;
 if (headerSeg) {
+  // Handler legado mantido temporariamente para compatibilidade
   headerSeg.addEventListener('click', (e) => {
     const btn = e.target.closest('.seg-option');
     if (!btn) return;
@@ -113,9 +118,7 @@ if (headerSeg) {
   });
 }
 // ---------------- Settings (Ajustes) modal ----------------
-function escHtml(s){
-  return (s==null?"":String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-}
+// NOTA: escHtml agora é importado de formatters.js
 function renderSettingsModal(){
   if (!settingsModalEl) return;
   const box = settingsModalEl.querySelector('.modal-content');
@@ -175,11 +178,14 @@ function renderSettingsModal(){
 }
 function openSettings(){ if (!settingsModalEl) return; renderSettingsModal(); document.documentElement.classList.add('modal-open'); settingsModalEl.classList.remove('hidden'); }
 function closeSettings(){ if (!settingsModalEl) return; settingsModalEl.classList.add('hidden'); document.documentElement.classList.remove('modal-open'); }
+// Settings modal handlers - FASE 5: Migrados para UIEventHandlers e AuthEventHandlers
+// Mantendo handlers legados para compatibilidade durante transição
 if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettings);
 if (settingsModalEl) settingsModalEl.addEventListener('click', (e)=>{ if (e.target === settingsModalEl) closeSettings(); });
 // React to auth state updates and keep the modal content fresh
 try { document.addEventListener('auth:state', renderSettingsModal); } catch(_) {}
-// Bottom floating pill actions
+
+// Bottom floating pill actions - FASE 5: Migrado para UIEventHandlers
 const bottomPill = document.querySelector('.floating-pill');
 if (bottomPill) {
   bottomPill.addEventListener('click', (e) => {
@@ -692,36 +698,7 @@ function sortTransactions() {
   appState.setTransactions(txs);
 }
 
-// Sanitize legacy transactions: ensure postDate/opDate/planned exist
-function sanitizeTransactions(list) {
-  let changed = false;
-  const out = (list || []).map((t) => {
-    if (!t) return t;
-    const nt = { ...t };
-    // Ensure opDate exists; fallback to date from ts
-    if (!nt.opDate) {
-      if (nt.ts) {
-        try { nt.opDate = new Date(nt.ts).toISOString().slice(0, 10); } catch { nt.opDate = todayISO(); }
-      } else {
-        nt.opDate = todayISO();
-      }
-      changed = true;
-    }
-    // Ensure postDate exists; compute with card rule
-    if (!nt.postDate) {
-      const method = nt.method || 'Dinheiro';
-      try { nt.postDate = post(nt.opDate, method); } catch { nt.postDate = nt.opDate; }
-      changed = true;
-    }
-    // Ensure planned flag exists
-    if (typeof nt.planned === 'undefined' && nt.opDate) {
-      nt.planned = nt.opDate > todayISO();
-      changed = true;
-    }
-    return nt;
-  });
-  return { list: out, changed };
-}
+// NOTA: sanitizeTransactions agora é importado de validators.js
 
 // Revalida postDate e normaliza método de cartão para dados legados
 function recomputePostDates() {
@@ -1369,17 +1346,7 @@ const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit
 // ---------------------------------------------------------------------------
 
 // --- Date helpers ---
-/**
- * Formats a Date object to YYYY-MM-DD (ISO) in local time.
- * @param {Date} date
- * @returns {string}
- */
-function formatToISO(date) {
-  // Adjust for local timezone before formatting
-  const d = new Date(date);
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().split('T')[0];
-}
+// NOTA: formatToISO agora é importado de calculations.js
 
 // Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
 const todayISO = () => formatToISO(new Date());
@@ -4021,6 +3988,53 @@ if (!window.plannedHandlersInit) {
   modalManager.setupModalHandlers('plannedModal', 'closePlannedModal');
   window.plannedHandlersInit = true;
 }
+// ============================================================================
+// 🎯 FASE 5 - INICIALIZAÇÃO DO SISTEMA DE EVENTOS
+// ============================================================================
+
+// Inicializa EventManager quando DOM estiver pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeEventSystem);
+} else {
+  // DOM já carregado, inicializa imediatamente
+  setTimeout(initializeEventSystem, 0);
+}
+
+async function initializeEventSystem() {
+  try {
+    console.log('🎯 Inicializando sistema de eventos...');
+    
+    // Inicializa EventManager (coordena todos os handlers)
+    await EventManager.init();
+    
+    // Event handlers específicos são inicializados pelo EventManager
+    console.log('✅ Sistema de eventos inicializado com sucesso');
+    
+    // Registra listeners para eventos customizados
+    EventManager.on('dom:ready', () => {
+      console.log('📱 DOM pronto - aplicação inicializada');
+    });
+    
+    EventManager.on('window:loaded', () => {
+      console.log('🚀 Window carregado - app totalmente pronto');
+    });
+    
+    // Debug: mostra status dos event handlers
+    if (EventManager.isDebugMode()) {
+      EventManager.printReport();
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao inicializar sistema de eventos:', error);
+    // Fallback: continua com event handlers tradicionais se EventManager falhar
+    console.warn('⚠️  Continuando com event handlers legados...');
+  }
+}
+
+// ============================================================================
+// 🔄 INICIALIZAÇÃO LEGADA DE SWIPE (mantida para compatibilidade)
+// ============================================================================
+
 // Initialize swipe for operations (op-line)
 initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.op-line', 'opsSwipeInit');
 // Initialize swipe for card list (card-line) only if the list root exists
