@@ -1,10 +1,13 @@
 // ============================================================================
-// 📦 IMPORTS - FASE 5 REFATORAÇÃO - EVENT HANDLERS
+// 📦 IMPORTS - FASE 6 REFATORAÇÃO - FEATURE MODULES  
 // ============================================================================
 import { modalManager, askMoveToToday, askConfirmLogout } from './ui/modals.js';
 import { themeManager } from './components/theme-manager.js';
 import { stickyHeader } from './ui/sticky-header.js';
 import { appState, statePersistence, initializeState } from './js/state/index.js';
+
+// FASE 6 - Feature Modules
+import { transactionModule } from './features/transaction-module.js';
 
 // FASE 5 - Sistema de Event Handlers
 import { EventManager } from './events/event-manager.js';
@@ -1347,49 +1350,17 @@ const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit
 
 // --- Date helpers ---
 // NOTA: formatToISO agora é importado de calculations.js
+// NOTA: todayISO agora é importado de calculations.js
 
 // Retorna YYYY-MM-DD no fuso local (corrige o shift do toISOString em UTC)
-const todayISO = () => formatToISO(new Date());
-// expose todayISO to global for inline scripts
-window.todayISO = todayISO;
+// expose todayISO to global for inline scripts (já feito no import)
 
 // Ensure end-pad is computed on first render as well
 // Keep end-pad in sync with toolbar/viewport changes (iOS/Safari)
 // End‑pad fixado via CSS: sem atualizações dinâmicas
 
-// Função para calcular o postDate de cartões corretamente (nova lógica)
-const post = (iso, m) => {
-  if (m === 'Dinheiro') return iso;
-  const c = cards.find(x => x.name === m);
-  if (!c) return iso;
-  // Usa dayjs para facilitar manipulação de datas
-  // Se não houver dayjs, implementa lógica equivalente
-  const [y, mo, d] = iso.split('-').map(Number);
-  const closingDay = c.close;
-  const dueDay = c.due;
-  const txDay = d;
-  let invoiceMonth = mo - 1; // JS Date/Month é 0-based
-  let invoiceYear = y;
-  if (txDay > closingDay) {
-    // entra na fatura do mês seguinte
-    if (invoiceMonth === 11) {
-      invoiceMonth = 0;
-      invoiceYear += 1;
-    } else {
-      invoiceMonth += 1;
-    }
-  }
-  // Monta data de vencimento da fatura (YYYY-MM-DD)
-  const pad = n => String(n).padStart(2, '0');
-  // Use formatToISO to ensure correct formatting (even though string concat is safe here)
-  return formatToISO(new Date(invoiceYear, invoiceMonth, dueDay));
-};
-
-const addYearsIso  = (iso, n) => {
-  const d = new Date(iso);
-  d.setFullYear(d.getFullYear() + n);
-  return formatToISO(d);
-};
+// NOTA: post agora é importado de calculations.js
+// NOTA: addYearsIso agora é importado de date-utils.js
 
 
 // ---- Recurrence rule helpers ----
@@ -2676,10 +2647,7 @@ function getCardById(id) {
 }
 
 // Função utilitária para formatar data ISO (YYYY-MM-DD)
-function formatDateISO(date) {
-  if (!(date instanceof Date)) return '';
-  return date.toISOString().slice(0,10);
-}
+// NOTA: formatDateISO agora é importado de format-utils.js
 
 // Delete a transaction (with options for recurring rules)
 function delTx(id, iso) {

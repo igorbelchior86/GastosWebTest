@@ -8,6 +8,7 @@ import { UIEventHandlers } from './ui-handlers.js';
 import { AuthEventHandlers } from './auth-handlers.js';
 import { TouchEventHandlers } from './touch-handlers.js';
 import { NetworkEventHandlers } from './network-handlers.js';
+import { TransactionEventHandlers } from './transaction-events.js';
 
 /**
  * EventManager - Sistema central de gerenciamento de eventos
@@ -66,7 +67,8 @@ export class EventManager {
       { name: 'NetworkEventHandlers', class: NetworkEventHandlers, priority: 1 },
       { name: 'AuthEventHandlers', class: AuthEventHandlers, priority: 2 },
       { name: 'TouchEventHandlers', class: TouchEventHandlers, priority: 3 },
-      { name: 'UIEventHandlers', class: UIEventHandlers, priority: 4 }
+      { name: 'UIEventHandlers', class: UIEventHandlers, priority: 4 },
+      { name: 'TransactionEventHandlers', class: TransactionEventHandlers, priority: 5 }
     ];
 
     // Ordena por prioridade

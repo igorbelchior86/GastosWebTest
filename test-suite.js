@@ -469,6 +469,99 @@ window.listTestCategories = () => {
 };
 
 // Exibe instruções
+// ============================================================================
+// 🏗️ TESTES FASE 6 - FEATURE MODULES
+// ============================================================================
+
+// Testa TransactionModule
+testRunner.addTest('TransactionModule deve estar disponível', () => {
+  TestRunner.assertExists(window.transactionModule, 'TransactionModule instance');
+  TestRunner.assertExists(window.TransactionModule, 'TransactionModule class');
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionModule deve ter métodos CRUD básicos', () => {
+  const tm = window.transactionModule;
+  TestRunner.assertExists(tm.getTransactions, 'getTransactions method');
+  TestRunner.assertExists(tm.setTransactions, 'setTransactions method');
+  TestRunner.assertExists(tm.addTransaction, 'addTransaction method');
+  TestRunner.assertExists(tm.updateTransaction, 'updateTransaction method');
+  TestRunner.assertExists(tm.deleteTransaction, 'deleteTransaction method');
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionModule deve ter métodos utilitários', () => {
+  const tm = window.transactionModule;
+  TestRunner.assertExists(tm.sortTransactions, 'sortTransactions method');
+  TestRunner.assertExists(tm.filterTransactions, 'filterTransactions method');
+  TestRunner.assertExists(tm.validateTransaction, 'validateTransaction method');
+  TestRunner.assertExists(tm.getTransactionStats, 'getTransactionStats method');
+  TestRunner.assertExists(tm.exportTransactions, 'exportTransactions method');
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionModule validação deve detectar erros', () => {
+  const tm = window.transactionModule;
+  
+  // Transação inválida - sem descrição
+  const invalidTx1 = { desc: '', val: 100, postDate: '2025-01-01' };
+  const errors1 = tm.validateTransaction(invalidTx1);
+  TestRunner.assert(errors1.length > 0, 'Should detect missing description');
+  
+  // Transação inválida - valor não numérico
+  const invalidTx2 = { desc: 'Test', val: 'abc', postDate: '2025-01-01' };
+  const errors2 = tm.validateTransaction(invalidTx2);
+  TestRunner.assert(errors2.length > 0, 'Should detect invalid value');
+  
+  // Transação válida
+  const validTx = { desc: 'Test', val: 100, postDate: '2025-01-01' };
+  const errors3 = tm.validateTransaction(validTx);
+  TestRunner.assert(errors3.length === 0, 'Should pass validation for valid transaction');
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionModule filtros devem funcionar', () => {
+  const tm = window.transactionModule;
+  
+  // Mock some transactions for testing
+  const originalTxs = tm.getTransactions();
+  const mockTxs = [
+    { id: 'test1', desc: 'Grocery', val: -50, postDate: '2025-01-01', method: 'Dinheiro' },
+    { id: 'test2', desc: 'Salary', val: 2000, postDate: '2025-01-01', method: 'Dinheiro' },
+    { id: 'test3', desc: 'Coffee', val: -10, postDate: '2025-01-02', method: 'Cartão' }
+  ];
+  
+  tm.setTransactions(mockTxs);
+  
+  // Test filter by type
+  const expenses = tm.filterTransactions({ type: 'expense' });
+  TestRunner.assert(expenses.length === 2, 'Should filter expenses correctly');
+  
+  const income = tm.filterTransactions({ type: 'income' });
+  TestRunner.assert(income.length === 1, 'Should filter income correctly');
+  
+  // Test filter by method
+  const cash = tm.filterTransactions({ method: 'Dinheiro' });
+  TestRunner.assert(cash.length === 2, 'Should filter by method');
+  
+  // Test filter by description
+  const coffee = tm.filterTransactions({ description: 'coffee' });
+  TestRunner.assert(coffee.length === 1, 'Should filter by description (case insensitive)');
+  
+  // Restore original transactions
+  tm.setTransactions(originalTxs);
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionEventHandlers deve estar disponível', () => {
+  TestRunner.assertExists(window.transactionEventHandlers, 'TransactionEventHandlers instance');
+  TestRunner.assertExists(window.TransactionEventHandlers, 'TransactionEventHandlers class');
+}, 'Phase 6 - Feature Modules');
+
+testRunner.addTest('TransactionEventHandlers deve ter métodos de evento', () => {
+  const teh = window.transactionEventHandlers;
+  TestRunner.assertExists(teh.init, 'init method');
+  TestRunner.assertExists(teh.setupTransactionForm, 'setupTransactionForm method');
+  TestRunner.assertExists(teh.setupTransactionActions, 'setupTransactionActions method');
+  TestRunner.assertExists(teh.handleTransactionSubmit, 'handleTransactionSubmit method');
+  TestRunner.assertExists(teh.validateField, 'validateField method');
+}, 'Phase 6 - Feature Modules');
+
 console.log('🧪 SUITE DE TESTES CARREGADA!');
 console.log('📋 Comandos disponíveis:');
 console.log('   • runAllTests()                    - Executa todos os testes');
