@@ -5,7 +5,6 @@
 
 import { transactionModule } from '../features/transaction-module.js';
 import { modalManager } from '../ui/modals.js';
-import { renderTransactionsList, renderSummary } from '../ui/renderers.js';
 
 export class TransactionEventHandlers {
   constructor() {
@@ -396,14 +395,14 @@ export class TransactionEventHandlers {
    */
   refreshTransactionViews() {
     try {
-      // Re-render transaction list
-      if (typeof renderTransactionsList === 'function') {
-        renderTransactionsList();
+      // Re-render transaction table (use existing global function)
+      if (typeof window.renderTable === 'function') {
+        window.renderTable();
       }
       
-      // Re-render summary
-      if (typeof renderSummary === 'function') {
-        renderSummary();
+      // Update balance display if function exists
+      if (typeof window.updateBalance === 'function') {
+        window.updateBalance();
       }
 
       // Dispatch custom event for other components
