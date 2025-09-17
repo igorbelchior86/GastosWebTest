@@ -171,6 +171,23 @@
             display: none;
         }
         
+        /* Estilos para elementos de teste */
+        .sticky-month {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .header-seg .segment-option.active {
+            background: #667eea;
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -214,6 +231,75 @@
                 <span>👋 Pronto para executar testes!</span>
             </div>
             <div id="console-output" class="console-output hidden"></div>
+        </div>
+    </div>
+
+    <!-- DOM elements necessários para os testes (ocultos) -->
+    <div style="display: none;">
+        <!-- Modal de transação -->
+        <div id="txModal" class="hidden">
+            <input id="txDesc" type="text" placeholder="Descrição">
+            <input id="txVal" type="text" placeholder="Valor">
+            <input id="opDate" type="date">
+            <select id="method">
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Cartão">Cartão</option>
+            </select>
+            <button id="addBtn">Adicionar</button>
+        </div>
+        
+        <!-- Modal de cartão -->
+        <div id="cardModal" class="hidden">
+            <input id="cardName" type="text" placeholder="Nome do Cartão">
+            <input id="cardClose" type="number" placeholder="Dia de Fechamento">
+            <input id="cardDue" type="number" placeholder="Dia de Vencimento">
+            <button id="saveCardBtn">Salvar Cartão</button>
+        </div>
+        
+        <!-- Modal de loading -->
+        <div id="loadingModal" class="hidden">
+            <div>Carregando...</div>
+        </div>
+        
+        <!-- Elementos de navegação -->
+        <div class="header-seg">
+            <button class="segment-option" data-action="home" data-view="transactions">Transações</button>
+            <button class="segment-option" data-action="cards" data-view="planned">Planejadas</button>
+        </div>
+        
+        <!-- Floating pill navigation -->
+        <div class="floating-pill">
+            <button data-action="home">Home</button>
+            <button data-action="cards">Cards</button>
+        </div>
+        
+        <!-- Lista de cartões -->
+        <ul id="cardList"></ul>
+        
+        <!-- Tabela principal para os testes -->
+        <table id="dailyTable">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Descrição</th>
+                    <th>Valor</th>
+                    <th>Método</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        
+        <!-- Botão adicionar transação -->
+        <button id="addTxBtn">+ Adicionar Transação</button>
+        
+        <!-- Elementos variados para testes -->
+        <div id="APP_VERSION">1.4.8</div>
+        <input id="startInput" type="text" placeholder="Saldo inicial">
+        <button id="setStartBtn">Definir Saldo</button>
+        
+        <!-- Sticky Header Mock -->
+        <div id="stickyHeader" style="position: sticky; top: 0;">
+            <div class="sticky-month" id="stickyMonth">Janeiro 2024</div>
         </div>
     </div>
 
@@ -388,6 +474,46 @@
         
         // Verifica se test suite está disponível ao carregar
         window.addEventListener('load', () => {
+            // Adiciona event listeners para navegação
+            document.querySelectorAll('.segment-option').forEach(el => {
+                el.addEventListener('click', function() {
+                    const action = this.dataset.action || this.dataset.view;
+                    if (action && window.setActiveNavigation) {
+                        window.setActiveNavigation(action);
+                    }
+                });
+            });
+            
+            // Adiciona event listeners para modal
+            const addTxBtn = document.getElementById('addTxBtn');
+            const txModal = document.getElementById('txModal');
+            
+            if (addTxBtn && txModal) {
+                addTxBtn.addEventListener('click', function() {
+                    txModal.classList.remove('hidden');
+                    txModal.style.display = 'block';
+                });
+            }
+            
+            // Adiciona listener para ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.hidden').forEach(modal => {
+                        if (modal.id && modal.id.includes('Modal')) {
+                            modal.classList.add('hidden');
+                            modal.style.display = 'none';
+                        }
+                    });
+                    // Também fecha modais que estão visíveis
+                    document.querySelectorAll('[id*="Modal"]').forEach(modal => {
+                        if (!modal.classList.contains('hidden')) {
+                            modal.classList.add('hidden');
+                            modal.style.display = 'none';
+                        }
+                    });
+                }
+            });
+            
             // Aguarda um pouco mais para garantir que o main.js termine de carregar
             setTimeout(() => {
                 if (typeof runAllTests === 'undefined') {
@@ -438,8 +564,21 @@
     <script src="js/utils/format-utils-global.js"></script>
     <script src="js/utils/data-utils-global.js"></script>
     
-    <!-- Carrega versão simplificada do main.js para testes (sem dependências DOM) -->
-    <script src="main-lite.js"></script>
+    <!-- Mock do Auth para testes -->
+    <script>
+        window.Auth = {
+            currentUser: null,
+            signInWithGoogle: function() { return Promise.resolve(null); },
+            signOut: function() { return Promise.resolve(); },
+            onAuthStateChanged: function(callback) { 
+                // Mock para compatibilidade
+                return function() {}; // unsubscribe function
+            }
+        };
+    </script>
+    
+    <!-- Carrega versão completa do main.js para testes (incluindo Feature Modules da Fase 6) -->
+    <script type="module" src="main-mock.js?v=1726587801"></script>
     
     <!-- Carrega o test-suite.js -->
     <script src="test-suite.js"></script>

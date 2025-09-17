@@ -36,11 +36,18 @@ class TestRunner {
     const duration = Math.round(endTime - startTime);
 
     this.printSummary(duration);
+    
+    // Collect failures for detailed reporting
+    const failures = this.results
+      .filter(r => r.status === 'FALHOU')
+      .map(r => ({ name: r.name, error: r.error?.message || r.error || 'Unknown error' }));
+    
     return {
       passed: this.passedCount,
       failed: this.failedCount,
       total: this.tests.length,
-      duration
+      duration,
+      failures
     };
   }
 
@@ -101,6 +108,25 @@ class TestRunner {
   assertFunction(fn, message) {
     if (typeof fn !== 'function') {
       throw new Error(message || 'Expected a function');
+    }
+  }
+
+  // Additional assertion methods for Phase 8
+  assertTrue(condition, message) {
+    if (!condition) {
+      throw new Error(message || 'Expected true, got false');
+    }
+  }
+
+  assertFalse(condition, message) {
+    if (condition) {
+      throw new Error(message || 'Expected false, got true');
+    }
+  }
+
+  assertNotEqual(actual, expected, message) {
+    if (actual === expected) {
+      throw new Error(`${message || 'Values should not be equal'}: both are ${actual}`);
     }
   }
 
@@ -475,26 +501,26 @@ window.listTestCategories = () => {
 
 // Testa TransactionModule
 testRunner.addTest('TransactionModule deve estar disponível', () => {
-  TestRunner.assertExists(window.transactionModule, 'TransactionModule instance');
-  TestRunner.assertExists(window.TransactionModule, 'TransactionModule class');
+  testRunner.assertExists(window.transactionModule, 'TransactionModule instance');
+  testRunner.assertExists(window.TransactionModule, 'TransactionModule class');
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionModule deve ter métodos CRUD básicos', () => {
   const tm = window.transactionModule;
-  TestRunner.assertExists(tm.getTransactions, 'getTransactions method');
-  TestRunner.assertExists(tm.setTransactions, 'setTransactions method');
-  TestRunner.assertExists(tm.addTransaction, 'addTransaction method');
-  TestRunner.assertExists(tm.updateTransaction, 'updateTransaction method');
-  TestRunner.assertExists(tm.deleteTransaction, 'deleteTransaction method');
+  testRunner.assertExists(tm.getTransactions, 'getTransactions method');
+  testRunner.assertExists(tm.setTransactions, 'setTransactions method');
+  testRunner.assertExists(tm.addTransaction, 'addTransaction method');
+  testRunner.assertExists(tm.updateTransaction, 'updateTransaction method');
+  testRunner.assertExists(tm.deleteTransaction, 'deleteTransaction method');
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionModule deve ter métodos utilitários', () => {
   const tm = window.transactionModule;
-  TestRunner.assertExists(tm.sortTransactions, 'sortTransactions method');
-  TestRunner.assertExists(tm.filterTransactions, 'filterTransactions method');
-  TestRunner.assertExists(tm.validateTransaction, 'validateTransaction method');
-  TestRunner.assertExists(tm.getTransactionStats, 'getTransactionStats method');
-  TestRunner.assertExists(tm.exportTransactions, 'exportTransactions method');
+  testRunner.assertExists(tm.sortTransactions, 'sortTransactions method');
+  testRunner.assertExists(tm.filterTransactions, 'filterTransactions method');
+  testRunner.assertExists(tm.validateTransaction, 'validateTransaction method');
+  testRunner.assertExists(tm.getTransactionStats, 'getTransactionStats method');
+  testRunner.assertExists(tm.exportTransactions, 'exportTransactions method');
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionModule validação deve detectar erros', () => {
@@ -503,17 +529,17 @@ testRunner.addTest('TransactionModule validação deve detectar erros', () => {
   // Transação inválida - sem descrição
   const invalidTx1 = { desc: '', val: 100, postDate: '2025-01-01' };
   const errors1 = tm.validateTransaction(invalidTx1);
-  TestRunner.assert(errors1.length > 0, 'Should detect missing description');
+  testRunner.assert(errors1.length > 0, 'Should detect missing description');
   
   // Transação inválida - valor não numérico
   const invalidTx2 = { desc: 'Test', val: 'abc', postDate: '2025-01-01' };
   const errors2 = tm.validateTransaction(invalidTx2);
-  TestRunner.assert(errors2.length > 0, 'Should detect invalid value');
+  testRunner.assert(errors2.length > 0, 'Should detect invalid value');
   
   // Transação válida
   const validTx = { desc: 'Test', val: 100, postDate: '2025-01-01' };
   const errors3 = tm.validateTransaction(validTx);
-  TestRunner.assert(errors3.length === 0, 'Should pass validation for valid transaction');
+  testRunner.assert(errors3.length === 0, 'Should pass validation for valid transaction');
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionModule filtros devem funcionar', () => {
@@ -531,36 +557,117 @@ testRunner.addTest('TransactionModule filtros devem funcionar', () => {
   
   // Test filter by type
   const expenses = tm.filterTransactions({ type: 'expense' });
-  TestRunner.assert(expenses.length === 2, 'Should filter expenses correctly');
+  testRunner.assert(expenses.length === 2, 'Should filter expenses correctly');
   
   const income = tm.filterTransactions({ type: 'income' });
-  TestRunner.assert(income.length === 1, 'Should filter income correctly');
+  testRunner.assert(income.length === 1, 'Should filter income correctly');
   
   // Test filter by method
   const cash = tm.filterTransactions({ method: 'Dinheiro' });
-  TestRunner.assert(cash.length === 2, 'Should filter by method');
+  testRunner.assert(cash.length === 2, 'Should filter by method');
   
   // Test filter by description
   const coffee = tm.filterTransactions({ description: 'coffee' });
-  TestRunner.assert(coffee.length === 1, 'Should filter by description (case insensitive)');
+  testRunner.assert(coffee.length === 1, 'Should filter by description (case insensitive)');
   
   // Restore original transactions
   tm.setTransactions(originalTxs);
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionEventHandlers deve estar disponível', () => {
-  TestRunner.assertExists(window.transactionEventHandlers, 'TransactionEventHandlers instance');
-  TestRunner.assertExists(window.TransactionEventHandlers, 'TransactionEventHandlers class');
+  testRunner.assertExists(window.transactionEventHandlers, 'TransactionEventHandlers instance');
+  testRunner.assertExists(window.TransactionEventHandlers, 'TransactionEventHandlers class');
 }, 'Phase 6 - Feature Modules');
 
 testRunner.addTest('TransactionEventHandlers deve ter métodos de evento', () => {
   const teh = window.transactionEventHandlers;
-  TestRunner.assertExists(teh.init, 'init method');
-  TestRunner.assertExists(teh.setupTransactionForm, 'setupTransactionForm method');
-  TestRunner.assertExists(teh.setupTransactionActions, 'setupTransactionActions method');
-  TestRunner.assertExists(teh.handleTransactionSubmit, 'handleTransactionSubmit method');
-  TestRunner.assertExists(teh.validateField, 'validateField method');
+  testRunner.assertExists(teh.init, 'init method');
+  testRunner.assertExists(teh.setupTransactionForm, 'setupTransactionForm method');
+  testRunner.assertExists(teh.setupTransactionActions, 'setupTransactionActions method');
+  testRunner.assertExists(teh.handleTransactionSubmit, 'handleTransactionSubmit method');
+  testRunner.assertExists(teh.validateField, 'validateField method');
 }, 'Phase 6 - Feature Modules');
+
+// ============================================================================
+// 🏗️ TESTES FASE 7 - DEPENDENCY INJECTION
+// ============================================================================
+
+// Test DI Container functionality
+testRunner.addTest('DIContainer deve registrar e resolver serviços', () => {
+  const container = new DIContainer();
+  
+  // Register a simple service
+  container.register('testService', () => ({ name: 'test' }));
+  
+  const service = container.get('testService');
+  testRunner.assertExists(service, 'Service should be resolved');
+  testRunner.assertEqual(service.name, 'test', 'Service should have correct data');
+}, 'Phase 7 - Dependency Injection');
+
+testRunner.addTest('DIContainer deve suportar singletons', () => {
+  const container = new DIContainer();
+  
+  let instanceCount = 0;
+  container.register('singleton', () => {
+    instanceCount++;
+    return { id: instanceCount };
+  }, { singleton: true });
+  
+  const instance1 = container.get('singleton');
+  const instance2 = container.get('singleton');
+  
+  testRunner.assertEqual(instanceCount, 1, 'Should create only one instance');
+  testRunner.assertEqual(instance1.id, instance2.id, 'Should return same instance');
+}, 'Phase 7 - Dependency Injection');
+
+testRunner.addTest('DIContainer deve injetar dependências', () => {
+  const container = new DIContainer();
+  
+  container.register('dependency', () => ({ value: 42 }));
+  container.register('service', (deps) => {
+    return { 
+      dependency: deps.dependency,
+      getValue: () => deps.dependency.value
+    };
+  }, { dependencies: ['dependency'] });
+  
+  const service = container.get('service');
+  testRunner.assertExists(service.dependency, 'Dependency should be injected');
+  testRunner.assertEqual(service.getValue(), 42, 'Should access dependency value');
+}, 'Phase 7 - Dependency Injection');
+
+testRunner.addTest('TransactionModule deve aceitar appState via DI', () => {
+  const mockAppState = {
+    getTransactions: () => [{ id: 1, desc: 'Test' }],
+    setTransactions: () => {},
+    getCards: () => [{ name: 'Dinheiro' }]
+  };
+  
+  const txModule = new TransactionModule(mockAppState);
+  const transactions = txModule.getTransactions();
+  
+  testRunner.assertExists(transactions, 'Should get transactions');
+  testRunner.assertEqual(transactions.length, 1, 'Should return mock data');
+  testRunner.assertEqual(transactions[0].desc, 'Test', 'Should use injected appState');
+}, 'Phase 7 - Dependency Injection');
+
+testRunner.addTest('TransactionEventHandlers deve aceitar dependências via DI', () => {
+  const mockTxModule = {
+    addTransaction: () => ({ id: 1 }),
+    getTransactions: () => []
+  };
+  
+  const mockModalManager = {
+    closeModal: () => {},
+    openModal: () => {}
+  };
+  
+  const handler = new TransactionEventHandlers(mockTxModule, mockModalManager);
+  
+  testRunner.assertExists(handler.txModule, 'Should have transaction module');
+  testRunner.assertExists(handler.modalManager, 'Should have modal manager');
+  testRunner.assertEqual(handler.txModule, mockTxModule, 'Should use injected module');
+}, 'Phase 7 - Dependency Injection');
 
 console.log('🧪 SUITE DE TESTES CARREGADA!');
 console.log('📋 Comandos disponíveis:');
@@ -570,16 +677,89 @@ console.log('   • runSingleTest("nome do teste")   - Executa um teste específ
 console.log('   • listTestCategories()             - Lista categorias disponíveis');
 console.log('\n🎯 Execute runAllTests() para começar!');
 
+// ============================================================================
+// 📥 CARREGAR TESTES MODULARES DA FASE 8
+// ============================================================================
+
+// Função para carregar testes modulares
+function loadModularTests() {
+  const testModules = [
+    'tests/unit/state.test.js',
+    'tests/unit/transactions.test.js', 
+    'tests/unit/utils.test.js',
+    'tests/integration/crud-flows-fixed.test.js',
+    'tests/integration/user-scenarios-fixed.test.js'
+  ];
+  
+  let loadedModules = 0;
+  const totalModules = testModules.length;
+  
+  testModules.forEach(modulePath => {
+    const script = document.createElement('script');
+    script.src = modulePath;
+    script.onload = () => {
+      loadedModules++;
+      console.log(`✅ Loaded: ${modulePath} (${loadedModules}/${totalModules})`);
+      
+      if (loadedModules === totalModules) {
+        console.log('🎉 All Phase 8 test modules loaded successfully!');
+      }
+    };
+    script.onerror = () => {
+      console.warn(`⚠️ Failed to load: ${modulePath}`);
+      loadedModules++;
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// Carrega testes modulares se estiver no test-runner
+if (window.location.pathname.includes('test-runner.html')) {
+  setTimeout(loadModularTests, 500);
+}
+
 // Execução automática com delay para aguardar carregamento das dependências
 function waitForMainJsAndRunTests() {
   if (window.mainJsLoaded && window.location.pathname.includes('test-runner.html')) {
     console.log('\n🤖 Main.js carregado! Executando testes automaticamente...');
     window.runAllTests();
   } else {
-    console.log('⏳ Aguardando main.js carregar...');
-    setTimeout(waitForMainJsAndRunTests, 500); // Verifica a cada 500ms
+    // Debug: mostrar o status das dependências
+    const loadingStatus = window.mainJsLoadingStarted ? 'iniciado mas não completo' : 'não iniciado';
+    const missingDeps = [];
+    
+    if (!window.mainJsLoaded) missingDeps.push('mainJsLoaded');
+    if (!window.todayISO) missingDeps.push('todayISO');
+    if (!window.save) missingDeps.push('save');
+    if (!window.sortTransactions) missingDeps.push('sortTransactions');
+    
+    console.log(`⏳ Aguardando main.js carregar... (${loadingStatus})`);
+    if (missingDeps.length > 0) {
+      console.log(`   Faltando: ${missingDeps.join(', ')}`);
+    }
+    
+    // Timeout mais longo e fallback
+    setTimeout(waitForMainJsAndRunTests, 1000); // Verifica a cada 1 segundo
+  }
+}
+
+// Força execução se nada acontecer em 10 segundos (fallback para debug)
+function forceTestExecution() {
+  if (window.location.pathname.includes('test-runner.html') && typeof runAllTests === 'function') {
+    console.log('\n⚠️  Forçando execução de testes após timeout...');
+    const hasBasicDeps = typeof window.todayISO !== 'undefined' || typeof window.save !== 'undefined';
+    if (hasBasicDeps) {
+      console.log('✅ Algumas dependências encontradas, executando testes parciais');
+      window.runAllTests();
+    } else {
+      console.log('❌ Dependências críticas não encontradas, executando testes básicos apenas');
+      // Executa apenas testes que não dependem de main.js
+      window.runAllTests();
+    }
   }
 }
 
 // Inicia a verificação após um pequeno delay
 setTimeout(waitForMainJsAndRunTests, 1000);
+// Força execução após 10 segundos se nada acontecer
+setTimeout(forceTestExecution, 10000);

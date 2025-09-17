@@ -28,7 +28,10 @@
   </template>
   <header class="app-header" style="display: none;">
     <div class="logo-title">
-      <span class="logo-text">Gastos+</span>
+      <button id="yearSelector" class="logo-text-btn">
+        <span class="logo-text">Gastos+</span>
+        <span class="year-indicator">▼</span>
+      </button>
     </div>
     <!-- Offline indicator removed -->
 
@@ -68,8 +71,6 @@
       <div id="accordion"></div>
       <button id="resetData" class="danger" style="margin-top:12px; display:none" hidden>Limpar tudo</button>
     </div>
-    <hr class="divider">
-    <footer class="app-footer"><small id="version">v1.4.9(a23)</small></footer>
   </div>
 
   <!-- Modal Ajustes -->
@@ -102,6 +103,18 @@
 
       <ul id="cardList" class="card-list"></ul>
 
+    </div>
+  </div>
+
+  <!-- Modal Seletor de Ano -->
+  <div id="yearModal" class="bottom-modal backdrop-blur hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Selecionar Ano</h2>
+      <button id="closeYearModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="modal-content">
+        <div id="yearList" class="year-list"></div>
+      </div>
     </div>
   </div>
 

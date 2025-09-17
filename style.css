@@ -17,6 +17,26 @@ html[data-theme="light"] .logo-text {
   color: #000 !important;
   text-shadow: 0 0 8px #00FF8080, 0 0 2px #00FF8040 !important;
 }
+
+html[data-theme="light"] .year-indicator {
+  color: #000;
+}
+
+/* Year selector light theme */
+html[data-theme="light"] .year-item {
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #111;
+}
+
+html[data-theme="light"] .year-item:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .year-item:active {
+  background: rgba(0, 0, 0, 0.18);
+}
+
 html[data-theme="light"] .header-seg{
   position: relative;
   display: inline-flex;
@@ -327,11 +347,14 @@ html[data-theme="light"] .icon-repeat{
   background-color: #111 !important; /* glyph color via mask */
   filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
 }
+/* Invoice list should be flat in light theme too — no per-item cards/borders. 
+   Keep card-like borders for other lists (executed/planned blocks) but
+   override them inside the invoice so items render as a single, unbroken list. */
 html[data-theme="light"] .invoice .executed-list li .op-line{
-  background:#fff !important;
-  border:1px solid rgba(0,0,0,0.06) !important;
-  box-shadow:0 1px 4px rgba(0,0,0,0.10) !important;
-  color:var(--txt-main) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--txt-main) !important;
 }
 /* Garantir que todos os elementos dentro da fatura no tema claro tenham texto visível */
 html[data-theme="light"] .invoice .executed-list li .op-left span,
@@ -688,12 +711,12 @@ body{display:block;}
 
 /* Spacer real no final do conteúdo do acordeão: mantém
    o último dia visível acima do pseudo‑footer SEM depender
-   de reflows disparados pelo botão Home 
+   de reflows disparados pelo botão Home */
 #accordion::after{
   content: '';
   display: block;
-  height: calc(10px + env(safe-area-inset-bottom));
-}*/
+  height: calc(120px + env(safe-area-inset-bottom));
+}
 
 /* Divider no rodapé do conteúdo: sem grande espaçamento extra */
 hr.divider{
@@ -1000,6 +1023,82 @@ summary.day-summary .icon-invoice::before{
 }
 .logo-title{display:flex;align-items:center;gap:8px;margin-right:auto;}
 .logo-text{font-weight:700;font-size:32pt;letter-spacing:.5pt;color:#fff;text-shadow:0 0 6px #00FF0040;margin-right:auto;}
+
+/* Year selector button */
+.logo-text-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.logo-text-btn:hover {
+  opacity: 0.9;
+}
+
+.logo-text-btn:active {
+  opacity: 0.8;
+}
+
+.year-indicator {
+  font-size: 16px;
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+.logo-text-btn:hover .year-indicator {
+  transform: translateY(1px);
+}
+
+/* Year list modal */
+.year-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.year-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--txt-main);
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.year-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.year-item:active {
+  background: rgba(255, 255, 255, 0.18);
+  transform: scale(0.98);
+}
+
+.year-item.current {
+  background: var(--green);
+  color: #000;
+  font-weight: 700;
+}
+
+.year-item.current:hover {
+  background: var(--green);
+  opacity: 0.9;
+}
+
 .app-footer{
   text-align:center;
   font-size:.75rem;
@@ -1659,14 +1758,14 @@ details.invoice[open] > summary::after{
 
 /* --- ALIGNMENTS INSIDE CARD INVOICE OPERATIONS ---------------------------------- */
 /* Garantir: descrição à esquerda, valor numérico à direita, timestamp abaixo da descrição */
-.invoice .executed-list { list-style: none; padding: 0; margin: 8px 0 0 0; }
+.invoice .executed-list { list-style: none; padding: 0; margin: 0 0 32px 0; }
 .invoice .executed-list li { list-style: none; padding: 0; margin: 0; }
 .invoice .executed-list li .op-line{
   display: flex;
   flex-direction: column;
   gap: 2px;
   height: auto;
-  padding: 8px 0;              /* mais respiro entre itens */
+  padding: 0 12px 12px 12px;          /* small horizontal indent + slightly larger spacing below each item */
   background: transparent !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -1708,24 +1807,31 @@ details.invoice[open] > summary::after{
 
 /* Group date heading inside invoice */
 .invoice .invoice-group-date{
-  margin: 10px 0 4px 0;
+  margin: 16px 0 4px 0; /* slightly more space after the header divider */
   font-weight: 700;
   font-size: .95rem;
   color: var(--txt-main);
 }
-.invoice .invoice-divider{ height:1px; background: rgba(255,255,255,.12); margin: 6px 0 10px 0; }
+.invoice .invoice-divider{ height:1px; background: rgba(255,255,255,.12); margin: 6px 0 0 0; }
 .invoice .invoice-divider.thin{ opacity:.9; }
 .invoice .invoice-divider.bold{ height:2px; opacity:.9; }
 
 /* Light theme adjustments for new flat invoice list */
-html[data-theme="light"] .invoice .executed-list li .op-line{ color: #111; }
+/* Ensure invoice list items stay flat on light backgrounds */
+html[data-theme="light"] .invoice .executed-list li .op-line{
+  color: #111 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 html[data-theme="light"] .invoice .invoice-divider{ background: var(--divider) !important; opacity: 1; }
 html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 
 /* Ensure the swipe wrapper fills the entire card width so the value can reach the right edge */
 .invoice .executed-list li .swipe-wrapper {
   flex: 1 1 100%;
-  width: 100%;
+  width: calc(100% - 24px); /* account for left+right padding on .op-line so swipe area aligns visually */
+  margin-left: 12px;        /* keep swipe area aligned with the indented content */
 }
 
 /* ===================== MODAL ===================== */
@@ -1870,6 +1976,22 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 .settings-theme-card .theme-row .theme-btn:first-child:focus-visible{ border-radius: 18px 0 0 18px; }
 .settings-theme-card .theme-row .theme-btn:last-child:focus-visible{ border-radius: 0 18px 18px 0; }
+
+/* Version section styles */
+.version-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
+.version-number {
+  color: var(--txt-main);
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
 .settings-item .left{display:inline-flex;align-items:center;gap:10px;color:#fff;font-weight:700;}
 .settings-item .settings-cta{color:#fff;font-weight:800;}
 .settings-item.danger .settings-cta{color:#ff6b6b;}
@@ -2364,6 +2486,12 @@ html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-b
   box-shadow: inset 0 3px 8px rgba(0,0,0,0.08);
 }
 html[data-theme="light"] #settingsModal .settings-theme-card .theme-row .theme-btn[aria-pressed="true"]::after{ background: radial-gradient(ellipse at center, rgba(0,0,0,0.10), rgba(0,0,0,0)); }
+
+/* Version section light theme */
+html[data-theme="light"] .version-number {
+  color: #111;
+  opacity: 0.7;
+}
 
 /* Danger action */
 html[data-theme="light"] #settingsModal .settings-item .settings-cta{ color:#111; }
@@ -2927,4 +3055,8 @@ html.skeleton-boot #dividerSaldo { display: none !important; }
 
 html[data-theme="dark"] {
   --op-left-color: #ffffff;
+}
+
+html[data-theme="dark"] .year-indicator {
+  color: #ffffff;
 }
