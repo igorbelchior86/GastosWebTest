@@ -152,7 +152,7 @@ function renderSettingsModal(){
     <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Versão</h2>
     <div class="settings-card">
       <div class="version-row">
-        <span class="version-number">v1.4.9(a23)</span>
+  <span class="version-number">v1.4.9(a40)</span>
       </div>
     </div>
 
@@ -217,7 +217,27 @@ const yearModal = document.getElementById('yearModal');
 const closeYearModalBtn = document.getElementById('closeYearModal');
 
 if (yearSelector) {
+  // Keep click behavior (open modal)
   yearSelector.addEventListener('click', openYearModal);
+
+  // Keyboard navigation: ArrowLeft / ArrowRight change year without opening modal
+  yearSelector.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      selectYear(VIEW_YEAR - 1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      selectYear(VIEW_YEAR + 1);
+    }
+  });
+
+  // Wheel support: scroll to change year (vertical wheel only)
+  yearSelector.addEventListener('wheel', (e) => {
+    if (e.deltaY === 0 || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    if (e.deltaY < 0) selectYear(VIEW_YEAR + 1);
+    else if (e.deltaY > 0) selectYear(VIEW_YEAR - 1);
+  }, { passive: false });
 }
 
 if (closeYearModalBtn) {
@@ -591,6 +611,7 @@ if (!USE_MOCK) {
       if (k === 'tx') cacheSet('tx', v);
       if (k === 'cards') cacheSet('cards', v);
       if (k === 'startBal') cacheSet('startBal', v);
+      if (k === 'startSet') cacheSet('startSet', v);
       return; // no remote write while offline
     }
     return set(ref(db, `${PATH}/${k}`), v);
@@ -637,7 +658,7 @@ function updatePendingBadge() {
 
 // Marks a collection as dirty so we know to flush it later.
 function markDirty(kind) {
-  const allowed = ['tx','cards','startBal'];
+  const allowed = ['tx','cards','startBal','startSet'];
   if (!allowed.includes(kind)) return;
   const q = cacheGet('dirtyQueue', []);
   if (!q.includes(kind)) q.push(kind);
@@ -696,7 +717,8 @@ async function flushQueue() {
   try {
     if (q.includes('tx'))       await save('tx', transactions);
     if (q.includes('cards'))    await save('cards', cards);
-    if (q.includes('startBal')) await save('startBal', startBalance);
+  if (q.includes('startBal')) await save('startBal', startBalance);
+  if (q.includes('startSet')) await save('startSet', startSet);
   } catch (err) {
     console.error('flushQueue failed:', err);
     // Put back flags so we retry later (union of previous + current)
@@ -731,6 +753,9 @@ async function flushQueue() {
 let transactions = [];
 let cards = [{ name:'Dinheiro', close:0, due:0 }];
 let startBalance;
+let startDate = null; // ISO string YYYY-MM-DD when the user set the initial balance
+let startSet = false; // persisted flag: user completed start flow
+let bootHydrated = false; // becomes true after cache is loaded on startup
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
@@ -925,6 +950,25 @@ if (!USE_MOCK) {
   sortTransactions();
   cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
   startBalance = cacheGet('startBal', null);
+  startDate = cacheGet('startDate', null);
+  // Load persisted flag that indicates the user completed the start-balance flow
+  startSet = cacheGet('startSet', false);
+  console.log('Startup start state -> startBalance:', startBalance, 'startDate:', startDate, 'startSet:', startSet);
+  // Mark hydrated so initStart actually runs and update the UI
+  bootHydrated = true;
+  try { initStart(); renderTable(); } catch(_) {}
+  // Load persisted flag that indicates the user completed the start-balance flow
+  startSet = cacheGet('startSet', false);
+  console.log('Startup start state -> startBalance:', startBalance, 'startDate:', startDate, 'startSet:', startSet);
+  // Mark hydrated in mock fallback and update the UI
+  bootHydrated = true;
+  try { initStart(); renderTable(); } catch(_) {}
+  // Normalização: se não há âncora (startDate) e o startBalance foi carregado como 0,
+  // tratamos isso como "não definido" para mostrar a seção de saldo inicial.
+  if (startDate == null && (startBalance === 0 || startBalance === '0')) {
+    startBalance = null;
+    try { cacheSet('startBal', null); } catch (_) {}
+  }
 
   // Listen for tx changes (LWW merge per item)
   onValue(txRef, (snap) => {
@@ -1014,6 +1058,16 @@ if (!USE_MOCK) {
     initStart();
     renderTable();
   });
+  // Listen for persisted startSet flag changes so remote clears/sets propagate
+  const startSetRef = ref(firebaseDb, `${PATH}/startSet`);
+  onValue(startSetRef, (snap) => {
+    const val = snap.exists() ? !!snap.val() : false;
+    if (val === startSet) return;
+    startSet = val;
+    try { cacheSet('startSet', startSet); } catch(_) {}
+    initStart();
+    renderTable();
+  });
   };
 
   const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
@@ -1059,6 +1113,12 @@ if (!USE_MOCK) {
   transactions = cacheGet('tx', []);
   cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
   startBalance = cacheGet('startBal', null);
+  startDate = cacheGet('startDate', null);
+  // Same normalization for mock fallback
+  if (startDate == null && (startBalance === 0 || startBalance === '0')) {
+    startBalance = null;
+    try { cacheSet('startBal', null); } catch (_) {}
+  }
 
   if (hasLiveTx && JSON.stringify(fixedTx) !== JSON.stringify(transactions)) {
     transactions = fixedTx;
@@ -1475,18 +1535,36 @@ function updateStickyMonth() {
   if (!stickyMonth) return;
   
   let label = '';
+  let lastDiv = null;
   const divs = document.querySelectorAll('summary.month-divider');
   divs.forEach(div => {
     const rect = div.getBoundingClientRect();
     // choose the last divider whose top passed the header
     if (rect.top <= HEADER_OFFSET) {
       label = div.textContent.replace(/\s+/g, ' ').trim();
+      lastDiv = div;
     }
   });
   if (label) {
-    // Exibe apenas o nome do mês (primeira palavra do label)
-    const mesApenas = label.split(/\s+/)[0];
-    stickyMonth.textContent = mesApenas;
+    // Use the last matching divider element to determine month index/year
+    let monthText = '';
+    try {
+      if (lastDiv) {
+        const det = lastDiv.closest('details.month');
+        if (det && det.dataset && det.dataset.key) {
+          const parts = det.dataset.key.split('-');
+          const mIdx = Number(parts[1]);
+          if (!Number.isNaN(mIdx)) {
+            const dt = new Date(VIEW_YEAR, mIdx, 1);
+            monthText = dt.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            if (monthText && monthText.length) monthText = monthText.charAt(0).toUpperCase() + monthText.slice(1);
+          }
+        }
+      }
+    } catch (_) {}
+    // Fallback: use the first word from label if anything goes wrong
+    if (!monthText) monthText = label.split(/\s+/)[0];
+    stickyMonth.textContent = monthText;
     stickyMonth.classList.add('visible');
   } else {
     stickyMonth.classList.remove('visible');
@@ -1772,12 +1850,83 @@ recurrence.onchange = () => {
 let isEditing = null;
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
-// Oculta o botão "Limpar tudo" em produção
-if (resetBtn) {
-  resetBtn.hidden = true;
-  resetBtn.style.display = 'none';
-  // Em produção, não anexamos o handler de limpeza.
+
+// Função reutilizável que executa o reset (confirm dentro da função por padrão)
+async function performResetAllData(askConfirm = true) {
+  if (askConfirm && !confirm('Deseja realmente APAGAR TODOS OS DADOS? Esta ação é irreversível.')) return;
+  try {
+    // Clear in-memory
+    transactions = [];
+    cards = [{ name: 'Dinheiro', close: 0, due: 0 }];
+    startBalance = null;
+    startDate = null;
+  startSet = false;
+
+    // Clear caches (best-effort)
+    try { cacheSet('tx', transactions); } catch (_) {}
+    try { cacheSet('cards', cards); } catch (_) {}
+    try { cacheSet('startBal', startBalance); } catch (_) {}
+    try { cacheSet('startDate', startDate); } catch (_) {}
+    try { cacheSet('dirtyQueue', []); } catch (_) {}
+
+    // Try persist (best effort)
+    try { await save('tx', transactions); } catch (_) {}
+    try { await save('cards', cards); } catch (_) {}
+    try { await save('startBal', startBalance); } catch (_) {}
+    try { await save('startDate', startDate); } catch (_) {}
+  try { cacheSet('startSet', false); } catch (_) {}
+  try { await save('startSet', false); } catch (_) {}
+
+    // Rerender
+    refreshMethods(); renderCardList(); initStart(); renderTable();
+    showToast('Todos os dados foram apagados.', 'success');
+  } catch (err) {
+    console.error('Erro ao limpar dados:', err);
+    showToast('Erro ao apagar dados. Veja console.', 'error');
+  }
 }
+
+// Mostra o botão original "Limpar tudo" no fim do acordeão (se existir) e anexa handler
+if (resetBtn) {
+  resetBtn.hidden = false;
+  resetBtn.style.display = '';
+  resetBtn.addEventListener('click', () => performResetAllData(true));
+}
+
+// Cria um botão flutuante fixo para "Limpar tudo" (sem tocar no HTML original)
+(function createFloatingResetButton(){
+  try {
+    // Avoid creating multiple times
+    if (document.getElementById('resetDataFloat')) return;
+    const btn = document.createElement('button');
+    btn.id = 'resetDataFloat';
+    btn.type = 'button';
+    btn.className = 'danger reset-float';
+    btn.title = 'Limpar tudo';
+    btn.textContent = 'Limpar tudo';
+    // Inline styles to ensure visibility regardless of CSS
+    Object.assign(btn.style, {
+      position: 'fixed',
+      left: '16px',
+      bottom: '94px',
+      zIndex: '10000',
+      padding: '10px 12px',
+      background: '#c53030',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '10px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+      cursor: 'pointer',
+      fontWeight: '600'
+    });
+
+    btn.addEventListener('click', () => performResetAllData(true));
+
+    // Only append when body is ready
+    if (document.body) document.body.appendChild(btn);
+    else window.addEventListener('load', () => { document.body.appendChild(btn); });
+  } catch (_) {}
+})();
 // Auto-format initial balance input as BRL currency
 if (startInput) {
   startInput.addEventListener('input', () => {
@@ -3255,116 +3404,34 @@ function txByDate(iso) {
 
 // Detecta anos disponíveis nas transações
 function getAvailableYears() {
-  const years = new Set();
+  // Calendar-like year provider: return a wide, predictable range so user
+  // can navigate like a calendar. We avoid generating an extremely large
+  // DOM by returning a reasonable window, and the modal provides controls
+  // to page earlier/later if needed.
   const currentYear = new Date().getFullYear();
-  
-  // Sempre inclui o ano atual
-  years.add(currentYear);
-  
-  if (!Array.isArray(transactions) || transactions.length === 0) {
-    return Array.from(years).sort((a, b) => b - a);
-  }
+  const MIN_YEAR = 0; // allow going back to year 0 as requested
+  const FUTURE_PADDING = 50; // years into the future to allow by default
+  const MAX_YEAR = currentYear + FUTURE_PADDING;
 
-  // Analisa todas as transações com parsing mais robusto
-  transactions.forEach(tx => {
-    // Verifica opDate
-    if (tx.opDate) {
-      try {
-        let dateStr = tx.opDate;
-        // Garante formato YYYY-MM-DD
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            // Assume DD/MM/YYYY ou MM/DD/YYYY
-            if (parts[2].length === 4) {
-              dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
-          }
-        }
-        const year = new Date(dateStr).getFullYear();
-        if (!isNaN(year) && year >= 2020 && year <= currentYear + 10) {
-          years.add(year);
-        }
-      } catch (e) {
-        console.warn('Error parsing opDate:', tx.opDate, e);
-      }
-    }
-    
-    // Verifica postDate
-    if (tx.postDate) {
-      try {
-        let dateStr = tx.postDate;
-        // Garante formato YYYY-MM-DD
-        if (dateStr.includes('/')) {
-          const parts = dateStr.split('/');
-          if (parts.length === 3) {
-            if (parts[2].length === 4) {
-              dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-            }
-          }
-        }
-        const year = new Date(dateStr).getFullYear();
-        if (!isNaN(year) && year >= 2020 && year <= currentYear + 10) {
-          years.add(year);
-        }
-      } catch (e) {
-        console.warn('Error parsing postDate:', tx.postDate, e);
-      }
-    }
-    
-    // Para recorrências
-    if (tx.recurrence) {
-      for (let y = currentYear - 2; y <= currentYear + 10; y++) {
-        const testDate = new Date(y, 0, 15).toISOString().slice(0, 10);
-        try {
-          if (typeof occursOn === 'function' && occursOn(tx, testDate)) {
-            years.add(y);
-          }
-        } catch (e) {
-          // Ignora erros de recorrência
-        }
-      }
-    }
-  });
-
-  // Força inclusão de anos baseado em qualquer data encontrada
-  const allYears = new Set();
-  transactions.forEach(tx => {
-    [tx.opDate, tx.postDate].forEach(date => {
-      if (date) {
-        try {
-          // Tenta diferentes formatos
-          let year;
-          if (date.includes('-')) {
-            year = parseInt(date.split('-')[0]);
-          } else if (date.includes('/')) {
-            const parts = date.split('/');
-            year = parseInt(parts[2]); // Assume DD/MM/YYYY
-          } else {
-            year = new Date(date).getFullYear();
-          }
-          
-          if (year >= 2020 && year <= currentYear + 10) {
-            allYears.add(year);
-          }
-        } catch (e) {
-          // Ignora erro de parsing
-        }
-      }
-    });
-  });
-  
-  // Combina todos os anos encontrados
-  allYears.forEach(y => years.add(y));
-
-  return Array.from(years).sort((a, b) => b - a);
+  const years = [];
+  for (let y = MAX_YEAR; y >= MIN_YEAR; y--) years.push(y);
+  return years;
 }
 
 // Atualiza o título com o ano atual
 function updateYearTitle() {
   const logoText = document.querySelector('.logo-text');
   if (logoText) {
+    // Keep visual text identical but expose current year via attributes for accessibility
     logoText.textContent = 'Gastos+';
+    // attach data and aria attributes so behavior can be added without changing visuals
+    const parentBtn = logoText.closest('#yearSelector');
+    if (parentBtn) {
+      parentBtn.setAttribute('data-year', String(VIEW_YEAR));
+      parentBtn.setAttribute('aria-label', `Gastos mais - ano ${VIEW_YEAR}`);
+      // ensure the element is focusable for keyboard handling
+      if (!parentBtn.hasAttribute('tabindex')) parentBtn.setAttribute('tabindex', '0');
+    }
   }
 }
 
@@ -3429,7 +3496,28 @@ function openYearModal() {
     yearList.appendChild(yearItem);
   });
   
+  // Open modal (make visible) before scrolling so measurements work
   modal.classList.remove('hidden');
+
+  // After the list is populated, ensure the currently selected year is
+  // vertically centered in the scrollable yearList. Use scrollIntoView
+  // with block: 'center' for broad browser support.
+  // Delay slightly to allow CSS transitions/layout to settle in some browsers.
+  requestAnimationFrame(() => {
+    const active = yearList.querySelector('.year-item.current');
+    if (active) {
+      try {
+        active.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+      } catch (e) {
+        // Fallback: manual centering
+        const container = yearList;
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = active.getBoundingClientRect();
+        const offset = (activeRect.top + activeRect.height / 2) - (containerRect.top + container.clientHeight / 2);
+        container.scrollTop += offset;
+      }
+    }
+  });
 }
 
 // Fecha o modal de seleção de ano
@@ -3445,36 +3533,16 @@ function selectYear(year) {
   VIEW_YEAR = year;
   updateYearTitle();
   renderTable(); // Re-renderiza com o novo ano
-  
-  // APENAS para anos passados/futuros: scroll para Janeiro
-  const currentYear = new Date().getFullYear();
-  const isCurrentYear = year === currentYear;
-  
-  if (!isCurrentYear) {
-    // Anos passados/futuros: scroll para Janeiro após renderização
-    setTimeout(() => {
-      const acc = document.getElementById('accordion');
-      const januaryElement = acc?.querySelector('details.month[data-key="m-0"]');
-      if (januaryElement) {
-        januaryElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start',
-          inline: 'nearest'
-        });
-      }
-    }, 300);
-  }
-  // Ano atual: não faz nada (mantém comportamento original)
 }
 
 // Calcula o range real de datas baseado nas transações
 function calculateDateRange() {
   if (!Array.isArray(transactions) || transactions.length === 0) {
-    // Se não há transações, usa range padrão do ano atual
-    const currentYear = new Date().getFullYear();
+    // Se não há transações, usa range padrão do ano selecionado (VIEW_YEAR)
+    const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
     return {
-      minDate: `${currentYear}-01-01`,
-      maxDate: `${currentYear}-12-31`
+      minDate: `${year}-01-01`,
+      maxDate: `${year}-12-31`
     };
   }
 
@@ -3521,10 +3589,10 @@ function calculateDateRange() {
 
   // Se ainda não encontrou datas, usa range padrão
   if (!minDate || !maxDate) {
-    const currentYear = new Date().getFullYear();
+    const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
     return {
-      minDate: `${currentYear}-01-01`,
-      maxDate: `${currentYear}-12-31`
+      minDate: `${year}-01-01`,
+      maxDate: `${year}-12-31`
     };
   }
 
@@ -3532,6 +3600,14 @@ function calculateDateRange() {
   const minDateObj = new Date(minDate);
   const maxDateObj = new Date(maxDate);
   
+  // Always expand the range so it at least covers the currently selected VIEW_YEAR
+  try {
+    const vyStart = new Date(VIEW_YEAR, 0, 1);
+    const vyEnd = new Date(VIEW_YEAR, 11, 31);
+    if (vyStart < minDateObj) minDateObj.setTime(vyStart.getTime());
+    if (vyEnd > maxDateObj) maxDateObj.setTime(vyEnd.getTime());
+  } catch (_) {}
+
   // Margem: início do mês da primeira transação até final do ano da última
   minDateObj.setDate(1); // primeiro dia do mês
   maxDateObj.setMonth(11, 31); // 31 de dezembro do ano
@@ -3546,15 +3622,39 @@ function calculateDateRange() {
 function buildRunningBalanceMap() {
   const { minDate, maxDate } = calculateDateRange();
   const balanceMap = new Map();
-  let runningBalance = startBalance || 0;
+  // Anchor semantics: if startDate is set, balances before that date are treated as 0.
+  // The running balance should begin at startDate with startBalance.
+  // If no startDate is set, fall back to previous behavior (seed with startBalance || 0 at minDate).
+  let runningBalance = 0;
+  const hasAnchor = !!startDate;
+  // use ISO string comparisons (YYYY-MM-DD) to avoid timezone issues
+  const anchorISO = hasAnchor ? String(startDate) : null;
 
   // Itera dia-a-dia no range calculado
   const startDateObj = new Date(minDate);
   const endDateObj = new Date(maxDate);
+
+  // If the anchor (startDate) exists but is before the current range's minDate,
+  // we should seed the running balance so days in this range start from the anchored value.
+  if (hasAnchor && anchorISO && anchorISO < minDate && anchorISO <= maxDate) {
+    runningBalance = (startBalance != null) ? startBalance : 0;
+  }
   
   for (let currentDate = new Date(startDateObj); currentDate <= endDateObj; currentDate.setDate(currentDate.getDate() + 1)) {
     const iso = currentDate.toISOString().slice(0, 10);
-    
+    // If we have an explicit anchor, ensure days before anchor are zero (and don't start runningBalance until anchor)
+    if (hasAnchor && iso < anchorISO) {
+      balanceMap.set(iso, 0);
+      continue;
+    }
+    if (hasAnchor && iso === anchorISO) {
+      // initialize running balance at anchor date
+      runningBalance = (startBalance != null) ? startBalance : 0;
+    }
+    // If no anchor and we're at the very first iterated date, seed with startBalance || 0
+    if (!hasAnchor && (iso === minDate)) {
+      runningBalance = (startBalance != null) ? startBalance : 0;
+    }
     // Calcula o impacto do dia usando a lógica existente
     const dayTx = txByDate(iso);
     
@@ -3619,7 +3719,7 @@ function buildRunningBalanceMap() {
 
     const dayTotal = cashImpact + cardImpact;
     runningBalance += dayTotal;
-    
+
     // Armazena o saldo para este dia
     balanceMap.set(iso, runningBalance);
   }
@@ -3642,11 +3742,12 @@ function renderAccordion() {
   acc.innerHTML = '';
   
   const hydrating = false; // Sempre force refresh completo
-  const noDataYet = (startBalance == null) && (!Array.isArray(transactions) || transactions.length === 0);
-  const keepSkeleton = hydrating || noDataYet; // keep shimmer if still no data
-  
+  // Force rendering of months/days even if there's no startBalance or transactions
+  const noDataYet = false;
+  const keepSkeleton = hydrating && noDataYet; // keep shimmer only during hydrating
+
   // Constrói o mapa de saldos contínuos uma única vez
-  const balanceMap = noDataYet ? new Map() : buildRunningBalanceMap();
+  const balanceMap = buildRunningBalanceMap();
   
   // Salva quais <details> estão abertos
   const openKeys = Array.from(acc.querySelectorAll('details[open]'))
@@ -3935,8 +4036,9 @@ Object.keys(invoiceTotals).forEach(card => {
 });
 
 const dayTotal = cashImpact + cardImpact;
-      // Obtém o saldo do dia do mapa precalculado
-      const dayBalance = balanceMap.get(iso) || (startBalance || 0);
+  // Obtém o saldo do dia do mapa precalculado
+  // Use balanceMap.has to avoid falling back to startBalance for dates before the anchor
+  const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : (startBalance || 0);
       const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
       let dDet;
       if (hydrating) {
@@ -4178,7 +4280,7 @@ const dayTotal = cashImpact + cardImpact;
 // Calcula o saldo do último dia do mês usando o mapa
 const lastDayOfMonth = new Date(VIEW_YEAR, mIdx + 1, 0).getDate();
 const lastDayISO = formatToISO(new Date(VIEW_YEAR, mIdx, lastDayOfMonth));
-const monthEndBalanceForHeader = balanceMap.get(lastDayISO) || (startBalance || 0);
+  const monthEndBalanceForHeader = balanceMap.has(lastDayISO) ? balanceMap.get(lastDayISO) : (startBalance || 0);
 const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado';
 
     // Atualiza o summary do mês (cabeçalho do accordion)
@@ -4234,7 +4336,12 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
 }
 
 function initStart() {
-  const showStart = startBalance === null && transactions.length === 0;
+  // Avoid showing start UI until we have loaded cached state to prevent flashes
+  if (!bootHydrated) return;
+  // Show start balance input whenever there's no anchored start date.
+  // If the persisted startSet flag exists, user already completed the start flow.
+  // Otherwise, fall back to presence of startDate/startBalance.
+  const showStart = !(startSet === true || (startDate != null && startBalance != null));
   // exibe ou oculta todo o container de saldo inicial
   startContainer.style.display = showStart ? 'block' : 'none';
   dividerSaldo.style.display = showStart ? 'block' : 'none';
@@ -4243,7 +4350,7 @@ function initStart() {
   // mantém o botão habilitado; a função addTx impede lançamentos
   addBtn.classList.toggle('disabled', showStart);
 }
-setStartBtn.addEventListener('click', () => {
+setStartBtn.addEventListener('click', async () => {
   const raw = startInput.value || '';
   // remove tudo que não for dígito
   const digits = raw.replace(/\D/g, '');
@@ -4260,7 +4367,19 @@ setStartBtn.addEventListener('click', () => {
   // salva o novo saldo e renderiza novamente
   startBalance = numberValue;
   cacheSet('startBal', startBalance);
-  save('startBal', startBalance);
+  // If there's no startDate yet, anchor this saved start balance to today
+  if (!startDate) {
+    startDate = todayISO();
+    cacheSet('startDate', startDate);
+    try { save('startDate', startDate); } catch (_) {}
+  }
+  // Persist start balance and mark the start flow as completed (startSet=true)
+  try {
+    await save('startBal', startBalance);
+  } catch(_) {}
+  startSet = true;
+  try { cacheSet('startSet', true); } catch(_) {}
+  try { await save('startSet', true); } catch(_) {}
   initStart();
   renderTable();
 });

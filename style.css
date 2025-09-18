@@ -1134,6 +1134,10 @@ summary.day-summary .icon-invoice::before{
   padding: 12px 18px;
   margin-bottom: 18px;
 }
+/* Hide start-container by default to prevent flash; main.js will show it via inline style when appropriate */
+.start-container { display: none; }
+/* Hide divider below start section by default to prevent flash; main.js will toggle it */
+#dividerSaldo { display: none; }
 .start-container .modal-title {
   font-family: 'SF Pro Display', system-ui;
   font-weight: 700;
@@ -1193,6 +1197,73 @@ summary.day-summary .icon-invoice::before{
   background: var(--glass-bg) !important;             /* rgba(42,42,44,.80) + radial highlight */
   border: 1px solid rgba(255,255,255,.08);
   box-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
+}
+/* Ensure year selector modal starts above floating pseudo-footer/buttons */
+#yearModal .bottom-modal-box {
+  margin-bottom: calc(88px + env(safe-area-inset-bottom));
+  max-height: 50vh; /* keep it half-screen like requested */
+  width: calc(100% - 16px);
+  max-width: 720px;
+}
+
+/* Make modal content scrollable so the year list can be centered reliably */
+#yearModal .modal-content {
+  max-height: calc(50vh - 72px); /* account for header and drag handle */
+  overflow: auto;
+}
+
+.year-list {
+  /* ensure the year list itself can scroll if content overflows */
+  overflow: auto;
+  max-height: calc(50vh - 120px);
+  padding: 8px 0;
+}
+
+/* ===================== YEAR MODAL - LIGHT THEME (scoped) ===================== */
+/* Apply a light-only skin to the year selector modal. These rules are
+   explicitly scoped to #yearModal so they don't affect any other modal
+   or the global dark theme. */
+#yearModal {
+  color: #111; /* base text color */
+}
+#yearModal .bottom-modal-box {
+  background: #ffffff; /* solid white card for clear contrast */
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  color: #111;
+}
+#yearModal .modal-drag { background: #e6e6e6; }
+#yearModal h2 { color: #111; }
+#yearModal .modal-close-btn { color: #111; }
+
+/* Year items: light cards with subtle borders and dark numbers */
+#yearModal .year-list { background: transparent; }
+#yearModal .year-item {
+  background: #f7f7f7;
+  border: 1px solid rgba(0,0,0,0.06);
+  color: #111;
+  box-shadow: none;
+}
+#yearModal .year-item:hover { background: #f0f0f0; }
+#yearModal .year-item.current {
+  background: #e6ffe6; /* subtle pale green to match app accent */
+  color: #003300;
+  font-weight: 800;
+}
+
+/* Ensure the modal content scrollbars are styled lightly (where supported) */
+#yearModal .modal-content::-webkit-scrollbar { width: 10px; }
+#yearModal .modal-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
+
+/* Keep floating buttons unaffected by z-index but ensure modal appears above them */
+#yearModal { z-index: 1500; }
+
+/* Hide the "Limpar tudo" (reset) buttons visually while keeping functionality intact */
+#resetData,
+#resetDataFloat {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* If you have any .card or .summary etc using transparent, override: */
