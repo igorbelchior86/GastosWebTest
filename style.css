@@ -688,6 +688,10 @@ border-radius: 0 !important;
   bottom: 0;
   background-color: #1e1e1e;
   z-index: -1;
+  
+  /* iOS 26 fix: Ensure backdrop extends fully behind browser chrome */
+  width: 100vw;
+  height: 100vh; /* Will be overridden by @supports rules above */
 }
 .app-hidden{visibility:hidden;}
 .hidden{opacity:0!important;pointer-events:none!important;}
@@ -701,6 +705,13 @@ body{display:block;}
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* evita bounce do body */
+  
+  /* iOS 26 fix: Ensure content respects safe areas on all sides */
+  padding-left: constant(safe-area-inset-left);
+  padding-left: env(safe-area-inset-left);
+  padding-right: constant(safe-area-inset-right);
+  padding-right: env(safe-area-inset-right);
+  
   /* espaço do header fixo */
   padding-top: calc(80px + constant(safe-area-inset-top));
   padding-top: calc(80px + env(safe-area-inset-top));
@@ -735,7 +746,8 @@ html.modal-open .app-footer { visibility: hidden; }
 /* Floating bottom pill (Home/Ajustes) */
 .floating-pill{
   position:fixed;
-  left:24px;
+  left: calc(24px + constant(safe-area-inset-left));
+  left: calc(24px + env(safe-area-inset-left));
   bottom:calc(12px + env(safe-area-inset-bottom));
   z-index:1201;
   display:inline-flex; align-items:center; gap:0;
@@ -780,13 +792,13 @@ html.modal-open .app-footer { visibility: hidden; }
    
    Solution:
    - PWA (standalone): Use 100lvh (large viewport) to extend behind chrome like browser
-   - Browser: Use 100dvh (dynamic viewport) to handle address bar changes smoothly
+   - Safari browser: Use 100lvh as well to extend behind address bar consistently
    
    This ensures consistent behavior between PWA and browser on iOS 26+.
    Fallback to 100svh for older iOS versions that don't support lvh/dvh.
 */
 @supports (height: 100lvh) {
-  /* Check if running as PWA (standalone mode) */
+  /* PWA mode: Use large viewport to extend behind chrome */
   @media (display-mode: standalone) {
     .wrapper { 
       height: 100lvh; /* Large viewport height for PWA to extend behind chrome */
@@ -797,13 +809,55 @@ html.modal-open .app-footer { visibility: hidden; }
       /* Force layout recalculation to ensure safe-area-inset values are available */
       min-height: 100lvh;
     }
+    
+    /* Ensure backdrops extend fully in PWA */
+    #backdrop-base,
+    .bottom-modal {
+      height: 100lvh;
+      width: 100vw;
+    }
   }
   
-  /* For regular Safari browser, maintain current behavior */
+  /* Safari browser: Also use large viewport to extend behind address bar */
   @media not (display-mode: standalone) {
     .wrapper { 
-      height: 100dvh; /* Dynamic viewport for browser to handle address bar */
+      height: 100lvh; /* Large viewport for Safari to extend behind address bar */
     }
+    
+    /* Ensure proper layout in Safari browser */
+    body {
+      min-height: 100lvh;
+    }
+    
+    /* Ensure backdrops extend fully in Safari browser */
+    #backdrop-base,
+    .bottom-modal {
+      height: 100lvh;
+      width: 100vw;
+    }
+  }
+}
+
+/* iOS Safari fallback: Force large viewport even if @supports fails */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  .wrapper {
+    /* Try to detect iOS Safari and force the large viewport */
+    height: 100lvh !important;
+  }
+  
+  body {
+    min-height: 100lvh !important;
+  }
+  
+  /* Fix modal backdrops and backdrop-base to extend fully */
+  #backdrop-base,
+  .bottom-modal {
+    height: 100lvh !important;
+    width: 100vw !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
   }
 }
 input,select,textarea{font-size:16px!important;box-sizing:border-box;}
@@ -963,7 +1017,13 @@ summary.day-summary .icon-invoice::before{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 20px;
+  
+  /* iOS 26 fix: Respect safe areas on left/right sides */
+  padding-left: calc(20px + constant(safe-area-inset-left));
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + constant(safe-area-inset-right));
+  padding-right: calc(20px + env(safe-area-inset-right));
+  
   box-sizing:border-box;
   overflow:hidden;
   backdrop-filter:saturate(180%) blur(30px);
@@ -2375,7 +2435,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 
 /* ===================== FLOATING BUTTONS ===================== */
 .floating-add-button{
-  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));right:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  right: calc(24px + constant(safe-area-inset-right));
+  right: calc(24px + env(safe-area-inset-right));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
@@ -2385,7 +2449,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 }
 /* Espelho do botão flutuante de adicionar: leva ao dia atual */
 .floating-home-button{
-  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  left: calc(24px + constant(safe-area-inset-left));
+  left: calc(24px + env(safe-area-inset-left));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
@@ -3077,6 +3145,29 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 .cancel-btn {
   background: #f5f5f5;
   color: #888;
+}
+.danger-btn {
+  background: #ff6b6b !important;
+  color: white !important;
+}
+.danger-btn:hover {
+  background: #ff5252 !important;
+}
+.reset-data-btn {
+  padding: 14px 0;
+  width: 100%;
+  border-radius: 18px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  background: #ff6b6b;
+  color: white;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.reset-data-btn:hover {
+  background: #ff5252;
 }
 /* Parcelas: colapsa/expande suavemente */
 #parcelasBlock {

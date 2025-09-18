@@ -57,6 +57,7 @@ function askMoveToToday() {
   return new Promise(resolve => {
     const cleanup = () => {
       confirmMoveModal.classList.add('hidden');
+      updateModalOpenState();
       // Remove temporary listeners
       confirmMoveYes.onclick = null;
       confirmMoveNo.onclick = null;
@@ -68,6 +69,7 @@ function askMoveToToday() {
     if (closeConfirmMove) closeConfirmMove.onclick = () => { cleanup(); resolve(false); };
     confirmMoveModal.onclick = (e) => { if (e.target === confirmMoveModal) { cleanup(); resolve(false); } };
     confirmMoveModal.classList.remove('hidden');
+    updateModalOpenState();
   });
 }
 
@@ -78,6 +80,7 @@ function askConfirmLogout() {
   return new Promise(resolve => {
     const cleanup = () => {
       confirmLogoutModal.classList.add('hidden');
+      updateModalOpenState();
       confirmLogoutYes.onclick = null;
       confirmLogoutNo.onclick = null;
       if (closeConfirmLogout) closeConfirmLogout.onclick = null;
@@ -88,6 +91,7 @@ function askConfirmLogout() {
     if (closeConfirmLogout) closeConfirmLogout.onclick = () => { cleanup(); resolve(false); };
     confirmLogoutModal.onclick = (e) => { if (e.target === confirmLogoutModal) { cleanup(); resolve(false); } };
     confirmLogoutModal.classList.remove('hidden');
+    updateModalOpenState();
   });
 }
 // Elements for Planejados modal
@@ -204,8 +208,8 @@ function renderSettingsModal(){
     });
   }
 }
-function openSettings(){ if (!settingsModalEl) return; renderSettingsModal(); document.documentElement.classList.add('modal-open'); settingsModalEl.classList.remove('hidden'); }
-function closeSettings(){ if (!settingsModalEl) return; settingsModalEl.classList.add('hidden'); document.documentElement.classList.remove('modal-open'); }
+function openSettings(){ if (!settingsModalEl) return; renderSettingsModal(); settingsModalEl.classList.remove('hidden'); updateModalOpenState(); }
+function closeSettings(){ if (!settingsModalEl) return; settingsModalEl.classList.add('hidden'); updateModalOpenState(); }
 if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettings);
 if (settingsModalEl) settingsModalEl.addEventListener('click', (e)=>{ if (e.target === settingsModalEl) closeSettings(); });
 // React to auth state updates and keep the modal content fresh
@@ -1297,6 +1301,22 @@ function updateModalOpenState() {
   const open = !!document.querySelector('.bottom-modal:not(.hidden)');
   const root = document.documentElement || document.body;
   if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
+  
+  // Safari iOS fix: Force scroll state cleanup when all modals are closed
+  // Fixes bug where accordion scroll becomes unresponsive after opening/closing modals
+  if (!open && /Safari/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    setTimeout(() => {
+      // Force a reflow to reset scroll state
+      const wrapper = document.querySelector('.wrapper');
+      if (wrapper) {
+        const currentScrollTop = wrapper.scrollTop;
+        wrapper.style.overflow = 'hidden';
+        wrapper.offsetHeight; // Force reflow
+        wrapper.style.overflow = 'auto';
+        wrapper.scrollTop = currentScrollTop;
+      }
+    }, 50);
+  }
 }
 if (closeTxModal) closeTxModal.onclick = toggleTxModal;
 if (txModal) {
@@ -1470,14 +1490,40 @@ function isInScrollableModal(el){
   // fallback: treat .modal-content as scrollable container
   return content && content.scrollHeight > content.clientHeight;
 }
+
+// Safari iOS fix: Force scroll state cleanup when no modals are open
+let lastModalState = false;
+function resetScrollStateIfNeeded() {
+  const currentModalState = anyModalOpen();
+  if (lastModalState && !currentModalState) {
+    // Modal was just closed - force scroll cleanup for Safari iOS
+    if (/Safari/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      setTimeout(() => {
+        // Force a reflow to reset scroll state
+        const wrapper = document.querySelector('.wrapper');
+        if (wrapper) {
+          const currentScrollTop = wrapper.scrollTop;
+          wrapper.style.overflow = 'hidden';
+          wrapper.offsetHeight; // Force reflow
+          wrapper.style.overflow = 'auto';
+          wrapper.scrollTop = currentScrollTop;
+        }
+      }, 50);
+    }
+  }
+  lastModalState = currentModalState;
+}
+
 // Allow scroll inside modal content; block background scroll only
 document.addEventListener('touchmove', (e) => {
+  resetScrollStateIfNeeded();
   if (!anyModalOpen()) return;
   const target = e.target;
   if (isInScrollableModal(target)) return; // allow natural scroll in modal
   e.preventDefault();
 }, { passive: false });
 document.addEventListener('wheel', (e) => {
+  resetScrollStateIfNeeded();
   if (!anyModalOpen()) return;
   const target = e.target;
   if (isInScrollableModal(target)) return; // allow wheel inside modal
@@ -3530,6 +3576,7 @@ function openYearModal() {
   
   // Open modal (make visible) before scrolling so measurements work
   modal.classList.remove('hidden');
+  updateModalOpenState();
 
   // After the list is populated, ensure the currently selected year is
   // vertically centered in the scrollable yearList. Use scrollIntoView
@@ -3557,6 +3604,7 @@ function closeYearModal() {
   const modal = document.getElementById('yearModal');
   if (modal) {
     modal.classList.add('hidden');
+    updateModalOpenState();
   }
 }
 
