@@ -520,27 +520,71 @@ const ua = navigator.userAgent.toLowerCase();
 const isIOSDebug = /iphone|ipad|ipod/.test(ua);
 const standaloneDebug = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
 
-if (isIOSDebug && standaloneDebug) {
-  console.log('🔧 iOS PWA Debug Info:');
+// Enhanced debugging for both PWA and Safari browser on iOS
+if (isIOSDebug) {
+  console.log('🔧 iOS Debug Info:');
   console.log('- User Agent:', navigator.userAgent);
   console.log('- Display Mode:', window.matchMedia ? window.matchMedia('(display-mode: standalone)').matches : 'unknown');
   console.log('- Navigator Standalone:', navigator.standalone);
+  console.log('- Running as:', standaloneDebug ? 'PWA' : 'Safari Browser');
   console.log('- Firebase Config:', firebaseConfig ? 'loaded' : 'missing');
   console.log('- Auth State:', window.Auth ? 'initialized' : 'pending');
   
-  // Monitor auth state changes
-  document.addEventListener('auth:state', (e) => {
-    const user = e.detail && e.detail.user;
-    console.log('🔧 iOS PWA Auth State:', user ? {
-      email: user.email,
-      uid: user.uid,
-      emailVerified: user.emailVerified
-    } : 'signed out');
-  });
+  // iOS 26 viewport debugging (for both PWA and Safari)
+  console.log('📱 iOS 26 Viewport Info:');
+  console.log('- window.innerHeight:', window.innerHeight);
+  console.log('- window.outerHeight:', window.outerHeight);
+  console.log('- screen.height:', screen.height);
+  console.log('- visualViewport:', window.visualViewport ? {
+    height: window.visualViewport.height,
+    width: window.visualViewport.width,
+    offsetTop: window.visualViewport.offsetTop
+  } : 'not supported');
   
-  // Monitor network status
+  // Check safe area support
+  const testDiv = document.createElement('div');
+  testDiv.style.cssText = 'position: fixed; top: env(safe-area-inset-top); left: env(safe-area-inset-left); visibility: hidden;';
+  document.body.appendChild(testDiv);
+  const computedStyle = getComputedStyle(testDiv);
+  console.log('- Safe area insets:', {
+    top: computedStyle.top,
+    left: computedStyle.left,
+    supported: computedStyle.top !== 'env(safe-area-inset-top)'
+  });
+  document.body.removeChild(testDiv);
+  
+  // Check viewport unit support
+  const viewportSupport = {
+    vh: CSS.supports('height', '100vh'),
+    svh: CSS.supports('height', '100svh'),
+    dvh: CSS.supports('height', '100dvh'),
+    lvh: CSS.supports('height', '100lvh')
+  };
+  console.log('- Viewport units support:', viewportSupport);
+  
+  // Check computed wrapper height
+  const wrapper = document.querySelector('.wrapper');
+  if (wrapper) {
+    console.log('- Wrapper computed height:', getComputedStyle(wrapper).height);
+    console.log('- Wrapper scrollHeight:', wrapper.scrollHeight);
+    console.log('- Wrapper clientHeight:', wrapper.clientHeight);
+  }
+  
+  if (standaloneDebug) {
+    // Monitor auth state changes (only for PWA)
+    document.addEventListener('auth:state', (e) => {
+      const user = e.detail && e.detail.user;
+      console.log('🔧 iOS PWA Auth State:', user ? {
+        email: user.email,
+        uid: user.uid,
+        emailVerified: user.emailVerified
+      } : 'signed out');
+    });
+  }
+  
+  // Monitor network status (for both PWA and Safari)
   const logNetworkStatus = () => {
-    console.log('🔧 iOS PWA Network:', navigator.onLine ? 'online' : 'offline');
+    console.log('🔧 iOS Network:', navigator.onLine ? 'online' : 'offline');
   };
   logNetworkStatus();
   window.addEventListener('online', logNetworkStatus);

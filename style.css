@@ -688,6 +688,15 @@ border-radius: 0 !important;
   bottom: 0;
   background-color: #1e1e1e;
   z-index: -1;
+  
+  /* iOS 26 fix: Ensure backdrop extends fully behind browser chrome */
+  width: 100vw;
+  height: 100vh; /* Will be overridden by @supports rules above */
+  
+  /* Additional iOS Safari fix: extend beyond the typical viewport bounds */
+  min-width: 100vw;
+  min-height: 100vh;
+  transform: translate3d(0, 0, 0); /* Force GPU acceleration */
 }
 .app-hidden{visibility:hidden;}
 .hidden{opacity:0!important;pointer-events:none!important;}
@@ -701,6 +710,13 @@ body{display:block;}
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* evita bounce do body */
+  
+  /* iOS 26 fix: Ensure content respects safe areas on all sides */
+  padding-left: constant(safe-area-inset-left);
+  padding-left: env(safe-area-inset-left);
+  padding-right: constant(safe-area-inset-right);
+  padding-right: env(safe-area-inset-right);
+  
   /* espaço do header fixo */
   padding-top: calc(80px + constant(safe-area-inset-top));
   padding-top: calc(80px + env(safe-area-inset-top));
@@ -735,7 +751,8 @@ html.modal-open .app-footer { visibility: hidden; }
 /* Floating bottom pill (Home/Ajustes) */
 .floating-pill{
   position:fixed;
-  left:24px;
+  left: calc(24px + constant(safe-area-inset-left));
+  left: calc(24px + env(safe-area-inset-left));
   bottom:calc(12px + env(safe-area-inset-bottom));
   z-index:1201;
   display:inline-flex; align-items:center; gap:0;
@@ -771,6 +788,130 @@ html.modal-open .app-footer { visibility: hidden; }
 /* Prefer 100svh where supported (stable initial viewport on iOS Safari) */
 @supports (height: 100svh) {
   .wrapper { height: 100svh; }
+}
+
+/* iOS 26+ PWA optimization: use large viewport to match browser behavior 
+   
+   Background: iOS PWAs behave differently than Safari browser regarding viewport handling.
+   Safari browser extends content behind dynamic chrome (address bar), but PWAs don't.
+   
+   Solution:
+   - PWA (standalone): Use 100lvh (large viewport) to extend behind chrome like browser
+   - Safari browser: Use 100lvh as well to extend behind address bar consistently
+   
+   This ensures consistent behavior between PWA and browser on iOS 26+.
+   Fallback to 100svh for older iOS versions that don't support lvh/dvh.
+*/
+@supports (height: 100lvh) {
+  /* PWA mode: Use large viewport to extend behind chrome */
+  @media (display-mode: standalone) {
+    .wrapper { 
+      height: 100lvh; /* Large viewport height for PWA to extend behind chrome */
+      width: 100vw;
+      max-width: none;
+    }
+    
+    /* Ensure safe areas are properly handled in PWA mode */
+    body {
+      /* Force layout recalculation to ensure safe-area-inset values are available */
+      min-height: 100lvh;
+      width: 100vw;
+      overflow-x: hidden;
+    }
+    
+    /* Ensure backdrops extend fully in PWA - beyond safe areas */
+    #backdrop-base,
+    .bottom-modal {
+      height: 100lvh;
+      width: 100vw;
+      /* Extend beyond safe areas */
+      margin-top: calc(-1 * env(safe-area-inset-top));
+      margin-left: calc(-1 * env(safe-area-inset-left));
+      margin-right: calc(-1 * env(safe-area-inset-right));
+      margin-bottom: calc(-1 * env(safe-area-inset-bottom));
+    }
+  }
+  
+  /* Safari browser: Also use large viewport to extend behind address bar */
+  @media not (display-mode: standalone) {
+    .wrapper { 
+      height: 100lvh; /* Large viewport for Safari to extend behind address bar */
+      width: 100vw;
+      max-width: none;
+    }
+    
+    /* Ensure proper layout in Safari browser */
+    body {
+      min-height: 100lvh;
+      width: 100vw;
+      overflow-x: hidden;
+    }
+    
+    /* Ensure backdrops extend fully in Safari browser - beyond safe areas */
+    #backdrop-base,
+    .bottom-modal {
+      height: 100lvh;
+      width: 100vw;
+      /* Extend beyond safe areas to cover entire screen including browser chrome */
+      margin-top: calc(-1 * env(safe-area-inset-top));
+      margin-left: calc(-1 * env(safe-area-inset-left));
+      margin-right: calc(-1 * env(safe-area-inset-right));
+      margin-bottom: calc(-1 * env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* iOS Safari fallback: Force large viewport even if @supports fails */
+@media screen and (-webkit-min-device-pixel-ratio: 2) {
+  .wrapper {
+    /* Try to detect iOS Safari and force the large viewport */
+    height: 100lvh !important;
+    width: 100vw !important;
+    max-width: none !important;
+  }
+  
+  body {
+    min-height: 100lvh !important;
+    width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Force modal backdrops and backdrop-base to extend fully beyond browser chrome */
+  #backdrop-base,
+  .bottom-modal {
+    height: 100lvh !important;
+    width: 100vw !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    position: fixed !important;
+    /* Extend beyond safe areas to ensure full coverage */
+    margin-top: calc(-1 * env(safe-area-inset-top)) !important;
+    margin-left: calc(-1 * env(safe-area-inset-left)) !important;
+    margin-right: calc(-1 * env(safe-area-inset-right)) !important;
+    margin-bottom: calc(-1 * env(safe-area-inset-bottom)) !important;
+  }
+  
+  /* Additional aggressive coverage for iOS Safari */
+  #backdrop-base::before,
+  .bottom-modal::before {
+    content: '' !important;
+    position: absolute !important;
+    top: -100px !important;
+    left: -100px !important;
+    right: -100px !important;
+    bottom: -100px !important;
+    background: inherit !important;
+    z-index: -1 !important;
+  }
+  
+  /* Ensure app header extends fully across */
+  .app-header {
+    width: 100vw !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
 }
 input,select,textarea{font-size:16px!important;box-sizing:border-box;}
 .value{white-space:nowrap;}
@@ -929,7 +1070,13 @@ summary.day-summary .icon-invoice::before{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 20px;
+  
+  /* iOS 26 fix: Respect safe areas on left/right sides */
+  padding-left: calc(20px + constant(safe-area-inset-left));
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + constant(safe-area-inset-right));
+  padding-right: calc(20px + env(safe-area-inset-right));
+  
   box-sizing:border-box;
   overflow:hidden;
   backdrop-filter:saturate(180%) blur(30px);
@@ -1186,6 +1333,18 @@ summary.day-summary .icon-invoice::before{
   background: rgba(0,0,0,.35) !important;            /* dim suave */
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
+  
+  /* iOS 26 fix: Force modal backdrop to cover entire screen */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important; /* Will be overridden by @supports rules */
+  min-width: 100vw !important;
+  min-height: 100vh !important;
+  transform: translate3d(0, 0, 0) !important; /* Force GPU acceleration */
 }
 
 /* Caixa do modal: vidro escuro com leve textura/gradiente */
@@ -1219,41 +1378,54 @@ summary.day-summary .icon-invoice::before{
   padding: 8px 0;
 }
 
-/* ===================== YEAR MODAL - LIGHT THEME (scoped) ===================== */
-/* Apply a light-only skin to the year selector modal. These rules are
-   explicitly scoped to #yearModal so they don't affect any other modal
-   or the global dark theme. */
-#yearModal {
-  color: #111; /* base text color */
+/* ===================== YEAR MODAL - LIGHT THEME (optional) ===================== */
+/* Preserve the existing dark styling by default. If a light variant is
+   required, add the attribute `data-theme="light"` on the `#yearModal`
+   element; the following rules will only apply then. This avoids
+   overriding the current dark appearance. */
+/* Apply the light variant when either the modal has data-theme="light"
+   or the entire page is in light mode (html[data-theme="light"]). */
+#yearModal[data-theme="light"], html[data-theme="light"] #yearModal {
+  color: #111; /* base text color for light variant */
 }
-#yearModal .bottom-modal-box {
+#yearModal[data-theme="light"] .bottom-modal-box,
+html[data-theme="light"] #yearModal .bottom-modal-box {
   background: #ffffff; /* solid white card for clear contrast */
   border: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 10px 30px rgba(0,0,0,0.28);
   color: #111;
 }
-#yearModal .modal-drag { background: #e6e6e6; }
-#yearModal h2 { color: #111; }
-#yearModal .modal-close-btn { color: #111; }
+#yearModal[data-theme="light"] .modal-drag,
+html[data-theme="light"] #yearModal .modal-drag { background: #e6e6e6; }
+#yearModal[data-theme="light"] h2,
+html[data-theme="light"] #yearModal h2 { color: #111; }
+#yearModal[data-theme="light"] .modal-close-btn,
+html[data-theme="light"] #yearModal .modal-close-btn { color: #111; }
 
 /* Year items: light cards with subtle borders and dark numbers */
-#yearModal .year-list { background: transparent; }
-#yearModal .year-item {
+#yearModal[data-theme="light"] .year-list,
+html[data-theme="light"] #yearModal .year-list { background: transparent; }
+#yearModal[data-theme="light"] .year-item,
+html[data-theme="light"] #yearModal .year-item {
   background: #f7f7f7;
   border: 1px solid rgba(0,0,0,0.06);
   color: #111;
   box-shadow: none;
 }
-#yearModal .year-item:hover { background: #f0f0f0; }
-#yearModal .year-item.current {
+#yearModal[data-theme="light"] .year-item:hover,
+html[data-theme="light"] #yearModal .year-item:hover { background: #f0f0f0; }
+#yearModal[data-theme="light"] .year-item.current,
+html[data-theme="light"] #yearModal .year-item.current {
   background: #e6ffe6; /* subtle pale green to match app accent */
   color: #003300;
   font-weight: 800;
 }
 
 /* Ensure the modal content scrollbars are styled lightly (where supported) */
-#yearModal .modal-content::-webkit-scrollbar { width: 10px; }
-#yearModal .modal-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
+#yearModal[data-theme="light"] .modal-content::-webkit-scrollbar,
+html[data-theme="light"] #yearModal .modal-content::-webkit-scrollbar { width: 10px; }
+#yearModal[data-theme="light"] .modal-content::-webkit-scrollbar-thumb,
+html[data-theme="light"] #yearModal .modal-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
 
 /* Keep floating buttons unaffected by z-index but ensure modal appears above them */
 #yearModal { z-index: 1500; }
@@ -2328,7 +2500,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 
 /* ===================== FLOATING BUTTONS ===================== */
 .floating-add-button{
-  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));right:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  right: calc(24px + constant(safe-area-inset-right));
+  right: calc(24px + env(safe-area-inset-right));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
@@ -2338,7 +2514,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 }
 /* Espelho do botão flutuante de adicionar: leva ao dia atual */
 .floating-home-button{
-  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:24px;z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + env(safe-area-inset-bottom));
+  left: calc(24px + constant(safe-area-inset-left));
+  left: calc(24px + env(safe-area-inset-left));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
