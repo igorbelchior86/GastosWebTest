@@ -520,17 +520,15 @@ const ua = navigator.userAgent.toLowerCase();
 const isIOSDebug = /iphone|ipad|ipod/.test(ua);
 const standaloneDebug = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
 
-// Enhanced debugging for both PWA and Safari browser on iOS
-if (isIOSDebug) {
-  console.log('🔧 iOS Debug Info:');
+if (isIOSDebug && standaloneDebug) {
+  console.log('🔧 iOS PWA Debug Info:');
   console.log('- User Agent:', navigator.userAgent);
   console.log('- Display Mode:', window.matchMedia ? window.matchMedia('(display-mode: standalone)').matches : 'unknown');
   console.log('- Navigator Standalone:', navigator.standalone);
-  console.log('- Running as:', standaloneDebug ? 'PWA' : 'Safari Browser');
   console.log('- Firebase Config:', firebaseConfig ? 'loaded' : 'missing');
   console.log('- Auth State:', window.Auth ? 'initialized' : 'pending');
   
-  // iOS 26 viewport debugging (for both PWA and Safari)
+  // iOS 26 viewport debugging
   console.log('📱 iOS 26 Viewport Info:');
   console.log('- window.innerHeight:', window.innerHeight);
   console.log('- window.outerHeight:', window.outerHeight);
@@ -562,29 +560,19 @@ if (isIOSDebug) {
   };
   console.log('- Viewport units support:', viewportSupport);
   
-  // Check computed wrapper height
-  const wrapper = document.querySelector('.wrapper');
-  if (wrapper) {
-    console.log('- Wrapper computed height:', getComputedStyle(wrapper).height);
-    console.log('- Wrapper scrollHeight:', wrapper.scrollHeight);
-    console.log('- Wrapper clientHeight:', wrapper.clientHeight);
-  }
+  // Monitor auth state changes
+  document.addEventListener('auth:state', (e) => {
+    const user = e.detail && e.detail.user;
+    console.log('🔧 iOS PWA Auth State:', user ? {
+      email: user.email,
+      uid: user.uid,
+      emailVerified: user.emailVerified
+    } : 'signed out');
+  });
   
-  if (standaloneDebug) {
-    // Monitor auth state changes (only for PWA)
-    document.addEventListener('auth:state', (e) => {
-      const user = e.detail && e.detail.user;
-      console.log('🔧 iOS PWA Auth State:', user ? {
-        email: user.email,
-        uid: user.uid,
-        emailVerified: user.emailVerified
-      } : 'signed out');
-    });
-  }
-  
-  // Monitor network status (for both PWA and Safari)
+  // Monitor network status
   const logNetworkStatus = () => {
-    console.log('🔧 iOS Network:', navigator.onLine ? 'online' : 'offline');
+    console.log('🔧 iOS PWA Network:', navigator.onLine ? 'online' : 'offline');
   };
   logNetworkStatus();
   window.addEventListener('online', logNetworkStatus);
