@@ -81,7 +81,7 @@
       <button id="closeSettingsModal" class="modal-close-btn" aria-label="Fechar">✕</button>
       <div class="modal-content">
   <button id="toggleThemeBtn" class="theme-toggle-btn">Modo Claro/Escuro</button>
-  <button id="resetDataBtn" class="reset-data-btn">Apagar Todos os Dados</button>
+  <!-- conteúdo futuro -->
       </div>
     </div>
   </div>
@@ -257,20 +257,34 @@
       <h2 id="confirmResetTitle">Apagar Todos os Dados</h2>
       <button id="closeConfirmReset" class="modal-close-btn" aria-label="Fechar">✕</button>
       <div class="form-grid">
-        <p id="confirmResetText" style="margin: 6px 0 4px; color: var(--txt-danger); text-align:center;">⚠️ Esta ação irá apagar permanentemente todos os seus dados: transações, cartões, planejados e configurações. Esta ação não pode ser desfeita.</p>
+  <p id="confirmResetText" style="margin: 6px 0 4px; color: var(--txt-main); opacity:0.95; text-align:center;">⚠️ Esta ação apagará permanentemente todas as suas transações, cartões e configurações. Não poderá ser desfeita.</p>
         <button id="confirmResetYes" class="action-btn danger-btn">Apagar Tudo</button>
         <button id="confirmResetNo" class="action-btn cancel-btn">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Ações inferiores: Home/Sobre em pill e Adicionar separadamente -->
+  <!-- Modal País / Moeda (profiles) -->
+  <div id="currencyProfileModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="currencyProfileTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="currencyProfileTitle">País / Moeda</h2>
+      <button id="closeCurrencyProfileModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="modal-content">
+        <ul id="currencyProfileList" style="list-style:none;padding:6px 0;margin:0;display:block;">
+          <!-- items injected by JS -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ações inferiores: Home/Ajustes em pill e Adicionar separadamente -->
   <div class="floating-pill" role="tablist" aria-label="Atalhos inferiores" data-selected="home" style="display: none;">
     <div class="pill-highlight" aria-hidden="true"></div>
     <button type="button" class="pill-option" data-action="home" role="tab" aria-selected="true" aria-label="Home">
       <span class="pill-icon icon-home"></span>
     </button>
-    <button type="button" class="pill-option" data-action="settings" role="tab" aria-selected="false" aria-label="Sobre">
+    <button type="button" class="pill-option" data-action="settings" role="tab" aria-selected="false" aria-label="Ajustes">
       <span class="pill-icon icon-gear"></span>
     </button>
   </div>
@@ -330,6 +344,7 @@
   <script src="js/utils/date-utils-global.js"></script>
   <script src="js/utils/format-utils-global.js"></script>
   <script src="js/utils/data-utils-global.js"></script>
+  <script src="js/utils/currency-profiles.js"></script>
   
   <script type="module" src="auth.js?v=1.4.8(a40)"></script>
   <script type="module" src="login.view.js?v=1.4.8(a40)"></script>

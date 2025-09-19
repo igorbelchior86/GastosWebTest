@@ -144,19 +144,34 @@ function renderSettingsModal(){
       </div>
     </div>
 
-  <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Tema</h2>
+  <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Personalização</h2>
     <div class="settings-card settings-theme-card">
       <div class="theme-row" id="themeButtons">
         <button type="button" class="theme-btn" data-theme="light">Claro</button>
         <button type="button" class="theme-btn" data-theme="dark">Escuro</button>
         <button type="button" class="theme-btn" data-theme="system">Sistema</button>
       </div>
+      <div style="margin-top:4px;padding:0;">
+        <div id="currencyProfileRow" class="settings-row" style="display:flex;align-items:center;justify-content:space-between;padding:14px;border-radius:10px;background:var(--card-bg);box-shadow:var(--card-shadow);cursor:pointer;">
+          <div id="currencyProfileLabel" style="font-weight:600;color:var(--txt-main);font-size:15px;">Brasil (BRL)</div>
+          <div style="color:var(--txt-muted);font-size:18px;">›</div>
+        </div>
+      </div>
     </div>
 
-    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Versão</h2>
-    <div class="settings-card">
-      <div class="version-row">
-  <span class="version-number">v1.4.9(a40)</span>
+    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Sobre</h2>
+    <div class="settings-list">
+      <div class="settings-item">
+        <div class="left">
+          <span class="version-number">v1.4.9(a40)</span>
+        </div>
+        <div class="right"></div>
+      </div>
+
+      <div class="settings-item danger">
+        <button type="button" id="resetDataBtn" class="settings-cta">
+          <span>Apagar Todos os Dados</span>
+        </button>
       </div>
     </div>
 
@@ -206,6 +221,99 @@ function renderSettingsModal(){
         updateThemeButtons(v);
       });
     });
+  }
+
+  // Currency/profile row wiring (opens a modal list)
+  const profileRow = box.querySelector('#currencyProfileRow');
+  if (profileRow && window.CURRENCY_PROFILES) {
+    const updateRowLabel = () => {
+      const cur = localStorage.getItem('ui:profile') || Object.keys(window.CURRENCY_PROFILES)[0];
+      const p = window.CURRENCY_PROFILES[cur] || Object.values(window.CURRENCY_PROFILES)[0];
+      const left = profileRow.querySelector('#currencyProfileLabel');
+      if (left) {
+        left.textContent = p ? p.name : '—';
+        left.style.setProperty('color', 'var(--txt-main)', 'important');
+        left.style.setProperty('opacity', '1', 'important');
+      }
+    };
+    updateRowLabel();
+    profileRow.addEventListener('click', () => {
+      const modal = document.getElementById('currencyProfileModal');
+      const list = document.getElementById('currencyProfileList');
+      if (!modal || !list) return;
+      // populate list
+      list.innerHTML = '';
+      Object.keys(window.CURRENCY_PROFILES).forEach(k => {
+        const p = window.CURRENCY_PROFILES[k];
+        const li = document.createElement('li');
+        li.style.padding = '12px 10px';
+        li.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+        li.style.cursor = 'pointer';
+  // make sure list text is high-contrast and visible in all themes
+  li.style.fontSize = '16px';
+  li.style.fontWeight = '600';
+  li.style.background = 'transparent';
+  // use setProperty with priority to override strict theme rules if needed
+  li.style.setProperty('color', 'var(--txt-main)', 'important');
+  li.style.setProperty('opacity', '1', 'important');
+  li.style.setProperty('mix-blend-mode', 'normal', 'important');
+        li.style.userSelect = 'none';
+        li.textContent = p.name;
+        li.dataset.profileId = p.id;
+        li.addEventListener('click', () => {
+          applyCurrencyProfile(p.id);
+          modal.classList.add('hidden');
+          updateModalOpenState();
+          updateRowLabel();
+        });
+        // touch / hover feedback
+        li.addEventListener('pointerenter', () => { li.style.background = 'rgba(255,255,255,0.02)'; });
+        li.addEventListener('pointerleave', () => { li.style.background = 'transparent'; });
+        list.appendChild(li);
+      });
+      modal.classList.remove('hidden');
+      updateModalOpenState();
+    });
+  }
+
+  // wire currency profile modal close
+  const closeCurrencyProfileModal = document.getElementById('closeCurrencyProfileModal');
+  const currencyProfileModalEl = document.getElementById('currencyProfileModal');
+  if (closeCurrencyProfileModal && currencyProfileModalEl) {
+    closeCurrencyProfileModal.addEventListener('click', () => { currencyProfileModalEl.classList.add('hidden'); updateModalOpenState(); });
+    currencyProfileModalEl.addEventListener('click', (e) => { if (e.target === currencyProfileModalEl) { currencyProfileModalEl.classList.add('hidden'); updateModalOpenState(); } });
+  }
+
+  // Reset button inside settings modal
+  const localResetBtn = box.querySelector('#resetDataBtn');
+  if (localResetBtn) {
+    localResetBtn.addEventListener('click', () => {
+      const confirmModal = document.getElementById('confirmResetModal');
+      if (confirmModal) {
+        confirmModal.classList.remove('hidden');
+        updateModalOpenState();
+      } else {
+        // fallback: call existing function directly
+        try { performResetAllData(true); } catch (e) { console.error(e); }
+      }
+    });
+  }
+
+  // Wire confirmation modal buttons if modal exists in DOM
+  const confirmResetModal = document.getElementById('confirmResetModal');
+  const confirmResetYes = document.getElementById('confirmResetYes');
+  const confirmResetNo = document.getElementById('confirmResetNo');
+  const closeConfirmReset = document.getElementById('closeConfirmReset');
+  if (confirmResetModal) {
+    if (confirmResetYes) confirmResetYes.onclick = async () => {
+      // proceed without extra confirm (we already asked via modal)
+      confirmResetModal.classList.add('hidden');
+      updateModalOpenState();
+      try { await performResetAllData(false); } catch (e) { console.error(e); }
+    };
+    if (confirmResetNo) confirmResetNo.onclick = () => { confirmResetModal.classList.add('hidden'); updateModalOpenState(); };
+    if (closeConfirmReset) closeConfirmReset.onclick = () => { confirmResetModal.classList.add('hidden'); updateModalOpenState(); };
+    confirmResetModal.onclick = (e) => { if (e.target === confirmResetModal) { confirmResetModal.classList.add('hidden'); updateModalOpenState(); } };
   }
 }
 function openSettings(){ if (!settingsModalEl) return; renderSettingsModal(); settingsModalEl.classList.remove('hidden'); updateModalOpenState(); }
@@ -407,6 +515,53 @@ function initThemeFromStorage(){
 
 // Initialize theme early
 initThemeFromStorage();
+
+/**
+ * Apply a currency/profile by id.
+ * - sets window.APP_PROFILE
+ * - creates window.APP_FMT Intl.NumberFormat for currency
+ * - persists choice to localStorage
+ * - toggles UI bits controlled by profile.features (e.g., invoice parcel)
+ */
+function applyCurrencyProfile(profileId){
+  if (!window.CURRENCY_PROFILES) return;
+  const p = window.CURRENCY_PROFILES[profileId] || Object.values(window.CURRENCY_PROFILES)[0];
+  if (!p) return;
+  window.APP_PROFILE = p;
+  try{
+    window.APP_FMT = new Intl.NumberFormat(p.locale, { style: 'currency', currency: p.currency, minimumFractionDigits: p.decimalPlaces, maximumFractionDigits: p.decimalPlaces });
+  }catch(e){
+    window.APP_FMT = { format: v => (Number(v).toFixed(p.decimalPlaces) + ' ' + p.currency) };
+  }
+  localStorage.setItem('ui:profile', p.id);
+
+  // toggle invoice parcel row if present
+  const invoiceRow = document.getElementById('invoiceParcelRow');
+  if (invoiceRow){
+    if (p.features && p.features.invoiceParcel === false){
+      invoiceRow.style.display = 'none';
+    } else {
+      invoiceRow.style.display = '';
+    }
+  }
+
+  // update placeholders that show currency examples
+  const startInput = document.querySelector('.start-container .currency-input');
+  if (startInput){
+    if (window.APP_FMT && window.APP_FMT.format) startInput.placeholder = window.APP_FMT.format(0);
+  }
+
+  // re-render parts that depend on formatting or features
+  if (typeof renderTxModal === 'function') try{ renderTxModal(); }catch(e){}
+  if (typeof renderCardList === 'function') try{ renderCardList(); }catch(e){}
+  if (typeof renderTable === 'function') try{ renderTable(); }catch(e){}
+}
+
+// Apply saved profile on load (if profiles are available)
+try{
+  const savedProfile = localStorage.getItem('ui:profile') || (window.CURRENCY_PROFILES ? Object.keys(window.CURRENCY_PROFILES)[0] : null);
+  if (savedProfile) applyCurrencyProfile(savedProfile);
+}catch(e){}
 
 
 import { openDB } from 'https://unpkg.com/idb?module';
