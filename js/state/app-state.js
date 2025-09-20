@@ -8,7 +8,8 @@ const defaultState = {
   startBalance: null,
   startDate: null,
   startSet: false,
-  bootHydrated: false
+  bootHydrated: false,
+  dataHydrated: false
 };
 
 const state = { ...defaultState };
@@ -88,6 +89,17 @@ export function setBootHydrated(value, options = {}) {
   return state.bootHydrated;
 }
 
+export function isDataHydrated() {
+  return state.dataHydrated;
+}
+
+export function setDataHydrated(value, options = {}) {
+  if (state.dataHydrated === value) return state.dataHydrated;
+  state.dataHydrated = value;
+  if (options.emit !== false) emit(['dataHydrated']);
+  return state.dataHydrated;
+}
+
 export function resetState(options = {}) {
   const changed = [];
   Object.keys(state).forEach(key => {
@@ -102,6 +114,7 @@ export function resetState(options = {}) {
 export const appState = new Proxy(state, {
   get(target, prop) {
     if (prop === 'bootHydrated') return target.bootHydrated;
+    if (prop === 'dataHydrated') return target.dataHydrated;
     if (prop in target) return target[prop];
     return undefined;
   },

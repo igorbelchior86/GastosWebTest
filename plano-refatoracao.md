@@ -12,6 +12,7 @@
 - **Placeholders/formatos**: sincronizados com o perfil ativo (ex.: saldo inicial).
 - **Estado (start flow)**: novo módulo `js/state/app-state.js` controla `startBalance`, `startDate`, `startSet` e `bootHydrated`, consumido por `main.js`.
 - **Perfil ↔ saldo inicial**: troca de perfil agora recarrega saldo/start específicos e limpa o input quando inexistente, evitando valores residuais.
+- **Hidratação controlada**: shimmer permanece até concluir leitura do Firebase; renderização só ocorre após hidratação completa, eliminando o flash de `R$ 0,00`.
 - **Testes manuais executados**: troca de perfis, lançamento/edição de transações, validação de modais e saldo inicial.
 
 ## Próximos Passos Sugeridos

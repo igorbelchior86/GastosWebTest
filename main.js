@@ -23,6 +23,52 @@ const state = appState;
 
 let startInputRef = null;
 
+const hydrationTargets = new Map();
+let hydrationInProgress = true;
+
+function resetHydration() {
+  hydrationInProgress = true;
+  hydrationTargets.clear();
+  try { document.documentElement.classList.add('skeleton-boot'); } catch (_) {}
+}
+
+function registerHydrationTarget(key, enabled) {
+  if (!enabled || !key) return;
+  hydrationTargets.set(key, false);
+}
+
+function markHydrationTargetReady(key) {
+  if (!key || !hydrationTargets.has(key)) return;
+  hydrationTargets.set(key, true);
+  maybeCompleteHydration();
+}
+
+function maybeCompleteHydration() {
+  if (!hydrationInProgress) return;
+  for (const status of hydrationTargets.values()) {
+    if (status === false) return;
+  }
+  completeHydration();
+}
+
+function completeHydration() {
+  if (!hydrationInProgress) return;
+  hydrationInProgress = false;
+  hydrationTargets.clear();
+  ensureStartSetFromBalance({ persist: true });
+  try { refreshMethods(); } catch (_) {}
+  try { renderCardList(); } catch (_) {}
+  try { initStart(); } catch (_) {}
+  try { safeRenderTable(); } catch (_) {}
+  try { document.documentElement.classList.remove('skeleton-boot'); } catch (_) {}
+}
+
+function isHydrating() {
+  return hydrationInProgress;
+}
+
+resetHydration();
+
 const INITIAL_CASH_CARD = { name: 'Dinheiro', close: 0, due: 0 };
 let transactions = [];
 let cards = [INITIAL_CASH_CARD];
@@ -140,7 +186,9 @@ function hydrateStateFromCache(options = {}) {
 
   state.bootHydrated = true;
 
-  if (render) {
+  ensureStartSetFromBalance();
+
+  if (render && !isHydrating()) {
     try { initStart(); } catch (_) {}
     try { if (typeof refreshMethods === 'function') refreshMethods(); } catch (_) {}
     try { if (typeof renderCardList === 'function') renderCardList(); } catch (_) {}
@@ -331,7 +379,7 @@ function renderSettingsModal(){
     <div class="settings-list">
       <div class="settings-item">
         <div class="left">
-          <span class="version-number">v1.4.9(a40)</span>
+          <span class="version-number">${APP_VERSION}</span>
         </div>
         <div class="right"></div>
       </div>
@@ -699,6 +747,7 @@ function applyCurrencyProfile(profileId, options = {}){
   if (!window.CURRENCY_PROFILES) return;
   const p = window.CURRENCY_PROFILES[profileId] || Object.values(window.CURRENCY_PROFILES)[0];
   if (!p) return;
+  resetHydration();
   window.APP_PROFILE = p;
   const profileDecimals = Number.isFinite(p.decimalPlaces) ? p.decimalPlaces : 2;
   try{
@@ -752,6 +801,7 @@ function applyCurrencyProfile(profileId, options = {}){
     ? null
     : newStartBalanceRaw;
   state.startSet = cacheGet('startSet', false);
+  ensureStartSetFromBalance({ persist: false });
   syncStartInputFromState();
 
   if (notify && typeof showToast === 'function') {
@@ -982,7 +1032,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = '1.4.9(a55)';
+const APP_VERSION = 'v1.4.9(a55)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
@@ -1296,6 +1346,7 @@ if (!USE_MOCK) {
   const startRealtime = async () => {
     console.log('Starting realtime listeners for PATH:', PATH);
     cleanupProfileListeners();
+    resetHydration();
 
     // Enhanced iOS PWA: Wait for redirect completion if needed
     const ua = navigator.userAgent.toLowerCase();
@@ -1344,11 +1395,19 @@ if (!USE_MOCK) {
 
     const listeners = [];
 
+    registerHydrationTarget('tx', !!txRef);
+    registerHydrationTarget('cards', !!cardsRef);
+    registerHydrationTarget('startBal', !!balRef);
+    registerHydrationTarget('startSet', !!startSetRef);
+
   // initialize from cache first for instant UI
   hydrateStateFromCache();
 
+    maybeCompleteHydration();
+
   // Listen for tx changes (LWW merge per item)
   if (txRef) listeners.push(onValue(txRef, (snap) => {
+    try {
     const raw  = snap.val() ?? [];
     const incoming = Array.isArray(raw) ? raw : Object.values(raw);
 
@@ -1399,45 +1458,70 @@ if (!USE_MOCK) {
       fixPlannedAlignment();
       expandPlannedDayLabels();
     }
+    } finally {
+      markHydrationTargetReady('tx');
+    }
   }));
 
   // Listen for card changes
   if (cardsRef) listeners.push(onValue(cardsRef, (snap) => {
     const raw  = snap.val() ?? [];
     const next = Array.isArray(raw) ? raw : Object.values(raw);
-    if (JSON.stringify(next) === JSON.stringify(cards)) return;
+    try {
+      if (JSON.stringify(next) === JSON.stringify(cards)) {
+        markHydrationTargetReady('cards');
+        return;
+      }
 
-    cards = next;
-    if (!cards.some(c => c.name === 'Dinheiro')) {
-      cards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+      cards = next;
+      if (!cards.some(c => c.name === 'Dinheiro')) {
+        cards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+      }
+      cacheSet('cards', cards);
+      // Revalida transações à luz do cadastro de cartões atual
+      const fixed = recomputePostDates();
+      if (fixed) { try { save('tx', transactions); } catch (_) {} cacheSet('tx', transactions); }
+      refreshMethods();
+      renderCardList();
+      renderTable();
+    } finally {
+      markHydrationTargetReady('cards');
     }
-    cacheSet('cards', cards);
-    // Revalida transações à luz do cadastro de cartões atual
-    const fixed = recomputePostDates();
-    if (fixed) { try { save('tx', transactions); } catch (_) {} cacheSet('tx', transactions); }
-    refreshMethods();
-    renderCardList();
-    renderTable();
   }));
 
   // Listen for balance changes
   if (balRef) listeners.push(onValue(balRef, (snap) => {
     const val = snap.exists() ? snap.val() : null;
-    if (val === state.startBalance) return;
-    state.startBalance = val;
-    cacheSet('startBal', state.startBalance);
-    syncStartInputFromState();
-    initStart();
-    renderTable();
+    if (val === state.startBalance) {
+      markHydrationTargetReady('startBal');
+      return;
+    }
+    try {
+      state.startBalance = val;
+      cacheSet('startBal', state.startBalance);
+      syncStartInputFromState();
+      ensureStartSetFromBalance();
+      initStart();
+      renderTable();
+    } finally {
+      markHydrationTargetReady('startBal');
+    }
   }));
   // Listen for persisted startSet flag changes so remote clears/sets propagate
   if (startSetRef) listeners.push(onValue(startSetRef, (snap) => {
     const val = snap.exists() ? !!snap.val() : false;
-    if (val === state.startSet) return;
-    state.startSet = val;
-    try { cacheSet('startSet', state.startSet); } catch(_) {}
-    initStart();
-    renderTable();
+    if (val === state.startSet) {
+      markHydrationTargetReady('startSet');
+      return;
+    }
+    try {
+      state.startSet = val;
+      try { cacheSet('startSet', state.startSet); } catch(_) {}
+      initStart();
+      renderTable();
+    } finally {
+      markHydrationTargetReady('startSet');
+    }
   }));
 
   profileListeners = listeners;
@@ -1472,6 +1556,7 @@ if (!USE_MOCK) {
     document.addEventListener('auth:state', h);
   }
 } else {
+  resetHydration();
   // Fallback (mock) — carrega uma vez
   const [liveTx, liveCards, liveBal] = await Promise.all([
     load('tx', []),
@@ -1510,6 +1595,8 @@ if (!USE_MOCK) {
     cacheSet('startBal', state.startBalance);
     initStart(); renderTable();
   }
+
+  completeHydration();
 }
 const openTxBtn = document.getElementById('openTxModal');
 const txModal   = document.getElementById('txModal');
@@ -2361,6 +2448,20 @@ function syncStartInputFromState() {
     input.value = safeFmtCurrency(state.startBalance, { forceNew: true });
   } catch (_) {
     input.value = String(state.startBalance);
+  }
+}
+
+function ensureStartSetFromBalance(options = {}) {
+  const { persist = true, refresh = true } = options;
+  if (state.startSet === true) return;
+  if (state.startBalance == null || Number.isNaN(Number(state.startBalance))) return;
+  state.startSet = true;
+  try { cacheSet('startSet', true); } catch (_) {}
+  if (persist && typeof save === 'function' && PATH) {
+    Promise.resolve().then(() => save('startSet', true)).catch(() => {});
+  }
+  if (refresh) {
+    try { initStart(); } catch (_) {}
   }
 }
 
@@ -3760,6 +3861,11 @@ document.addEventListener('click', (e) => {
 });
 
 function renderTable() {
+  if (isHydrating()) {
+    const accSk = document.getElementById('accordion');
+    if (accSk) accSk.dataset.state = 'skeleton';
+    return;
+  }
   clearTableContent();
   const acc = document.getElementById('accordion');
   if (acc) acc.dataset.state = 'skeleton';
@@ -5016,6 +5122,7 @@ cardModal.onclick = e => { if (e.target === cardModal) { cardModal.classList.add
         state.startBalance = liveBal;
         cacheSet('startBal', state.startBalance);
         syncStartInputFromState();
+        ensureStartSetFromBalance();
         initStart(); renderTable();
       }
     } catch (_) { /* ignore boot fetch when not logged yet */ }
