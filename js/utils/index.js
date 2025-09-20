@@ -9,6 +9,9 @@ export * from './date-utils.js';
 export * from './format-utils.js';
 export * from './dom-utils.js';
 export * from './data-utils.js';
+export * from './profile-utils.js';
+export * from './cache-utils.js';
+export * from '../state/app-state.js';
 
 // Named exports for specific imports
 export { 
@@ -44,14 +47,33 @@ export {
   isElementVisible 
 } from './dom-utils.js';
 
-export { 
-  sanitizeTransactions, 
-  validateTransaction, 
-  isDetachedOccurrence, 
-  isInScrollableModal, 
-  generateId, 
-  deepClone, 
-  sortTransactionsByDate, 
-  filterTransactionsByDateRange, 
-  calculateTotal 
+export {
+  sanitizeTransactions,
+  validateTransaction,
+  isDetachedOccurrence,
+  isInScrollableModal,
+  generateId,
+  deepClone,
+  sortTransactionsByDate,
+  filterTransactionsByDateRange,
+  calculateTotal
 } from './data-utils.js';
+
+export {
+  DEFAULT_PROFILE,
+  LEGACY_PROFILE_ID,
+  PROFILE_DATA_KEYS,
+  PROFILE_CACHE_KEYS,
+  getRuntimeProfile,
+  getCurrencyName,
+  getCurrentProfileId,
+  scopedCacheKey,
+  scopedDbSegment
+} from './profile-utils.js';
+
+export {
+  cacheGet,
+  cacheSet,
+  cacheRemove,
+  cacheClearProfile
+} from './cache-utils.js';

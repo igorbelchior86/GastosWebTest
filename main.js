@@ -1,3 +1,35 @@
+import { fmtCurrency, fmtNumber, parseCurrency, escHtml } from './js/utils/format-utils.js';
+import {
+  DEFAULT_PROFILE,
+  LEGACY_PROFILE_ID,
+  PROFILE_DATA_KEYS,
+  PROFILE_CACHE_KEYS,
+  getRuntimeProfile,
+  getCurrencyName,
+  getCurrentProfileId,
+  scopedCacheKey,
+  scopedDbSegment
+} from './js/utils/profile-utils.js';
+import { cacheGet, cacheSet, cacheRemove, cacheClearProfile } from './js/utils/cache-utils.js';
+import {
+  appState,
+  setStartBalance,
+  setStartDate,
+  setStartSet,
+  setBootHydrated
+} from './js/state/app-state.js';
+
+const state = appState;
+
+let startInputRef = null;
+
+const INITIAL_CASH_CARD = { name: 'Dinheiro', close: 0, due: 0 };
+let transactions = [];
+let cards = [INITIAL_CASH_CARD];
+// Flag for mocking data while working on UI.
+// Switch to `false` to reconnect to production Firebase.
+const USE_MOCK = false;              // conectar ao Firebase (TESTE via config import)
+
 // Year selector state
 let VIEW_YEAR = new Date().getFullYear(); // Ano atual padrão
 
@@ -7,6 +39,145 @@ let pendingDeleteTxIso = null;
 let pendingEditTxId = null;
 let pendingEditTxIso = null;
 let pendingEditMode = null;
+
+let profileListeners = [];
+let startRealtimeFn = null;
+
+function cleanupProfileListeners() {
+  if (!profileListeners || !profileListeners.length) return;
+  profileListeners.forEach(unsub => {
+    try { typeof unsub === 'function' && unsub(); }
+    catch (err) { console.warn('Listener cleanup failed', err); }
+  });
+  profileListeners = [];
+}
+
+function safeFmtCurrency(value, options) {
+  try { return fmtCurrency(value, options); } catch (_) {}
+  const profile = getRuntimeProfile();
+  const decimals = options?.maximumFractionDigits ?? options?.minimumFractionDigits ?? (profile.decimalPlaces ?? DEFAULT_PROFILE.decimalPlaces);
+  try {
+    const nf = new Intl.NumberFormat(profile.locale || DEFAULT_PROFILE.locale, {
+      style: 'currency',
+      currency: profile.currency || DEFAULT_PROFILE.currency,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+    return nf.format(Number(value) || 0);
+  } catch (_) {
+    return `${profile.currency || DEFAULT_PROFILE.currency} ${(Number(value) || 0).toFixed(decimals)}`;
+  }
+}
+
+function safeFmtNumber(value, options = {}) {
+  try { return fmtNumber(value, options); } catch (_) {}
+  const profile = getRuntimeProfile();
+  const minimumFractionDigits = options.minimumFractionDigits ?? 0;
+  const maximumFractionDigits = options.maximumFractionDigits ?? Math.max(minimumFractionDigits, profile.decimalPlaces ?? DEFAULT_PROFILE.decimalPlaces);
+  try {
+    const nf = new Intl.NumberFormat(profile.locale || DEFAULT_PROFILE.locale, {
+      minimumFractionDigits,
+      maximumFractionDigits,
+      useGrouping: options.useGrouping !== false
+    });
+    return nf.format(Number(value) || 0);
+  } catch (_) {
+    return (Number(value) || 0).toFixed(Math.max(0, maximumFractionDigits));
+  }
+}
+
+function profileRef(key) {
+  if (!firebaseDb || !PATH) return null;
+  const segment = scopedDbSegment(key);
+  return ref(firebaseDb, `${PATH}/${segment}`);
+}
+
+function safeParseCurrency(raw) {
+  try { return parseCurrency(raw); } catch (_) {}
+  if (typeof raw === 'number') return raw;
+  if (!raw) return 0;
+  return Number(String(raw).replace(/[^0-9+\-.,]/g, '').replace(/\./g, '').replace(/,/g, '.')) || 0;
+}
+
+function normalizeTransactionRecord(t) {
+  if (!t) return t;
+  return {
+    ...t,
+    method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
+    recurrence: t.recurrence ?? '',
+    installments: t.installments ?? 1,
+    parentId: t.parentId ?? null
+  };
+}
+
+function ensureCashCard(list) {
+  const cardsList = Array.isArray(list) ? list.filter(Boolean).map(c => ({ ...c })) : [];
+  if (!cardsList.some(c => c && c.name === 'Dinheiro')) {
+    cardsList.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+  }
+  return cardsList;
+}
+
+function hydrateStateFromCache(options = {}) {
+  const { render = true } = options;
+  const cachedTx = cacheGet('tx', []);
+  transactions = (cachedTx || [])
+    .filter(Boolean)
+    .map(normalizeTransactionRecord);
+  sortTransactions();
+
+  cards = ensureCashCard(cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]));
+  state.startBalance = cacheGet('startBal', null);
+  state.startDate = cacheGet('startDate', null);
+  state.startSet = cacheGet('startSet', false);
+
+  if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
+    state.startBalance = null;
+    try { cacheSet('startBal', null); } catch (_) {}
+  }
+
+  syncStartInputFromState();
+
+  state.bootHydrated = true;
+
+  if (render) {
+    try { initStart(); } catch (_) {}
+    try { if (typeof refreshMethods === 'function') refreshMethods(); } catch (_) {}
+    try { if (typeof renderCardList === 'function') renderCardList(); } catch (_) {}
+    try { if (typeof renderTable === 'function') renderTable(); } catch (_) {}
+    try {
+      if (plannedModal && !plannedModal.classList.contains('hidden')) {
+        if (typeof renderPlannedModal === 'function') renderPlannedModal();
+        if (typeof fixPlannedAlignment === 'function') fixPlannedAlignment();
+        if (typeof expandPlannedDayLabels === 'function') expandPlannedDayLabels();
+      }
+    } catch (_) {}
+  }
+  updatePendingBadge();
+}
+
+const keyboardDeferredTasks = new Set();
+
+function scheduleAfterKeyboard(fn) {
+  if (typeof fn !== 'function') return;
+  try {
+    if (document.documentElement?.dataset?.vvKb === '1') {
+      keyboardDeferredTasks.add(fn);
+      return;
+    }
+  } catch (_) {}
+  fn();
+}
+
+function flushKeyboardDeferredTasks() {
+  if (!keyboardDeferredTasks.size) return;
+  const tasks = Array.from(keyboardDeferredTasks);
+  keyboardDeferredTasks.clear();
+  tasks.forEach(fn => {
+    try { fn(); }
+    catch (err) { console.error('Deferred keyboard task failed', err); }
+  });
+}
 // Modal Excluir Recorrência - refs
 const deleteRecurrenceModal = document.getElementById('deleteRecurrenceModal');
 const closeDeleteRecurrenceModal = document.getElementById('closeDeleteRecurrenceModal');
@@ -120,9 +291,6 @@ if (headerSeg) {
   });
 }
 // ---------------- Settings (Ajustes) modal ----------------
-function escHtml(s){
-  return (s==null?"":String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-}
 function renderSettingsModal(){
   if (!settingsModalEl) return;
   const box = settingsModalEl.querySelector('.modal-content');
@@ -261,9 +429,12 @@ function renderSettingsModal(){
         li.textContent = p.name;
         li.dataset.profileId = p.id;
         li.addEventListener('click', () => {
-          applyCurrencyProfile(p.id);
           modal.classList.add('hidden');
           updateModalOpenState();
+          if (typeof closeSettings === 'function') {
+            closeSettings();
+          }
+          applyCurrencyProfile(p.id, { notify: true });
           updateRowLabel();
         });
         // touch / hover feedback
@@ -523,15 +694,25 @@ initThemeFromStorage();
  * - persists choice to localStorage
  * - toggles UI bits controlled by profile.features (e.g., invoice parcel)
  */
-function applyCurrencyProfile(profileId){
+function applyCurrencyProfile(profileId, options = {}){
+  const { notify = false } = options;
   if (!window.CURRENCY_PROFILES) return;
   const p = window.CURRENCY_PROFILES[profileId] || Object.values(window.CURRENCY_PROFILES)[0];
   if (!p) return;
   window.APP_PROFILE = p;
+  const profileDecimals = Number.isFinite(p.decimalPlaces) ? p.decimalPlaces : 2;
   try{
-    window.APP_FMT = new Intl.NumberFormat(p.locale, { style: 'currency', currency: p.currency, minimumFractionDigits: p.decimalPlaces, maximumFractionDigits: p.decimalPlaces });
+    window.APP_FMT = new Intl.NumberFormat(p.locale, { style: 'currency', currency: p.currency, minimumFractionDigits: profileDecimals, maximumFractionDigits: profileDecimals });
   }catch(e){
-    window.APP_FMT = { format: v => (Number(v).toFixed(p.decimalPlaces) + ' ' + p.currency) };
+    window.APP_FMT = { format: v => (Number(v).toFixed(profileDecimals) + ' ' + p.currency) };
+  }
+  try{
+    window.APP_NUM = new Intl.NumberFormat(p.locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: Math.max(profileDecimals, 2)
+    });
+  }catch(e){
+    window.APP_NUM = { format: v => Number(v ?? 0).toFixed(profileDecimals) };
   }
   localStorage.setItem('ui:profile', p.id);
 
@@ -548,13 +729,50 @@ function applyCurrencyProfile(profileId){
   // update placeholders that show currency examples
   const startInput = document.querySelector('.start-container .currency-input');
   if (startInput){
-    if (window.APP_FMT && window.APP_FMT.format) startInput.placeholder = window.APP_FMT.format(0);
+    const decimals = Number.isFinite(p.decimalPlaces) ? p.decimalPlaces : (DEFAULT_PROFILE.decimalPlaces ?? 2);
+    try {
+      const placeholderFmt = new Intl.NumberFormat(p.locale || DEFAULT_PROFILE.locale, {
+        style: 'currency',
+        currency: p.currency || DEFAULT_PROFILE.currency,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+      startInput.placeholder = placeholderFmt.format(0);
+    } catch (_) {
+      const cur = p.currency || DEFAULT_PROFILE.currency;
+      startInput.placeholder = `${cur} ${(0).toFixed(decimals)}`;
+    }
+    syncStartInputFromState();
   }
 
-  // re-render parts that depend on formatting or features
-  if (typeof renderTxModal === 'function') try{ renderTxModal(); }catch(e){}
-  if (typeof renderCardList === 'function') try{ renderCardList(); }catch(e){}
-  if (typeof renderTable === 'function') try{ renderTable(); }catch(e){}
+  const newStartDate = cacheGet('startDate', null);
+  const newStartBalanceRaw = cacheGet('startBal', null);
+  state.startDate = newStartDate;
+  state.startBalance = (newStartDate == null && (newStartBalanceRaw === 0 || newStartBalanceRaw === '0'))
+    ? null
+    : newStartBalanceRaw;
+  state.startSet = cacheGet('startSet', false);
+  syncStartInputFromState();
+
+  if (notify && typeof showToast === 'function') {
+    const label = p && p.name ? p.name : (profileId || 'perfil');
+    showToast(`Moeda ajustada para ${label}`, 'success', 3600);
+  }
+
+  cleanupProfileListeners();
+  const runAfterBoot = () => {
+    try { hydrateStateFromCache(); } catch (err) { console.error('Failed to hydrate cache for profile', err); }
+    if (typeof renderTxModal === 'function') {
+      try { renderTxModal(); } catch (e) { console.error('renderTxModal failed after profile change', e); }
+    }
+    if (!USE_MOCK && typeof startRealtimeFn === 'function' && PATH) {
+      startRealtimeFn().catch(err => {
+        console.error('Failed to restart realtime after profile change', err);
+      });
+    }
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(runAfterBoot);
+  else Promise.resolve().then(runAfterBoot);
 }
 
 // Apply saved profile on load (if profiles are available)
@@ -582,6 +800,15 @@ const cacheDB = await openDB('gastos-cache', 1, {
 });
 async function idbGet(k) { try { return await cacheDB.get('kv', k); } catch { return undefined; } }
 async function idbSet(k, v) { try { await cacheDB.put('kv', v, k); } catch {} }
+async function idbRemove(k) { try { await cacheDB.delete('kv', k); } catch {} }
+
+if (typeof window !== 'undefined') {
+  window.APP_CACHE_BACKING = {
+    idbGet,
+    idbSet,
+    idbRemove
+  };
+}
 
 /**
  * Initialize swipe-to-reveal actions on elements.
@@ -755,10 +982,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-// Flag for mocking data while working on UI.  
-// Switch to `false` to reconnect to production Firebase.
-const USE_MOCK = false;              // conectar ao Firebase (TESTE via config import)
-const APP_VERSION = '1.4.9(a19)';
+const APP_VERSION = '1.4.9(a55)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
@@ -805,38 +1029,29 @@ if (!USE_MOCK) {
       if (k === 'startSet') cacheSet('startSet', v);
       return; // no remote write while offline
     }
-    return set(ref(db, `${PATH}/${k}`), v);
+    const remoteKey = scopedDbSegment(k);
+    return set(ref(db, `${PATH}/${remoteKey}`), v);
   };
   load = async (k, d) => {
-    const s = await get(ref(db, `${PATH}/${k}`));
+    const remoteKey = scopedDbSegment(k);
+    const s = await get(ref(db, `${PATH}/${remoteKey}`));
     return s.exists() ? s.val() : d;
   };
 } else {
   // Modo MOCK (LocalStorage)
   PATH = 'mock_365';
-  save = (k, v) => localStorage.setItem(`${PATH}_${k}`, JSON.stringify(v));
-  load = async (k, d) =>
-    JSON.parse(localStorage.getItem(`${PATH}_${k}`)) ?? d;
+  save = (k, v) => {
+    const scoped = scopedCacheKey(k);
+    localStorage.setItem(`${PATH}_${scoped}`, JSON.stringify(v));
+  };
+  load = async (k, d) => {
+    const scoped = scopedCacheKey(k);
+    const raw = localStorage.getItem(`${PATH}_${scoped}`);
+    if (raw != null) return JSON.parse(raw);
+    return d;
+  };
 }
 
-
-// Cache local (LocalStorage+IDB) p/ boot instantâneo, com fallback/hydrate
-const cacheGet  = (k, d) => {
-  try {
-    const ls = localStorage.getItem(`cache_${k}`);
-    if (ls != null) return JSON.parse(ls);
-  } catch {}
-  // Fallback: fetch from IDB asynchronously and warm localStorage
-  (async () => {
-    const v = await idbGet(`cache_${k}`);
-    if (v !== undefined) localStorage.setItem(`cache_${k}`, JSON.stringify(v));
-  })();
-  return d;
-};
-const cacheSet  = (k, v) => {
-  localStorage.setItem(`cache_${k}`, JSON.stringify(v));
-  idbSet(`cache_${k}`, v);
-};
 
 // ---------------- Offline queue helpers (generalized) ----------------
 // We track which collections are "dirty" while offline: 'tx', 'cards', 'startBal'.
@@ -908,8 +1123,8 @@ async function flushQueue() {
   try {
     if (q.includes('tx'))       await save('tx', transactions);
     if (q.includes('cards'))    await save('cards', cards);
-  if (q.includes('startBal')) await save('startBal', startBalance);
-  if (q.includes('startSet')) await save('startSet', startSet);
+    if (q.includes('startBal')) await save('startBal', state.startBalance);
+    if (q.includes('startSet')) await save('startSet', state.startSet);
   } catch (err) {
     console.error('flushQueue failed:', err);
     // Put back flags so we retry later (union of previous + current)
@@ -941,12 +1156,10 @@ async function flushQueue() {
 
 
 // Load transactions/cards/balance: now with realtime listeners if not USE_MOCK
-let transactions = [];
-let cards = [{ name:'Dinheiro', close:0, due:0 }];
-let startBalance;
-let startDate = null; // ISO string YYYY-MM-DD when the user set the initial balance
-let startSet = false; // persisted flag: user completed start flow
-let bootHydrated = false; // becomes true after cache is loaded on startup
+setStartBalance(null);
+setStartDate(null);
+setStartSet(false);
+setBootHydrated(false);
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
@@ -1051,7 +1264,7 @@ const showToast = (msg, type = 'error', duration = 3000) => {
 function buildSaveToast(tx) {
   try {
     const valueNum = typeof tx.val === 'number' ? tx.val : Number((tx.val || '0').toString().replace(/[^0-9.-]/g, ''));
-    const formattedVal = valueNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formattedVal = safeFmtCurrency(valueNum);
     const isCard = tx.method && tx.method !== 'Dinheiro';
     const hasOpDate = !!tx.opDate;
     const renderIso = tx.postDate || (hasOpDate && tx.method ? post(tx.opDate, tx.method) : null);
@@ -1082,7 +1295,8 @@ if (!USE_MOCK) {
   // Start realtime listeners only after user is authenticated
   const startRealtime = async () => {
     console.log('Starting realtime listeners for PATH:', PATH);
-    
+    cleanupProfileListeners();
+
     // Enhanced iOS PWA: Wait for redirect completion if needed
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
@@ -1098,7 +1312,7 @@ if (!USE_MOCK) {
       const u = window.Auth && window.Auth.currentUser;
       if (u && PATH) {
         console.log('Testing access to PATH:', PATH, 'for user:', u.email);
-        const testRef = ref(firebaseDb, `${PATH}/startBal`);
+        const testRef = ref(firebaseDb, `${PATH}/${scopedDbSegment('startBal')}`);
         try {
           await get(testRef);
           console.log('Access confirmed to PATH:', PATH);
@@ -1123,57 +1337,23 @@ if (!USE_MOCK) {
     }
 
     // Live listeners (Realtime DB)
-    const txRef    = ref(firebaseDb, `${PATH}/tx`);
-    const cardsRef = ref(firebaseDb, `${PATH}/cards`);
-    const balRef   = ref(firebaseDb, `${PATH}/startBal`);
+    const txRef    = profileRef('tx');
+    const cardsRef = profileRef('cards');
+    const balRef   = profileRef('startBal');
+    const startSetRef = profileRef('startSet');
+
+    const listeners = [];
 
   // initialize from cache first for instant UI
-  transactions = cacheGet('tx', []);
-  transactions = (transactions || [])
-    .filter(t => t) // ignora null/undefined
-    .map(t => ({
-      ...t,
-      method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
-      recurrence: t.recurrence ?? '',
-      installments: t.installments ?? 1,
-      parentId: t.parentId ?? null
-    }));
-  sortTransactions();
-  cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
-  startBalance = cacheGet('startBal', null);
-  startDate = cacheGet('startDate', null);
-  // Load persisted flag that indicates the user completed the start-balance flow
-  startSet = cacheGet('startSet', false);
-  console.log('Startup start state -> startBalance:', startBalance, 'startDate:', startDate, 'startSet:', startSet);
-  // Mark hydrated so initStart actually runs and update the UI
-  bootHydrated = true;
-  try { initStart(); renderTable(); } catch(_) {}
-  // Load persisted flag that indicates the user completed the start-balance flow
-  startSet = cacheGet('startSet', false);
-  console.log('Startup start state -> startBalance:', startBalance, 'startDate:', startDate, 'startSet:', startSet);
-  // Mark hydrated in mock fallback and update the UI
-  bootHydrated = true;
-  try { initStart(); renderTable(); } catch(_) {}
-  // Normalização: se não há âncora (startDate) e o startBalance foi carregado como 0,
-  // tratamos isso como "não definido" para mostrar a seção de saldo inicial.
-  if (startDate == null && (startBalance === 0 || startBalance === '0')) {
-    startBalance = null;
-    try { cacheSet('startBal', null); } catch (_) {}
-  }
+  hydrateStateFromCache();
 
   // Listen for tx changes (LWW merge per item)
-  onValue(txRef, (snap) => {
+  if (txRef) listeners.push(onValue(txRef, (snap) => {
     const raw  = snap.val() ?? [];
     const incoming = Array.isArray(raw) ? raw : Object.values(raw);
 
     // normalize helper
-    const norm = (t) => ({
-      ...t,
-      method: (t.method && t.method.toLowerCase() === 'dinheiro') ? 'Dinheiro' : t.method,
-      recurrence: t.recurrence ?? '',
-      installments: t.installments ?? 1,
-      parentId: t.parentId ?? null
-    });
+    const norm = normalizeTransactionRecord;
 
     const remote = (incoming || [])
       .filter(t => t)
@@ -1219,10 +1399,10 @@ if (!USE_MOCK) {
       fixPlannedAlignment();
       expandPlannedDayLabels();
     }
-  });
+  }));
 
   // Listen for card changes
-  onValue(cardsRef, (snap) => {
+  if (cardsRef) listeners.push(onValue(cardsRef, (snap) => {
     const raw  = snap.val() ?? [];
     const next = Array.isArray(raw) ? raw : Object.values(raw);
     if (JSON.stringify(next) === JSON.stringify(cards)) return;
@@ -1238,34 +1418,37 @@ if (!USE_MOCK) {
     refreshMethods();
     renderCardList();
     renderTable();
-  });
+  }));
 
   // Listen for balance changes
-  onValue(balRef, (snap) => {
+  if (balRef) listeners.push(onValue(balRef, (snap) => {
     const val = snap.exists() ? snap.val() : null;
-    if (val === startBalance) return;
-    startBalance = val;
-    cacheSet('startBal', startBalance);
+    if (val === state.startBalance) return;
+    state.startBalance = val;
+    cacheSet('startBal', state.startBalance);
+    syncStartInputFromState();
     initStart();
     renderTable();
-  });
+  }));
   // Listen for persisted startSet flag changes so remote clears/sets propagate
-  const startSetRef = ref(firebaseDb, `${PATH}/startSet`);
-  onValue(startSetRef, (snap) => {
+  if (startSetRef) listeners.push(onValue(startSetRef, (snap) => {
     const val = snap.exists() ? !!snap.val() : false;
-    if (val === startSet) return;
-    startSet = val;
-    try { cacheSet('startSet', startSet); } catch(_) {}
+    if (val === state.startSet) return;
+    state.startSet = val;
+    try { cacheSet('startSet', state.startSet); } catch(_) {}
     initStart();
     renderTable();
-  });
+  }));
+
+  profileListeners = listeners;
   };
+  startRealtimeFn = startRealtime;
 
   const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
   if (readyUser) { 
     console.log('User already ready:', readyUser.email);
     PATH = resolvePathForUser(readyUser); 
-    startRealtime(); 
+    startRealtimeFn && startRealtimeFn(); 
     // Recalcula a altura do header para usuário já logado
     setTimeout(() => recalculateHeaderOffset(), 100);
   } else {
@@ -1278,7 +1461,7 @@ if (!USE_MOCK) {
         document.removeEventListener('auth:state', h); 
         PATH = resolvePathForUser(u); 
         console.log('Starting realtime with PATH:', PATH);
-        startRealtime(); 
+        startRealtimeFn && startRealtimeFn(); 
         // Recalcula a altura do header agora que o usuário está logado e o header está visível
         setTimeout(() => recalculateHeaderOffset(), 100);
       } else {
@@ -1293,7 +1476,7 @@ if (!USE_MOCK) {
   const [liveTx, liveCards, liveBal] = await Promise.all([
     load('tx', []),
     load('cards', cards),
-    load('startBal', startBalance)
+    load('startBal', state.startBalance)
   ]);
 
   const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
@@ -1303,11 +1486,11 @@ if (!USE_MOCK) {
 
   transactions = cacheGet('tx', []);
   cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
-  startBalance = cacheGet('startBal', null);
-  startDate = cacheGet('startDate', null);
+  state.startBalance = cacheGet('startBal', null);
+  state.startDate = cacheGet('startDate', null);
   // Same normalization for mock fallback
-  if (startDate == null && (startBalance === 0 || startBalance === '0')) {
-    startBalance = null;
+  if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
+    state.startBalance = null;
     try { cacheSet('startBal', null); } catch (_) {}
   }
 
@@ -1322,9 +1505,9 @@ if (!USE_MOCK) {
     cacheSet('cards', cards);
     refreshMethods(); renderCardList(); renderTable();
   }
-  if (liveBal !== startBalance) {
-    startBalance = liveBal;
-    cacheSet('startBal', startBalance);
+  if (liveBal !== state.startBalance) {
+    state.startBalance = liveBal;
+    cacheSet('startBal', state.startBalance);
     initStart(); renderTable();
   }
 }
@@ -1455,8 +1638,47 @@ if (openTxBtn) openTxBtn.onclick = () => {
 function updateModalOpenState() {
   const open = !!document.querySelector('.bottom-modal:not(.hidden)');
   const root = document.documentElement || document.body;
+
+  // Add/remove the existing modal-open class (used by CSS)
   if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
-  
+
+  // Prevent viewport jumps on mobile when a modal opens and the on-screen keyboard appears.
+  // Approach: save current scroll position and apply a fixed-position lock to the <body> so
+  // the browser won't resize/layout the page when visual viewport changes. Restore on close.
+  try {
+    if (open) {
+      if (!root.classList.contains('modal-locked')) {
+        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        // Apply lock styles to body
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+        // mark locked and persist scroll value on root for restore
+        root.classList.add('modal-locked');
+        root.dataset.modalScroll = String(scrollY);
+      }
+    } else {
+      if (root.classList.contains('modal-locked')) {
+        // restore
+        root.classList.remove('modal-locked');
+        const prev = parseInt(root.dataset.modalScroll || '0', 10) || 0;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        // ensure we restore the previous scroll position
+        window.scrollTo(0, prev);
+        try { delete root.dataset.modalScroll; } catch(_) { root.removeAttribute('data-modal-scroll'); }
+      }
+    }
+  } catch (e) {
+    // best-effort only; don't break UI if this fails
+    console.error('updateModalOpenState lock/unlock failed', e);
+  }
+
   // Safari iOS fix: Force scroll state cleanup when all modals are closed
   // Fixes bug where accordion scroll becomes unresponsive after opening/closing modals
   if (!open && /Safari/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
@@ -1691,33 +1913,78 @@ document.addEventListener('wheel', (e) => {
   if (!vv) return;
   const root = document.documentElement;
   const THRESH = 140; // px
-  const update = () => {
-    const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
-    const isKb = gap > THRESH && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isKb) {
+  const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  let keyboardOpen = false;
+  let closeTimer = null;
+
+  const applyKeyboardOpen = (gap) => {
+    keyboardOpen = true;
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    if (root) {
       root.dataset.vvKb = '1';
+      root.classList.add('keyboard-open');
       root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
-    } else {
-      delete root.dataset.vvKb;
-      root.style.removeProperty('--kb-offset-bottom');
     }
   };
+
+  const applyKeyboardClosed = () => {
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = setTimeout(() => {
+      keyboardOpen = false;
+      if (root) {
+        delete root.dataset.vvKb;
+        root.classList.remove('keyboard-open');
+        root.style.removeProperty('--kb-offset-bottom');
+      }
+      flushKeyboardDeferredTasks();
+    }, 200);
+  };
+
+  const update = () => {
+    const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
+    const isKb = IS_IOS && gap > THRESH;
+    if (isKb) {
+      applyKeyboardOpen(gap);
+    } else {
+      if (keyboardOpen || root?.dataset?.vvKb === '1') {
+        applyKeyboardClosed();
+      }
+    }
+  };
+
+  const scheduleUpdate = (delay = 0) => {
+    if (delay <= 0) {
+      scheduleAfterKeyboard(update);
+    } else {
+      setTimeout(() => scheduleAfterKeyboard(update), delay);
+    }
+  };
+
   update();
   vv.addEventListener('resize', update);
-  window.addEventListener('orientationchange', () => setTimeout(update, 50));
-  window.addEventListener('focusin', () => setTimeout(update, 0));
-  window.addEventListener('focusout', () => setTimeout(update, 50));
+  window.addEventListener('orientationchange', () => scheduleUpdate(160));
+  window.addEventListener('focusin', () => scheduleUpdate());
+  window.addEventListener('focusout', () => scheduleUpdate(220));
 })();
 
 
 
 
-const currency=v=>v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const currency = (v) => safeFmtCurrency(v);
+const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 // Palavras que caracterizam “salário”
 const SALARY_WORDS = ['salário', 'salario', 'provento', 'rendimento', 'pagamento', 'paycheck', 'salary'];
-const mobile=()=>window.innerWidth<=480;
-const fmt=d=>d.toLocaleDateString('pt-BR',mobile()?{day:'2-digit',month:'2-digit'}:{day:'2-digit',month:'2-digit',year:'numeric'});
+const mobile = () => window.innerWidth <= 480;
+const fmt = (d) => {
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toLocaleDateString('pt-BR', mobile()
+    ? { day: '2-digit', month: '2-digit' }
+    : { day: '2-digit', month: '2-digit', year: 'numeric' }
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Sticky month header  (Safari/iOS não suporta <summary> sticky)
@@ -1740,6 +2007,14 @@ function createStickyMonth() {
 // Função para recalcular e atualizar a altura do header
 function recalculateHeaderOffset() {
   if (!headerEl) return;
+  // If visualViewport keyboard flag is set, avoid recalculating header offsets
+  // to prevent UI from 'jumping' when the OS on-screen keyboard resizes the viewport.
+  try {
+    if (document.documentElement?.dataset?.vvKb === '1') {
+      scheduleAfterKeyboard(recalculateHeaderOffset);
+      return;
+    }
+  } catch(_) {}
   const h = headerEl.getBoundingClientRect().height;
   
   // Só cria e posiciona o sticky quando o header tiver altura real (> 30px)
@@ -1951,7 +2226,7 @@ try {
   val.setAttribute('pattern', '[0-9.,]*');
 } catch (_) {}
 
-// Auto-format value input as BRL currency while typing
+// Auto-format value input using the active currency profile while typing
 val.addEventListener('input', () => {
   // Remove all non-digit characters
   const digits = val.value.replace(/\D/g, '');
@@ -1966,18 +2241,12 @@ val.addEventListener('input', () => {
   }
   // Parse as cents and format
   const numberValue = parseInt(digits, 10) / 100;
-  // Check toggle for sign
   const activeToggle = document.querySelector('.value-toggle button.active');
-  let formatted = numberValue.toLocaleString('pt-BR', {
+  const signedValue = (activeToggle && activeToggle.dataset.type === 'expense') ? -numberValue : numberValue;
+  val.value = safeFmtNumber(signedValue, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
-  if (activeToggle && activeToggle.dataset.type === 'expense') {
-    formatted = '-' + formatted.replace(/^-/, '');
-  } else {
-    formatted = formatted.replace(/^-/, '');
-  }
-  val.value = formatted;
 });
 
 const valueToggles = document.querySelectorAll('.value-toggle button');
@@ -1992,16 +2261,11 @@ valueToggles.forEach(btn => {
       return;
     }
     const numberValue = parseInt(digits, 10) / 100;
-    let formatted = numberValue.toLocaleString('pt-BR', {
+    const signedValue = btn.dataset.type === 'expense' ? -numberValue : numberValue;
+    val.value = safeFmtNumber(signedValue, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    if (btn.dataset.type === 'expense') {
-      formatted = '-' + formatted.replace(/^-/, '');
-    } else {
-      formatted = formatted.replace(/^-/, '');
-    }
-    val.value = formatted;
   });
 });
 
@@ -2083,6 +2347,22 @@ recurrence.onchange = () => {
 let isEditing = null;
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
+if (startInput) startInputRef = startInput;
+
+function syncStartInputFromState() {
+  const input = startInputRef || document.getElementById('startInput');
+  if (!input) return;
+  if (!startInputRef && input) startInputRef = input;
+  if (state.startBalance == null || Number.isNaN(Number(state.startBalance))) {
+    input.value = '';
+    return;
+  }
+  try {
+    input.value = safeFmtCurrency(state.startBalance, { forceNew: true });
+  } catch (_) {
+    input.value = String(state.startBalance);
+  }
+}
 
 // Função reutilizável que executa o reset (confirm dentro da função por padrão)
 async function performResetAllData(askConfirm = true) {
@@ -2091,22 +2371,23 @@ async function performResetAllData(askConfirm = true) {
     // Clear in-memory
     transactions = [];
     cards = [{ name: 'Dinheiro', close: 0, due: 0 }];
-    startBalance = null;
-    startDate = null;
-  startSet = false;
+    state.startBalance = null;
+    state.startDate = null;
+  state.startSet = false;
+    syncStartInputFromState();
 
     // Clear caches (best-effort)
     try { cacheSet('tx', transactions); } catch (_) {}
     try { cacheSet('cards', cards); } catch (_) {}
-    try { cacheSet('startBal', startBalance); } catch (_) {}
-    try { cacheSet('startDate', startDate); } catch (_) {}
+    try { cacheSet('startBal', state.startBalance); } catch (_) {}
+    try { cacheSet('startDate', state.startDate); } catch (_) {}
     try { cacheSet('dirtyQueue', []); } catch (_) {}
 
     // Try persist (best effort)
     try { await save('tx', transactions); } catch (_) {}
     try { await save('cards', cards); } catch (_) {}
-    try { await save('startBal', startBalance); } catch (_) {}
-    try { await save('startDate', startDate); } catch (_) {}
+    try { await save('startBal', state.startBalance); } catch (_) {}
+    try { await save('startDate', state.startDate); } catch (_) {}
   try { cacheSet('startSet', false); } catch (_) {}
   try { await save('startSet', false); } catch (_) {}
 
@@ -2160,7 +2441,7 @@ if (resetBtn) {
     else window.addEventListener('load', () => { document.body.appendChild(btn); });
   } catch (_) {}
 })();
-// Auto-format initial balance input as BRL currency
+// Auto-format initial balance input using the active currency profile
 if (startInput) {
   startInput.addEventListener('input', () => {
     const digits = startInput.value.replace(/\D/g, '');
@@ -2169,9 +2450,7 @@ if (startInput) {
       return;
     }
     const numberValue = parseInt(digits, 10) / 100;
-    startInput.value = numberValue.toLocaleString('pt-BR', {
-      style: 'currency', currency: 'BRL'
-    });
+    startInput.value = safeFmtCurrency(numberValue);
   });
 }
 const startContainer = document.querySelector('.start-container');
@@ -2713,7 +2992,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   right.className = 'op-right';
   const value = document.createElement('span');
   value.className = 'value';
-  value.textContent = `R$ ${(tx.val < 0 ? '-' : '')}${Math.abs(tx.val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  value.textContent = safeFmtCurrency(tx.val, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   if (tx.val < 0) {
     value.classList.add('negative');
   } else {
@@ -2750,12 +3032,12 @@ function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjustedBefo
   // Prefill form
   const today = todayISO();
   desc.value = `Pagamento fatura – ${cardName}`;
-  // Set expense toggle active and format value as BRL (negative)
+  // Ensure the value toggle reflects expense/receipt and keeps the formatted sign
   document.querySelectorAll('.value-toggle button').forEach(b => b.classList.remove('active'));
   const expBtn = document.querySelector('.value-toggle button[data-type="expense"]');
   if (expBtn) expBtn.classList.add('active');
   const rem = Number(remaining) || 0;
-  val.value = (-rem).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  val.value = safeFmtNumber(-rem, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   date.value = today;
   // Lock method to Dinheiro
   hiddenSelect.value = 'Dinheiro';
@@ -2811,7 +3093,7 @@ if (invoiceParcelCheckbox) {
       const n = Math.max(2, parseInt(installments.value || '2', 10) || 2);
       installments.value = String(n);
       const per = n > 0 ? base / n : base;
-      val.value = (-per).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      val.value = safeFmtNumber(-per, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } else {
       parcelasBlock.classList.add('hidden');
       installments.disabled = true;
@@ -2820,7 +3102,7 @@ if (invoiceParcelCheckbox) {
       // Restore full remaining amount to value field
       const ctx = pendingInvoiceCtx || {};
       const base = Math.abs(Number(ctx.remaining) || 0);
-      val.value = (-base).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      val.value = safeFmtNumber(-base, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
   });
 }
@@ -2834,7 +3116,7 @@ if (installments) {
     const base = Math.abs(Number(ctx.remaining) || 0);
     const n = parseInt(installments.value, 10) || 1;
     const per = n > 0 ? base / n : base;
-    val.value = (-per).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    val.value = safeFmtNumber(-per, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   });
 }
 
@@ -2953,8 +3235,7 @@ async function addTx() {
     renderTable();
     toggleTxModal();
     // Custom edit confirmation toast
-    const formattedVal = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.'))
-      .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const formattedVal = safeFmtCurrency(safeParseCurrency(val.value));
     const recValue = recurrence.value;
     let toastMsg;
     if (!recValue) {
@@ -3087,7 +3368,7 @@ async function addTx() {
     return;
   }
 
-  if (startBalance === null) {
+  if (state.startBalance === null) {
     showToast('Defina o saldo inicial primeiro (pode ser 0).');
     return;
   }
@@ -3179,11 +3460,10 @@ function resetTxForm() {
   date.value = todayISO();
   toggleTxModal();
   // Custom save confirmation toast
-  const v = 0; // valor já limpo, mas podemos mostrar mensagem genérica
   // Recupera última transação para mensagem
   let last = transactions[transactions.length - 1];
-  let formattedVal = last && typeof last.val === 'number'
-    ? last.val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const formattedVal = last && typeof last.val === 'number'
+    ? safeFmtCurrency(last.val)
     : '';
   const recValue = recurrence.value;
   let toastMsg;
@@ -3391,15 +3671,19 @@ const editTx = id => {
   // 3) Valor + toggle despesa/receita
   const valInput = document.getElementById('value');
   if (valInput) {
-    const abs = Math.abs(Number(t.val || 0));
-    valInput.value = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const signedVal = Number(t.val || 0);
+    valInput.value = safeFmtNumber(signedVal, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
   document.querySelectorAll('.value-toggle button').forEach(b => b.classList.remove('active'));
   const type = (Number(t.val || 0) < 0) ? 'expense' : 'income';
   const typeBtn = document.querySelector(`.value-toggle button[data-type="${type}"]`);
   if (typeBtn) typeBtn.classList.add('active');
-  if (type === 'expense' && valInput) {
-    valInput.value = '-' + valInput.value.replace(/^-/, '');
+  if (type !== 'expense' && valInput) {
+    // Ensure positive numbers don't keep stray negatives
+    valInput.value = valInput.value.replace(/^-/, '');
   }
 
   // 4) Método de pagamento (pill + select + radios do cartão)
@@ -3861,9 +4145,9 @@ function buildRunningBalanceMap() {
   // The running balance should begin at startDate with startBalance.
   // If no startDate is set, fall back to previous behavior (seed with startBalance || 0 at minDate).
   let runningBalance = 0;
-  const hasAnchor = !!startDate;
+  const hasAnchor = !!state.startDate;
   // use ISO string comparisons (YYYY-MM-DD) to avoid timezone issues
-  const anchorISO = hasAnchor ? String(startDate) : null;
+  const anchorISO = hasAnchor ? String(state.startDate) : null;
 
   // Itera dia-a-dia no range calculado
   const startDateObj = new Date(minDate);
@@ -3872,7 +4156,7 @@ function buildRunningBalanceMap() {
   // If the anchor (startDate) exists but is before the current range's minDate,
   // we should seed the running balance so days in this range start from the anchored value.
   if (hasAnchor && anchorISO && anchorISO < minDate && anchorISO <= maxDate) {
-    runningBalance = (startBalance != null) ? startBalance : 0;
+    runningBalance = (state.startBalance != null) ? state.startBalance : 0;
   }
   
   for (let currentDate = new Date(startDateObj); currentDate <= endDateObj; currentDate.setDate(currentDate.getDate() + 1)) {
@@ -3884,11 +4168,11 @@ function buildRunningBalanceMap() {
     }
     if (hasAnchor && iso === anchorISO) {
       // initialize running balance at anchor date
-      runningBalance = (startBalance != null) ? startBalance : 0;
+      runningBalance = (state.startBalance != null) ? state.startBalance : 0;
     }
     // If no anchor and we're at the very first iterated date, seed with startBalance || 0
     if (!hasAnchor && (iso === minDate)) {
-      runningBalance = (startBalance != null) ? startBalance : 0;
+      runningBalance = (state.startBalance != null) ? state.startBalance : 0;
     }
     // Calcula o impacto do dia usando a lógica existente
     const dayTx = txByDate(iso);
@@ -3974,7 +4258,6 @@ function renderAccordion() {
   
   // Força limpeza total do accordeon para evitar duplicação
   // especialmente quando muda de ano
-  acc.innerHTML = '';
   
   const hydrating = false; // Sempre force refresh completo
   // Force rendering of months/days even if there's no startBalance or transactions
@@ -3994,7 +4277,7 @@ function renderAccordion() {
   if (!keepSkeleton) acc.innerHTML = '';
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  const currency = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const currency = v => safeFmtCurrency(v);
   const curMonth = new Date().getMonth();   // 0‑based
 
   // Helper para criar o header da fatura do cartão
@@ -4002,9 +4285,10 @@ function renderAccordion() {
     const invSum = document.createElement('summary');
     invSum.classList.add('invoice-header-line');
     // Formatação do total original da fatura (valor bruto)
-    const formattedTotal = cardTotalAmount < 0
-      ? `R$ -${Math.abs(cardTotalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-      : `R$ ${cardTotalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const formattedTotal = safeFmtCurrency(cardTotalAmount, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
 
     // Metadados: pagamentos (dinheiro), ajustes e parcelamento
     const paidAbs = transactions
@@ -4019,13 +4303,13 @@ function renderAccordion() {
     if (parcel) {
       const n = parseInt(parcel.installments, 10) || 0;
       const per = Math.abs(Number(parcel.val) || 0);
-      const perFmt = `R$ ${per.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      const perFmt = safeFmtCurrency(per, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       note = `<small class="note">Parcelada em ${n} vezes de ${perFmt}</small>`;
     } else if (paidAbs >= totalAbs - 0.005) { // tolerância de centavos
       note = `<small class="note">Paga</small>`;
     } else if (paidAbs > 0) {
       const remaining = Math.max(0, totalAbs - paidAbs);
-      note = `<small class="note">Restante - R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>`;
+      note = `<small class="note">Restante - ${safeFmtCurrency(remaining, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>`;
     }
 
     // Usa hífen simples para coincidir com a expectativa do usuário: "Fatura - Nome do Cartão"
@@ -4100,6 +4384,7 @@ function renderAccordion() {
     // Build or reuse month container
     let mDet;
     if (keepSkeleton) {
+      // If an existing month node exists, reuse it and preserve its open state
       mDet = acc.querySelector(`details.month[data-key="m-${mIdx}"]`) || document.createElement('details');
       mDet.className = 'month';
       mDet.dataset.key = `m-${mIdx}`;
@@ -4107,7 +4392,9 @@ function renderAccordion() {
       const currentYear = new Date().getFullYear();
       const isCurrentYear = VIEW_YEAR === currentYear;
       const isOpen = isCurrentYear ? (mIdx >= curMonth) : false;
-      mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
+      // Preserve previous open if element existed, otherwise use persisted openKeys or default
+      const prevMonth = acc.querySelector(`details.month[data-key="m-${mIdx}"]`);
+      mDet.open = prevMonth ? !!prevMonth.open : (openKeys.includes(mDet.dataset.key) || isOpen);
       if (!mDet.parentElement) acc.appendChild(mDet);
       // Ensure summary exists and is in final structure
       let mSum = mDet.querySelector('summary.month-divider');
@@ -4273,7 +4560,7 @@ Object.keys(invoiceTotals).forEach(card => {
 const dayTotal = cashImpact + cardImpact;
   // Obtém o saldo do dia do mapa precalculado
   // Use balanceMap.has to avoid falling back to startBalance for dates before the anchor
-  const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : (startBalance || 0);
+  const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : (state.startBalance || 0);
       const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
       let dDet;
       if (hydrating) {
@@ -4284,19 +4571,22 @@ const dayTotal = cashImpact + cardImpact;
         dDet.dataset.has = String(dayTx.length > 0);
         if (!dDet.parentElement) mDet.appendChild(dDet);
       } else {
+        // Attempt to preserve open state from any existing day node with same key
+        const prev = mDet.querySelector(`details.day[data-key="d-${iso}"]`);
         dDet = document.createElement('details');
         dDet.dataset.has = String(dayTx.length > 0);
         dDet.className = 'day';
         dDet.dataset.key = `d-${iso}`;    // identifica o dia YYYY‑MM‑DD
-        dDet.open = openKeys.includes(dDet.dataset.key);
+        dDet.open = prev ? !!prev.open : openKeys.includes(dDet.dataset.key);
       }
       const today = todayISO();
       if (iso === today) dDet.classList.add('today');
       let dSum = dDet.querySelector('summary.day-summary');
       if (!dSum) { dSum = document.createElement('summary'); dSum.className = 'day-summary'; }
-  const saldoFormatado = dayBalance < 0
-        ? `R$ -${Math.abs(dayBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-        : `R$ ${dayBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const saldoFormatado = safeFmtCurrency(dayBalance, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
       const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
       const hasCardDue = cards.some(card => card.due === d);
       const hasSalary  = dayTx.some(t =>
@@ -4515,7 +4805,7 @@ const dayTotal = cashImpact + cardImpact;
 // Calcula o saldo do último dia do mês usando o mapa
 const lastDayOfMonth = new Date(VIEW_YEAR, mIdx + 1, 0).getDate();
 const lastDayISO = formatToISO(new Date(VIEW_YEAR, mIdx, lastDayOfMonth));
-  const monthEndBalanceForHeader = balanceMap.has(lastDayISO) ? balanceMap.get(lastDayISO) : (startBalance || 0);
+  const monthEndBalanceForHeader = balanceMap.has(lastDayISO) ? balanceMap.get(lastDayISO) : (state.startBalance || 0);
 const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado';
 
     // Atualiza o summary do mês (cabeçalho do accordion)
@@ -4572,11 +4862,11 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
 
 function initStart() {
   // Avoid showing start UI until we have loaded cached state to prevent flashes
-  if (!bootHydrated) return;
+  if (!state.bootHydrated) return;
   // Show start balance input whenever there's no anchored start date.
   // If the persisted startSet flag exists, user already completed the start flow.
   // Otherwise, fall back to presence of startDate/startBalance.
-  const showStart = !(startSet === true || (startDate != null && startBalance != null));
+  const showStart = !(state.startSet === true || (state.startDate != null && state.startBalance != null));
   // exibe ou oculta todo o container de saldo inicial
   startContainer.style.display = showStart ? 'block' : 'none';
   dividerSaldo.style.display = showStart ? 'block' : 'none';
@@ -4600,19 +4890,20 @@ setStartBtn.addEventListener('click', async () => {
     return;
   }
   // salva o novo saldo e renderiza novamente
-  startBalance = numberValue;
-  cacheSet('startBal', startBalance);
+  state.startBalance = numberValue;
+  cacheSet('startBal', state.startBalance);
+  syncStartInputFromState();
   // If there's no startDate yet, anchor this saved start balance to today
-  if (!startDate) {
-    startDate = todayISO();
-    cacheSet('startDate', startDate);
-    try { save('startDate', startDate); } catch (_) {}
+  if (!state.startDate) {
+    state.startDate = todayISO();
+    cacheSet('startDate', state.startDate);
+    try { save('startDate', state.startDate); } catch (_) {}
   }
   // Persist start balance and mark the start flow as completed (startSet=true)
   try {
-    await save('startBal', startBalance);
+    await save('startBal', state.startBalance);
   } catch(_) {}
-  startSet = true;
+  state.startSet = true;
   try { cacheSet('startSet', true); } catch(_) {}
   try { await save('startSet', true); } catch(_) {}
   initStart();
@@ -4696,7 +4987,7 @@ cardModal.onclick = e => { if (e.target === cardModal) { cardModal.classList.add
       const [liveTx, liveCards, liveBal] = await Promise.all([
         load('tx', []),
         load('cards', cards),
-        load('startBal', startBalance)
+        load('startBal', state.startBalance)
       ]);
 
       const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
@@ -4721,9 +5012,10 @@ cardModal.onclick = e => { if (e.target === cardModal) { cardModal.classList.add
         cacheSet('cards', cards);
         refreshMethods(); renderCardList(); renderTable();
       }
-      if (liveBal !== startBalance) {
-        startBalance = liveBal;
-        cacheSet('startBal', startBalance);
+      if (liveBal !== state.startBalance) {
+        state.startBalance = liveBal;
+        cacheSet('startBal', state.startBalance);
+        syncStartInputFromState();
         initStart(); renderTable();
       }
     } catch (_) { /* ignore boot fetch when not logged yet */ }

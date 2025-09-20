@@ -14,11 +14,8 @@ export function toggleModal(modal, modalClass = 'hidden') {
   modal.classList.toggle(modalClass);
   
   // Update global modal state
-  if (isOpening) {
-    document.documentElement.classList.add('modal-open');
-  } else {
-    document.documentElement.classList.remove('modal-open');
-  }
+  // defer to centralized updater to ensure consistent body locking
+  try { updateModalOpenState(); } catch (e) { if (isOpening) document.documentElement.classList.add('modal-open'); else document.documentElement.classList.remove('modal-open'); }
   
   return isOpening;
 }
@@ -30,7 +27,7 @@ export function toggleModal(modal, modalClass = 'hidden') {
 export function showModal(modal) {
   if (!modal) return;
   modal.classList.remove('hidden');
-  document.documentElement.classList.add('modal-open');
+  try { updateModalOpenState(); } catch (e) { document.documentElement.classList.add('modal-open'); }
 }
 
 /**
@@ -40,7 +37,7 @@ export function showModal(modal) {
 export function hideModal(modal) {
   if (!modal) return;
   modal.classList.add('hidden');
-  document.documentElement.classList.remove('modal-open');
+  try { updateModalOpenState(); } catch (e) { document.documentElement.classList.remove('modal-open'); }
 }
 
 /**
@@ -167,8 +164,40 @@ export function createElement(tag, attributes = {}, content = '') {
  * Update global modal open state based on visible modals
  */
 export function updateModalOpenState() {
-  const hasVisibleModal = document.querySelector('.modal:not(.hidden)') !== null;
-  document.documentElement.classList.toggle('modal-open', hasVisibleModal);
+  const root = document.documentElement || document.body;
+  const hasVisibleModal = !!document.querySelector('.bottom-modal:not(.hidden)');
+  // toggle class used by CSS
+  root.classList.toggle('modal-open', hasVisibleModal);
+
+  // Keep body fixed when a modal is open to avoid viewport/keyboard resizing jumps on mobile
+  try {
+    if (hasVisibleModal) {
+      if (!root.classList.contains('modal-locked')) {
+        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+        root.classList.add('modal-locked');
+        root.dataset.modalScroll = String(scrollY);
+      }
+    } else {
+      if (root.classList.contains('modal-locked')) {
+        root.classList.remove('modal-locked');
+        const prev = parseInt(root.dataset.modalScroll || '0', 10) || 0;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        window.scrollTo(0, prev);
+        try { delete root.dataset.modalScroll; } catch (_) { root.removeAttribute('data-modal-scroll'); }
+      }
+    }
+  } catch (e) {
+    // ignore failures
+  }
 }
 
 /**
