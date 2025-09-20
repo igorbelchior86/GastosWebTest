@@ -2588,6 +2588,7 @@ const notify = (msg, type = 'error') => {
 
 const togglePlanned = async (id, iso) => {
   const master = transactions.find(x => x.id === id);
+  const shouldRefreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   // ← memoriza quais faturas estavam abertas
   const openInvoices = Array.from(
     document.querySelectorAll('details.invoice[open]')
@@ -2660,6 +2661,9 @@ const togglePlanned = async (id, iso) => {
   }
   save('tx', transactions);
   renderTable();
+  if (shouldRefreshPlannedModal) {
+    try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
+  }
   // restaura faturas que o usuário tinha expandido
   openInvoices.forEach(pd => {
     const det = document.querySelector(`details.invoice[data-pd="${pd}"]`);
@@ -2669,6 +2673,53 @@ const togglePlanned = async (id, iso) => {
   // mostra o toast por último, já com a tela renderizada
   if (toastMsg) notify(toastMsg, 'success');
 };
+
+function openEditFlow(tx, iso) {
+  if (!tx) return;
+  const hasRecurrence = (() => {
+    if (tx.recurrence && tx.recurrence.trim()) return true;
+    if (tx.parentId) {
+      const parent = transactions.find(p => p.id === tx.parentId);
+      if (parent && parent.recurrence && parent.recurrence.trim()) return true;
+    }
+    for (const p of transactions) {
+      if (!p.recurrence || !p.recurrence.trim()) continue;
+      if (!occursOn(p, iso)) continue;
+      const sameMethod = (p.method || '') === (tx.method || '');
+      const sameDesc   = (p.desc || '') === (tx.desc || '');
+      const sameVal    = Math.abs(Number(p.val || 0) - Number(tx.val || 0)) < 0.005;
+      if (sameMethod && (sameDesc || sameVal)) return true;
+    }
+    return false;
+  })();
+
+  const performEdit = (id) => {
+    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+      plannedModal.classList.add('hidden');
+      updateModalOpenState();
+    }
+    if (isDetachedOccurrence(tx)) pendingEditMode = null;
+    editTx(id);
+  };
+
+  // helper to open recurrence modal safely
+  const showRecurrenceModal = (id) => {
+    pendingEditTxId  = id;
+    pendingEditTxIso = iso || tx.opDate;
+    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+      plannedModal.classList.add('hidden');
+      updateModalOpenState();
+    }
+    editRecurrenceModal.classList.remove('hidden');
+  };
+
+  if (tx.recurrence || (hasRecurrence && !tx.recurrence && !tx.parentId)) {
+    showRecurrenceModal(tx.id);
+    return;
+  }
+
+  performEdit(tx.id);
+}
 
 const openCardBtn=document.getElementById('openCardModal');
 const cardModal=document.getElementById('cardModal');
@@ -2835,6 +2886,9 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const actions = document.createElement('div');
   actions.className = 'swipe-actions';
 
+  const actionTargetId = tx.parentId || tx.id;
+  const actionTargetTx = transactions.find(item => item && item.id === actionTargetId) || tx;
+
   // Edit button
   const editBtn = document.createElement('button');
   editBtn.className = 'icon edit';
@@ -2844,35 +2898,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   editBtn.appendChild(editIconDiv);
   editBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    // master or dynamically recurring occurrence
-    const t = tx;
-    const hasRecurrence = (() => {
-      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
-      if (t.parentId) {
-        const master = transactions.find(p => p.id === t.parentId);
-        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
-      }
-      for (const p of transactions) {
-        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
-          if (occursOn(p, t.opDate)) {
-            if (p.desc === t.desc || p.val === t.val) return true;
-          }
-        }
-      }
-      return false;
-    })();
-    if (t.recurrence || (hasRecurrence && !t.recurrence && !t.parentId)) {
-      pendingEditTxId  = t.id;
-      pendingEditTxIso = t.opDate;
-      editRecurrenceModal.classList.remove('hidden');
-      return;
-    }
-    if (isDetachedOccurrence(t)) {
-      pendingEditMode = null;
-      editTx(t.id);
-      return;
-    }
-    editTx(t.id);
+    openEditFlow(actionTargetTx, tx.opDate);
   });
   actions.appendChild(editBtn);
 
@@ -2883,34 +2909,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const delIconDiv = document.createElement('div');
   delIconDiv.className = 'icon-action icon-delete';
   delBtn.appendChild(delIconDiv);
-  delBtn.onclick = () => {
-    const t = tx;
-    const hasRecurrence = (() => {
-      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
-      if (t.parentId) {
-        const master = transactions.find(p => p.id === t.parentId);
-        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
-      }
-      for (const p of transactions) {
-        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
-          if (occursOn(p, t.opDate)) {
-            if (p.desc === t.desc || p.val === t.val) return true;
-          }
-        }
-      }
-      return false;
-    })();
-    if (hasRecurrence) {
-      delTx(t.id, t.opDate);
-    } else {
-      if (confirm('Deseja excluir esta operação?')) {
-        transactions = transactions.filter(x => x.id !== t.id);
-        save('tx', transactions);
-        renderTable();
-        notify('Operação excluída!', 'success');
-      }
-    }
-  };
+  delBtn.onclick = () => delTx(actionTargetId, tx.opDate);
   actions.appendChild(delBtn);
 
   // Operation line
@@ -2923,6 +2922,14 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   topRow.className = 'op-main';
   const left = document.createElement('div');
   left.className = 'op-left';
+
+  const appendInvoiceBadge = (target) => {
+    if (!target || !tx.invoicePayment) return;
+    const badge = document.createElement('span');
+    badge.className = 'invoice-payment-badge';
+    badge.textContent = 'Pagamento de fatura';
+    target.appendChild(badge);
+  };
 
   // Build timestamp text so we can place it under the description
   const ts = document.createElement('div');
@@ -2963,7 +2970,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       checkbox.type = 'checkbox';
       checkbox.className = 'plan-check';
       checkbox.name = 'planned';
-      checkbox.onchange = () => togglePlanned(tx.id, tx.opDate);
+      checkbox.onchange = () => togglePlanned(actionTargetId, tx.opDate);
       const labelWrapper = document.createElement('span');
       labelWrapper.textContent = tx.desc;
       const leftText = document.createElement('div');
@@ -2971,6 +2978,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const titleRow = document.createElement('div');
       titleRow.className = 'left-title';
       titleRow.appendChild(labelWrapper);
+      appendInvoiceBadge(titleRow);
       leftText.appendChild(titleRow);
       leftText.appendChild(ts);
       left.appendChild(checkbox);
@@ -2983,6 +2991,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const titleRow = document.createElement('div');
       titleRow.className = 'left-title';
       titleRow.appendChild(descNode);
+      appendInvoiceBadge(titleRow);
       leftText.appendChild(titleRow);
       leftText.appendChild(ts);
       left.appendChild(leftText);
@@ -3034,7 +3043,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       chk.type = 'checkbox';
       chk.className = 'plan-check';
       chk.name = 'planned';
-      chk.onchange = () => togglePlanned(tx.id, tx.opDate);
+      chk.onchange = () => togglePlanned(actionTargetId, tx.opDate);
       left.appendChild(chk);
     }
     const descNode = document.createElement('span');
@@ -3044,6 +3053,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     const titleRow = document.createElement('div');
     titleRow.className = 'left-title';
     titleRow.appendChild(descNode);
+    appendInvoiceBadge(titleRow);
     leftText.appendChild(titleRow);
     leftText.appendChild(ts);
     left.appendChild(leftText);
@@ -3642,6 +3652,9 @@ function delTx(id, iso) {
     transactions = transactions.filter(x => x.id !== id);
     save('tx', transactions);
     renderTable();
+    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+      try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
+    }
     showToast('Operação excluída.', 'success');
     return;
   }
@@ -3686,6 +3699,7 @@ function findMasterRuleFor(tx, iso) {
 deleteSingleBtn.onclick = () => {
   const tx = transactions.find(t => t.id === pendingDeleteTxId);
   const iso = pendingDeleteTxIso;
+  const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, iso);
   if (master) {
@@ -3703,12 +3717,16 @@ deleteSingleBtn.onclick = () => {
   }
   save('tx', transactions);
   renderTable();
+  if (refreshPlannedModal) {
+    try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
+  }
   closeDeleteModal();
 };
 
 deleteFutureBtn.onclick = () => {
   const tx = transactions.find(t => t.id === pendingDeleteTxId);
   const iso = pendingDeleteTxIso;
+  const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, iso);
   if (master) {
@@ -3721,6 +3739,9 @@ deleteFutureBtn.onclick = () => {
   }
   save('tx', transactions);
   renderTable();
+  if (refreshPlannedModal) {
+    try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
+  }
   closeDeleteModal();
 };
 
@@ -3730,8 +3751,12 @@ deleteAllBtn.onclick = () => {
   const master = findMasterRuleFor(tx, pendingDeleteTxIso) || tx;
   // Remove both master rule and any occurrences with parentId
   transactions = transactions.filter(t => t.id !== master.id && t.parentId !== master.id);
+  const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   save('tx', transactions);
   renderTable();
+  if (refreshPlannedModal) {
+    try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
+  }
   closeDeleteModal();
   showToast('Todas as recorrências excluídas!', 'success');
 };
@@ -3947,7 +3972,7 @@ function txByDate(iso) {
     if (t.recurrence) return;            // só não-recorrentes aqui
     if (t.opDate !== iso) return;        // renderiza sempre no opDate
     // Oculta movimentos internos da fatura (pagamento/ajuste)
-    if (t.invoicePayment || t.invoiceAdjust) return;
+    if (t.invoiceAdjust) return;
 
     if (t.method !== 'Dinheiro') {
       // CARTÃO
@@ -5213,6 +5238,7 @@ function preparePlannedList() {
   // Agrupa por data
   const plannedByDate = {};
   const add = (tx) => {
+    if (!tx || !tx.opDate) return;
     const key = tx.opDate;
     if (!plannedByDate[key]) plannedByDate[key] = [];
     plannedByDate[key].push(tx);
@@ -5275,15 +5301,15 @@ function preparePlannedList() {
   // 3) Ordena e renderiza mantendo o DOM atual
   const sortedDates = Object.keys(plannedByDate).sort();
   for (const date of sortedDates) {
-    const group = plannedByDate[date].sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
+  const group = plannedByDate[date].sort((a,b)=>(a.ts||'').localeCompare(b.ts||''));
 
-    const dateObj = new Date(date+'T00:00');
-    const dateLabel = dateObj.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
-    const groupHeader = document.createElement('h3');
-    groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
-    plannedList.appendChild(groupHeader);
+  const dateObj = new Date(date+'T00:00');
+  const dateLabel = dateObj.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
+  const groupHeader = document.createElement('h3');
+  groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
+  plannedList.appendChild(groupHeader);
 
-    for (const tx of group) plannedList.appendChild(makeLine(tx, true)); // sem wrapper extra
+    for (const tx of group) plannedList.appendChild(makeLine(tx, true));
   }
 }
 

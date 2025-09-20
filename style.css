@@ -1700,6 +1700,21 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
 /* Layout for description + recurrence icon on one row */
 .op-left .left-text{ display:flex; flex-direction:column; min-width:0; }
 .op-left .left-title{ display:flex; align-items:center; gap:6px; min-width:0; }
+.op-left .left-title .invoice-payment-badge{
+  display:inline-flex;
+  align-items:center;
+  padding:2px 6px;
+  border-radius:999px;
+  background:rgba(0, 123, 255, 0.18);
+  color:var(--blue);
+  font-size:0.65rem;
+  font-weight:600;
+  letter-spacing:0.03em;
+  text-transform:uppercase;
+}
+html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
+  background:rgba(0, 86, 179, 0.12);
+}
 .executed-cash .op-right{
   display:flex;
   align-items:center;
