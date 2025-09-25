@@ -3114,6 +3114,17 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   padding: 12px;
   color: #fff;
 }
+
+#cardModal.from-settings .bottom-modal-box {
+  transform: translateX(32px);
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), opacity .28s ease;
+}
+
+#cardModal.from-settings.from-settings-visible .bottom-modal-box {
+  transform: translateX(0);
+  opacity: 1;
+}
 .card-content {
   display: flex;
   flex-direction: column;
