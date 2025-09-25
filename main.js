@@ -341,11 +341,7 @@ if (headerSeg) {
       headerSeg.dataset.selected = 'planned';
       openPlannedBtn.click();
     } else if (action === 'cards') {
-      const openCardBtn = document.getElementById('openCardModal');
-      if (openCardBtn) {
-        headerSeg.dataset.selected = 'cards';
-        openCardBtn.click();
-      }
+      headerSeg.dataset.selected = 'cards';
     }
   });
 }
@@ -384,6 +380,14 @@ function renderSettingsModal(){
           <div style="color:var(--txt-muted);font-size:18px;">›</div>
         </div>
       </div>
+    </div>
+
+    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Finanças</h2>
+    <div class="settings-list">
+      <button type="button" class="settings-item settings-link" id="settingsCardsBtn">
+        <span class="left">Cartões</span>
+        <span class="right"></span>
+      </button>
     </div>
 
     <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Sobre</h2>
@@ -512,6 +516,14 @@ function renderSettingsModal(){
   if (closeCurrencyProfileModal && currencyProfileModalEl) {
     closeCurrencyProfileModal.addEventListener('click', () => { currencyProfileModalEl.classList.add('hidden'); updateModalOpenState(); });
     currencyProfileModalEl.addEventListener('click', (e) => { if (e.target === currencyProfileModalEl) { currencyProfileModalEl.classList.add('hidden'); updateModalOpenState(); } });
+  }
+
+  // Local "Cartões" shortcut inside settings
+  const settingsCardsBtn = box.querySelector('#settingsCardsBtn');
+  if (settingsCardsBtn) {
+    settingsCardsBtn.addEventListener('click', () => {
+      showCardModal({ fromSettings: true });
+    });
   }
 
   // Reset button inside settings modal
@@ -2791,6 +2803,49 @@ function openEditFlow(tx, iso) {
 const openCardBtn=document.getElementById('openCardModal');
 const cardModal=document.getElementById('cardModal');
 const closeCardModal=document.getElementById('closeCardModal');
+
+function showCardModal(options = {}) {
+  if (!cardModal) return;
+  const fromSettings = options.fromSettings === true;
+
+  if (fromSettings) {
+    cardModal.dataset.origin = 'settings';
+    cardModal.classList.add('from-settings');
+    cardModal.classList.remove('from-settings-visible');
+    cardModal.classList.remove('hidden');
+    void cardModal.offsetWidth;
+    cardModal.classList.add('from-settings-visible');
+  } else {
+    cardModal.dataset.origin = 'default';
+    cardModal.classList.remove('from-settings');
+    cardModal.classList.remove('from-settings-visible');
+    cardModal.classList.remove('hidden');
+  }
+
+  updateModalOpenState();
+
+  setTimeout(() => {
+    try { renderCardList(); }
+    catch (_) {}
+  }, 0);
+}
+
+function hideCardModal() {
+  if (!cardModal) return;
+  cardModal.classList.add('hidden');
+  cardModal.classList.remove('from-settings-visible');
+  if (!cardModal.dataset.origin || cardModal.dataset.origin !== 'settings') {
+    cardModal.classList.remove('from-settings');
+  } else {
+    setTimeout(() => {
+      if (cardModal.classList.contains('hidden')) {
+        cardModal.classList.remove('from-settings');
+      }
+    }, 320);
+  }
+  delete cardModal.dataset.origin;
+  updateModalOpenState();
+}
 
 function refreshMethods(){
   if (!met) return;
@@ -5130,9 +5185,15 @@ setStartBtn.addEventListener('click', async () => {
 });
 
 addCardBtn.onclick=addCard;addBtn.onclick=addTx;
-openCardBtn.onclick = () => { cardModal.classList.remove('hidden'); updateModalOpenState(); setTimeout(() => { try { renderCardList(); } catch(_) {} }, 0); };
-closeCardModal.onclick = () => { cardModal.classList.add('hidden'); updateModalOpenState(); };
-cardModal.onclick = e => { if (e.target === cardModal) { cardModal.classList.add('hidden'); updateModalOpenState(); } };
+if (openCardBtn) openCardBtn.onclick = () => showCardModal();
+if (closeCardModal) closeCardModal.onclick = hideCardModal;
+if (cardModal) {
+  cardModal.onclick = e => {
+    if (e.target === cardModal) {
+      hideCardModal();
+    }
+  };
+}
 
  (async () => {
     // Instancia todos os botões “Adicionar” a partir do template

@@ -2126,8 +2126,25 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 .settings-name{font-weight:800;font-size:1.05rem;color:#fff;}
 .settings-sub{font-size:.9rem;color:#c9c9c9;opacity:.9;}
 .settings-list{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;overflow:hidden;}
-.settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-top:1px solid rgba(255,255,255,.06);} 
+.settings-item{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;border-top:1px solid rgba(255,255,255,.06);}
 .settings-item:first-child{border-top:none;}
+
+.settings-list .settings-item.settings-link{
+  background:none;
+  border:none;
+  width:100%;
+  text-align:left;
+  color:inherit;
+  font:inherit;
+  cursor:pointer;
+}
+.settings-list .settings-item.settings-link:focus{
+  outline:none;
+}
+.settings-list .settings-item.settings-link:focus-visible{
+  box-shadow:inset 0 0 0 2px var(--focus-ring, #f59e0b);
+  border-radius:0; /* relies on container radius */
+}
 
 /* Theme selector card (iOS-like group) */
 .settings-theme-card{
@@ -3096,6 +3113,17 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   border-radius: 12px;
   padding: 12px;
   color: #fff;
+}
+
+#cardModal.from-settings .bottom-modal-box {
+  transform: translateX(32px);
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), opacity .28s ease;
+}
+
+#cardModal.from-settings.from-settings-visible .bottom-modal-box {
+  transform: translateX(0);
+  opacity: 1;
 }
 .card-content {
   display: flex;
