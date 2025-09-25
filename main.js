@@ -25,6 +25,17 @@ let startInputRef = null;
 
 const hydrationTargets = new Map();
 let hydrationInProgress = true;
+let reopenPlannedAfterEdit = false;
+const sameId = (a, b) => String(a ?? '') === String(b ?? '');
+
+function normalizeISODate(input) {
+  if (!input) return null;
+  if (input instanceof Date) return input.toISOString().slice(0, 10);
+  const str = String(input).trim();
+  if (!str) return null;
+  const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
 
 function resetHydration() {
   hydrationInProgress = true;
@@ -174,7 +185,7 @@ function hydrateStateFromCache(options = {}) {
 
   cards = ensureCashCard(cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]));
   state.startBalance = cacheGet('startBal', null);
-  state.startDate = cacheGet('startDate', null);
+  state.startDate = normalizeISODate(cacheGet('startDate', null));
   state.startSet = cacheGet('startSet', false);
 
   if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
@@ -794,7 +805,7 @@ function applyCurrencyProfile(profileId, options = {}){
     syncStartInputFromState();
   }
 
-  const newStartDate = cacheGet('startDate', null);
+  const newStartDate = normalizeISODate(cacheGet('startDate', null));
   const newStartBalanceRaw = cacheGet('startBal', null);
   state.startDate = newStartDate;
   state.startBalance = (newStartDate == null && (newStartBalanceRaw === 0 || newStartBalanceRaw === '0'))
@@ -1032,7 +1043,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(a55)';
+const APP_VERSION = 'v1.4.9(a94)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
@@ -1213,6 +1224,12 @@ setBootHydrated(false);
 const $=id=>document.getElementById(id);
 const tbody=document.querySelector('#dailyTable tbody');
 const wrapperEl = document.querySelector('.wrapper');
+let wrapperScrollAnimation = null;
+let wrapperScrollTop = 0;
+let wrapperTodayAnchor = null;
+let stickyMonthVisible = false;
+let stickyMonthLabel = '';
+let stickyHeightGuess = 52;
 const txModalTitle = document.querySelector('#txModal h2');
 
 // Compute a consistent bottom reserve so the last day stops above the pseudo‑footer
@@ -1388,9 +1405,10 @@ if (!USE_MOCK) {
     }
 
     // Live listeners (Realtime DB)
-    const txRef    = profileRef('tx');
-    const cardsRef = profileRef('cards');
-    const balRef   = profileRef('startBal');
+    const txRef       = profileRef('tx');
+    const cardsRef    = profileRef('cards');
+    const balRef      = profileRef('startBal');
+    const startDateRef= profileRef('startDate');
     const startSetRef = profileRef('startSet');
 
     const listeners = [];
@@ -1398,6 +1416,7 @@ if (!USE_MOCK) {
     registerHydrationTarget('tx', !!txRef);
     registerHydrationTarget('cards', !!cardsRef);
     registerHydrationTarget('startBal', !!balRef);
+    registerHydrationTarget('startDate', !!startDateRef);
     registerHydrationTarget('startSet', !!startSetRef);
 
   // initialize from cache first for instant UI
@@ -1507,6 +1526,26 @@ if (!USE_MOCK) {
       markHydrationTargetReady('startBal');
     }
   }));
+  if (startDateRef) listeners.push(onValue(startDateRef, (snap) => {
+    const raw = snap.exists() ? snap.val() : null;
+    const normalized = normalizeISODate(raw);
+    if (normalized === state.startDate) {
+      markHydrationTargetReady('startDate');
+      return;
+    }
+    try {
+      state.startDate = normalized;
+      try { cacheSet('startDate', state.startDate); } catch (_) {}
+      if (normalized && normalized !== raw && typeof save === 'function' && PATH) {
+        Promise.resolve().then(() => save('startDate', normalized)).catch(() => {});
+      }
+      ensureStartSetFromBalance({ persist: false, refresh: false });
+      initStart();
+      renderTable();
+    } finally {
+      markHydrationTargetReady('startDate');
+    }
+  }));
   // Listen for persisted startSet flag changes so remote clears/sets propagate
   if (startSetRef) listeners.push(onValue(startSetRef, (snap) => {
     const val = snap.exists() ? !!snap.val() : false;
@@ -1572,7 +1611,7 @@ if (!USE_MOCK) {
   transactions = cacheGet('tx', []);
   cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
   state.startBalance = cacheGet('startBal', null);
-  state.startDate = cacheGet('startDate', null);
+  state.startDate = normalizeISODate(cacheGet('startDate', null));
   // Same normalization for mock fallback
   if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
     state.startBalance = null;
@@ -1691,8 +1730,20 @@ function focusValueField() {
     valInput.setAttribute('inputmode', 'decimal');
   } catch (_) {}
 
+  const shouldRespectExistingFocus = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body || active === valInput) return false;
+    try {
+      if (typeof active.matches === 'function' && active.matches('input, select, textarea, button, [contenteditable="true"]')) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  };
+
   const doFocus = () => {
     if (txModal && txModal.classList.contains('hidden')) return;
+    if (shouldRespectExistingFocus()) return;
     try {
       valInput.focus({ preventScroll: true });
       // Select all to start typing immediately
@@ -1729,41 +1780,21 @@ function updateModalOpenState() {
   // Add/remove the existing modal-open class (used by CSS)
   if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
 
-  // Prevent viewport jumps on mobile when a modal opens and the on-screen keyboard appears.
-  // Approach: save current scroll position and apply a fixed-position lock to the <body> so
-  // the browser won't resize/layout the page when visual viewport changes. Restore on close.
-  try {
+  if (wrapperEl) {
+    try {
     if (open) {
-      if (!root.classList.contains('modal-locked')) {
-        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        // Apply lock styles to body
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${scrollY}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
-        // mark locked and persist scroll value on root for restore
-        root.classList.add('modal-locked');
-        root.dataset.modalScroll = String(scrollY);
+      wrapperScrollTop = wrapperEl.scrollTop || 0;
+      wrapperEl.dataset.locked = '1';
+      wrapperEl.style.overflow = 'hidden';
+      wrapperEl.scrollTop = wrapperScrollTop;
+    } else if (wrapperEl.dataset.locked) {
+      delete wrapperEl.dataset.locked;
+      wrapperEl.style.overflow = '';
+      wrapperEl.scrollTop = wrapperScrollTop;
       }
-    } else {
-      if (root.classList.contains('modal-locked')) {
-        // restore
-        root.classList.remove('modal-locked');
-        const prev = parseInt(root.dataset.modalScroll || '0', 10) || 0;
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        // ensure we restore the previous scroll position
-        window.scrollTo(0, prev);
-        try { delete root.dataset.modalScroll; } catch(_) { root.removeAttribute('data-modal-scroll'); }
-      }
+    } catch (e) {
+      console.error('updateModalOpenState lock/unlock failed', e);
     }
-  } catch (e) {
-    // best-effort only; don't break UI if this fails
-    console.error('updateModalOpenState lock/unlock failed', e);
   }
 
   // Safari iOS fix: Force scroll state cleanup when all modals are closed
@@ -1795,45 +1826,68 @@ const closeSettingsModal = document.getElementById('closeSettingsModal');
 function scrollTodayIntoView() {
   try {
     const iso = todayISO();
-    const wrap = wrapperEl || document.scrollingElement || document.documentElement;
-    let dayEl = document.querySelector('details.day.today') ||
-                document.querySelector(`details.day[data-key="d-${iso}"]`);
+    const wrap = wrapperEl;
+    if (!wrap) return;
+
+    let dayEl = document.querySelector(`details.day[data-key="d-${iso}"]`);
     if (!dayEl) { showToast('Dia atual não encontrado', 'error'); return; }
+
     const monthEl = dayEl.closest('details.month');
     if (monthEl && !monthEl.open) {
       monthEl.open = true;
-      // aguarda próximo frame para layout estabilizar e reexecuta
       requestAnimationFrame(() => scrollTodayIntoView());
       return;
     }
-    // manter colapsado (adiado para depois do scroll)
-    if (dayEl.open) dayEl.open = false;
-    // Centraliza manualmente no scroll container principal
+
+    if (dayEl.open) {
+      dayEl.open = false;
+      requestAnimationFrame(() => scrollTodayIntoView());
+      return;
+    }
+
+    if (wrapperScrollAnimation) return;
+
     requestAnimationFrame(() => {
       try {
-        const wrapRect = wrap.getBoundingClientRect();
-        const elRect   = dayEl.getBoundingClientRect();
-        const current  = wrap.scrollTop || 0;
-        const elTopInWrap = (elRect.top - wrapRect.top) + current;
-        // Desconta overlays fixos que ocupam área visível acima do conteúdo (ex.: sticky-month)
-        let overlayAbove = 0;
+        const header = document.querySelector('.app-header');
+        const headerHeight = header ? header.offsetHeight || 0 : 0;
         const sticky = document.querySelector('.sticky-month');
-        // O sticky pode ficar "visível" durante o scroll; antecipe sempre sua altura
         if (sticky) {
-          overlayAbove += sticky.offsetHeight || 0; // ~52px
+          const measured = sticky.offsetHeight || stickyHeightGuess;
+          if (measured > 0) stickyHeightGuess = measured;
         }
-        const footerReserve = 180; // altura ajustada para alinhar o dia mais acima
-        const effectiveViewport = Math.max(1, (wrap.clientHeight - overlayAbove - footerReserve));
-        const targetTop = Math.max(
-          0,
-          elTopInWrap - (effectiveViewport / 2) + (dayEl.offsetHeight / 2)
+        const stickyHeight = stickyHeightGuess;
+        const footerReserve = parseInt(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue('--floating-footer-height') || '0', 10
         );
-        wrap.scrollTo({ top: targetTop, behavior: 'smooth' });
-      } catch (_) {
-        dayEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+        const gap = 16;
+        const targetOffset = headerHeight + stickyHeight + gap;
+        const wrapRect = wrap.getBoundingClientRect();
+        const dayRect = dayEl.getBoundingClientRect();
+        const currentRelativeTop = dayRect.top - wrapRect.top;
+        if (Math.abs(currentRelativeTop - targetOffset) < 2 && wrapperScrollAnimation === null) {
+          return;
+        }
+
+        const delta = currentRelativeTop - targetOffset;
+        const maxScroll = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+        let targetTop = (wrap.scrollTop || 0) + delta;
+        targetTop = Math.max(0, Math.min(targetTop, Math.max(0, maxScroll - footerReserve)));
+
+        if (wrapperTodayAnchor != null && Math.abs(wrapperTodayAnchor - targetTop) < 2 && !wrapperScrollAnimation) {
+          return;
+        }
+
+        animateWrapperScroll(targetTop);
+      } catch (err) {
+        console.error('scrollTodayIntoView compute failed', err);
       }
     });
-  } catch (_) {}
+  } catch (err) {
+    console.error('scrollTodayIntoView failed', err);
+  }
 }
 if (homeBtn) homeBtn.addEventListener('click', scrollTodayIntoView);
 
@@ -1862,6 +1916,7 @@ if (homeBtn) homeBtn.addEventListener('click', scrollTodayIntoView);
       setSelected(action); updateHighlight();
       if (action === 'home') {
         scrollTodayIntoView();
+        closeSettings();
       } else if (action === 'settings') {
         // Use openSettings() which renders the theme selector (renderSettingsModal)
         openSettings();
@@ -2159,15 +2214,24 @@ function updateStickyMonth() {
     } catch (_) {}
     // Fallback: use the first word from label if anything goes wrong
     if (!monthText) monthText = label.split(/\s+/)[0];
-    stickyMonth.textContent = monthText;
-    stickyMonth.classList.add('visible');
-  } else {
+    if (!stickyMonthVisible || stickyMonthLabel !== monthText) {
+      stickyMonth.textContent = monthText;
+        if (!stickyMonthVisible) stickyMonth.classList.add('visible');
+        stickyMonthVisible = true;
+        stickyMonthLabel = monthText;
+    }
+  } else if (stickyMonthVisible) {
     stickyMonth.classList.remove('visible');
+    stickyMonthVisible = false;
+    stickyMonthLabel = '';
   }
 }
 
 // Atualiza stickyMonth ao rolar o container principal
-if (wrapperEl) wrapperEl.addEventListener('scroll', updateStickyMonth);
+if (wrapperEl) wrapperEl.addEventListener('scroll', (evt) => {
+  if (!wrapperScrollAnimation) wrapperTodayAnchor = null;
+  updateStickyMonth(evt);
+});
 else window.addEventListener('scroll', updateStickyMonth);
 
 // Observer para detectar quando os elementos month-divider são adicionados ao DOM
@@ -2587,7 +2651,7 @@ const notify = (msg, type = 'error') => {
 };
 
 const togglePlanned = async (id, iso) => {
-  const master = transactions.find(x => x.id === id);
+  const master = transactions.find(x => sameId(x.id, id));
   const shouldRefreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   // ← memoriza quais faturas estavam abertas
   const openInvoices = Array.from(
@@ -2694,7 +2758,8 @@ function openEditFlow(tx, iso) {
   })();
 
   const performEdit = (id) => {
-    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+    reopenPlannedAfterEdit = !!(plannedModal && !plannedModal.classList.contains('hidden'));
+    if (reopenPlannedAfterEdit) {
       plannedModal.classList.add('hidden');
       updateModalOpenState();
     }
@@ -2706,11 +2771,13 @@ function openEditFlow(tx, iso) {
   const showRecurrenceModal = (id) => {
     pendingEditTxId  = id;
     pendingEditTxIso = iso || tx.opDate;
-    if (plannedModal && !plannedModal.classList.contains('hidden')) {
+    reopenPlannedAfterEdit = !!(plannedModal && !plannedModal.classList.contains('hidden'));
+    if (reopenPlannedAfterEdit) {
       plannedModal.classList.add('hidden');
       updateModalOpenState();
     }
     editRecurrenceModal.classList.remove('hidden');
+    updateModalOpenState();
   };
 
   if (tx.recurrence || (hasRecurrence && !tx.recurrence && !tx.parentId)) {
@@ -2886,8 +2953,9 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const actions = document.createElement('div');
   actions.className = 'swipe-actions';
 
-  const actionTargetId = tx.parentId || tx.id;
-  const actionTargetTx = transactions.find(item => item && item.id === actionTargetId) || tx;
+  const existsInStore = transactions.some(item => item && String(item.id) === String(tx.id));
+  const actionTargetId = existsInStore ? tx.id : (tx.parentId || tx.id);
+  const actionTargetTx = transactions.find(item => item && String(item.id) === String(actionTargetId)) || tx;
 
   // Edit button
   const editBtn = document.createElement('button');
@@ -2970,7 +3038,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       checkbox.type = 'checkbox';
       checkbox.className = 'plan-check';
       checkbox.name = 'planned';
-      checkbox.onchange = () => togglePlanned(actionTargetId, tx.opDate);
+      checkbox.onchange = (ev) => {
+        ev.stopPropagation();
+        togglePlanned(actionTargetId, tx.opDate);
+      };
       const labelWrapper = document.createElement('span');
       labelWrapper.textContent = tx.desc;
       const leftText = document.createElement('div');
@@ -3001,7 +3072,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     const hasRecurrence = (() => {
       if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
       if (t.parentId) {
-        const master = transactions.find(p => p.id === t.parentId);
+        const master = transactions.find(p => sameId(p.id, t.parentId));
         if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
       }
       for (const p of transactions) {
@@ -3025,7 +3096,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const hasRecurrenceFinal =
         (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
         (t.parentId && transactions.some(p =>
-          p.id === t.parentId &&
+          sameId(p.id, t.parentId) &&
           typeof p.recurrence === 'string' &&
           p.recurrence.trim() !== ''
         ));
@@ -3043,7 +3114,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       chk.type = 'checkbox';
       chk.className = 'plan-check';
       chk.name = 'planned';
-      chk.onchange = () => togglePlanned(actionTargetId, tx.opDate);
+      chk.onchange = (ev) => {
+        ev.stopPropagation();
+        togglePlanned(actionTargetId, tx.opDate);
+      };
       left.appendChild(chk);
     }
     const descNode = document.createElement('span');
@@ -3249,7 +3323,7 @@ async function addTx() {
       return;
     }
     const newDesc    = desc.value.trim();
-    let newVal = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
+    let newVal = safeParseCurrency(val.value) || 0;
     const activeType = document.querySelector('.value-toggle button.active').dataset.type;
     if (activeType === 'expense') newVal = -Math.abs(newVal);
     const newMethod  = met.value;
@@ -3307,7 +3381,7 @@ async function addTx() {
              passadas.  Se o registro clicado for uma ocorrência gerada,
              subimos para o pai; caso contrário usamos o próprio. */
           const master = t.parentId
-            ? transactions.find(tx => tx.id === t.parentId)
+            ? transactions.find(tx => sameId(tx.id, t.parentId))
             : t;
           if (master) {
             master.desc         = newDesc;
@@ -3366,7 +3440,7 @@ async function addTx() {
   // Modo especial: pagamento/parcelamento de fatura
   if (isPayInvoiceMode && pendingInvoiceCtx) {
     const ctx = pendingInvoiceCtx;
-    const rawVal = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
+    const rawVal = safeParseCurrency(val.value) || 0;
     const amount = Math.abs(rawVal); // valor informado, sempre positivo
     if (amount <= 0) { showToast('Informe um valor válido.'); return; }
     const remaining = Number(ctx.remaining) || 0;
@@ -3494,7 +3568,7 @@ async function addTx() {
 // 1. Coleta os dados do formulário e valida
 function collectTxFormData() {
   const d = desc.value.trim();
-  let v = parseFloat(val.value.replace(/\./g, '').replace(/,/g, '.')) || 0;
+  let v = safeParseCurrency(val.value) || 0;
   const activeType = document.querySelector('.value-toggle button.active').dataset.type;
   if (activeType === 'expense') v = -Math.abs(v);
   const m = met.value;
@@ -3633,7 +3707,7 @@ function generateOccurrences(baseTx) {
 function getCardById(id) {
   if (!id) return null;
   // Tenta encontrar cartão pelo campo id, ou pelo nome (fallback)
-  return cards.find(c => c.id === id || c.name === id) || null;
+  return cards.find(c => sameId(c.id, id) || c.name === id) || null;
 }
 
 // Função utilitária para formatar data ISO (YYYY-MM-DD)
@@ -3644,12 +3718,12 @@ function formatDateISO(date) {
 
 // Delete a transaction (with options for recurring rules)
 function delTx(id, iso) {
-  const t = transactions.find(x => x.id === id);
+  const t = transactions.find(x => sameId(x.id, id));
   if (!t) return;
 
   // Se NÃO for recorrente (nem ocorrência destacada), exclui direto
   if (!t.recurrence && !t.parentId) {
-    transactions = transactions.filter(x => x.id !== id);
+    transactions = transactions.filter(x => !sameId(x.id, id));
     save('tx', transactions);
     renderTable();
     if (plannedModal && !plannedModal.classList.contains('hidden')) {
@@ -3681,7 +3755,7 @@ function findMasterRuleFor(tx, iso) {
   if (!tx) return null;
   if (tx.recurrence && tx.recurrence.trim() !== '') return tx;
   if (tx.parentId) {
-    const parent = transactions.find(p => p.id === tx.parentId);
+    const parent = transactions.find(p => sameId(p.id, tx.parentId));
     if (parent) return parent;
   }
   // Heuristic: find a rule that occurs on the same date and looks like this tx
@@ -3697,7 +3771,7 @@ function findMasterRuleFor(tx, iso) {
 }
 
 deleteSingleBtn.onclick = () => {
-  const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
@@ -3708,11 +3782,11 @@ deleteSingleBtn.onclick = () => {
     // Remove any materialized child occurrence for this exact date
     // This covers cases where the occurrence was previously edited/created
     // as a standalone item (with parentId) and would otherwise remain visible.
-    transactions = transactions.filter(x => !(x.parentId === master.id && x.opDate === iso));
+    transactions = transactions.filter(x => !(sameId(x.parentId, master.id) && x.opDate === iso));
     showToast('Ocorrência excluída!', 'success');
   } else {
     // fallback: not a recurrence → hard delete
-    transactions = transactions.filter(x => x.id !== tx.id);
+    transactions = transactions.filter(x => !sameId(x.id, tx.id));
     showToast('Operação excluída.', 'success');
   }
   save('tx', transactions);
@@ -3724,17 +3798,17 @@ deleteSingleBtn.onclick = () => {
 };
 
 deleteFutureBtn.onclick = () => {
-  const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, iso);
   if (master) {
     master.recurrenceEnd = iso;
-    showToast('Esta e futuras excluídas!', 'success');
+  showToast('Esta e futuras excluídas!', 'success');
   } else {
     // fallback: not a recurrence → delete only this occurrence
-    transactions = transactions.filter(x => x.id !== tx.id);
+    transactions = transactions.filter(x => !sameId(x.id, tx.id));
     showToast('Operação excluída.', 'success');
   }
   save('tx', transactions);
@@ -3746,11 +3820,11 @@ deleteFutureBtn.onclick = () => {
 };
 
 deleteAllBtn.onclick = () => {
-  const tx = transactions.find(t => t.id === pendingDeleteTxId);
+  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, pendingDeleteTxIso) || tx;
   // Remove both master rule and any occurrences with parentId
-  transactions = transactions.filter(t => t.id !== master.id && t.parentId !== master.id);
+  transactions = transactions.filter(t => !sameId(t.id, master.id) && !sameId(t.parentId, master.id));
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   save('tx', transactions);
   renderTable();
@@ -3764,6 +3838,13 @@ deleteAllBtn.onclick = () => {
 // Modal Editar Recorrência handlers
 function closeEditModal() {
   editRecurrenceModal.classList.add('hidden');
+  updateModalOpenState();
+  if (reopenPlannedAfterEdit && plannedModal) {
+    reopenPlannedAfterEdit = false;
+    renderPlannedModal();
+    plannedModal.classList.remove('hidden');
+    updateModalOpenState();
+  }
 }
 closeEditRecurrenceModal.onclick = closeEditModal;
 cancelEditRecurrence.onclick = closeEditModal;
@@ -4050,19 +4131,17 @@ function txByDate(iso) {
 
 // ===================== YEAR SELECTOR =====================
 
+const YEAR_SELECTOR_MIN = 1990;
+const YEAR_SELECTOR_MAX = 3000;
+
 // Detecta anos disponíveis nas transações
 function getAvailableYears() {
   // Calendar-like year provider: return a wide, predictable range so user
   // can navigate like a calendar. We avoid generating an extremely large
   // DOM by returning a reasonable window, and the modal provides controls
   // to page earlier/later if needed.
-  const currentYear = new Date().getFullYear();
-  const MIN_YEAR = 0; // allow going back to year 0 as requested
-  const FUTURE_PADDING = 50; // years into the future to allow by default
-  const MAX_YEAR = currentYear + FUTURE_PADDING;
-
   const years = [];
-  for (let y = MAX_YEAR; y >= MIN_YEAR; y--) years.push(y);
+  for (let y = YEAR_SELECTOR_MIN; y <= YEAR_SELECTOR_MAX; y++) years.push(y);
   return years;
 }
 
@@ -4099,36 +4178,41 @@ function openYearModal() {
   // Se ainda só tem o ano atual, força a inclusão de anos com transações
   if (availableYears.length === 1 && transactions.length > 0) {
     const extraYears = new Set(availableYears);
-    
+
     // Busca anos em todas as transações de forma mais agressiva
     transactions.forEach(tx => {
       // Verifica todas as propriedades que podem conter data
       Object.values(tx).forEach(value => {
         if (typeof value === 'string') {
           // Regex para encontrar anos de 4 dígitos
-          const yearMatch = value.match(/\b(20[2-9][0-9])\b/);
+          const yearMatch = value.match(/\b(19[9][0-9]|2\d{3}|3000)\b/);
           if (yearMatch) {
             const year = parseInt(yearMatch[1]);
-            if (year >= 2020 && year <= 2035) {
+            if (year >= YEAR_SELECTOR_MIN && year <= YEAR_SELECTOR_MAX) {
               extraYears.add(year);
             }
           }
-          
+
           // Verifica formato de data DD/MM/YYYY
-          const dateMatch = value.match(/\b\d{1,2}\/\d{1,2}\/(20[2-9][0-9])\b/);
+          const dateMatch = value.match(/\b\d{1,2}\/\d{1,2}\/(19[9][0-9]|2\d{3}|3000)\b/);
           if (dateMatch) {
             const year = parseInt(dateMatch[1]);
-            extraYears.add(year);
+            if (year >= YEAR_SELECTOR_MIN && year <= YEAR_SELECTOR_MAX) {
+              extraYears.add(year);
+            }
           }
         }
       });
     });
-    
+
     availableYears.length = 0;
-    availableYears.push(...Array.from(extraYears).sort((a, b) => b - a));
+    availableYears.push(...Array.from(extraYears).sort((a, b) => a - b));
   }
-  
-  availableYears.forEach(year => {
+
+  availableYears
+    .slice()
+    .sort((a, b) => a - b)
+    .forEach(year => {
     const yearItem = document.createElement('div');
     yearItem.className = 'year-item';
     if (year === VIEW_YEAR) {
@@ -5024,11 +5108,15 @@ setStartBtn.addEventListener('click', async () => {
   state.startBalance = numberValue;
   cacheSet('startBal', state.startBalance);
   syncStartInputFromState();
-  // If there's no startDate yet, anchor this saved start balance to today
-  if (!state.startDate) {
-    state.startDate = todayISO();
+  const anchorISO = normalizeISODate(state.startDate) || todayISO();
+  if (anchorISO !== state.startDate) {
+    state.startDate = anchorISO;
     cacheSet('startDate', state.startDate);
     try { save('startDate', state.startDate); } catch (_) {}
+  } else if (!state.startDate) {
+    // garante persistência mesmo se valor já vier normalizado de outra instância
+    cacheSet('startDate', anchorISO);
+    try { save('startDate', anchorISO); } catch (_) {}
   }
   // Persist start balance and mark the start flow as completed (startSet=true)
   try {
@@ -5269,7 +5357,7 @@ function preparePlannedList() {
 
       // evita duplicata se já houver planejado nesse dia
       const dup = (plannedByDate[iso] || []).some(t =>
-        (t.parentId && t.parentId === master.id) ||
+        (t.parentId && sameId(t.parentId, master.id)) ||
         ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
          Math.abs(Number(t.val||0))===Math.abs(Number(master.val||0)))
       );
@@ -5279,7 +5367,7 @@ function preparePlannedList() {
       // that matches this master (by parentId or desc/method/val), skip projection.
       const exists = transactions.some(t =>
         t && t.opDate === iso && (
-          (t.parentId && t.parentId === master.id) ||
+          (t.parentId && sameId(t.parentId, master.id)) ||
           ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
            Math.abs(Number(t.val||0))===Math.abs(Number(master.val||0)))
         )
@@ -5346,3 +5434,32 @@ initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.invoice-header-li
 
 // Initialize year selector title
 updateYearTitle();
+function animateWrapperScroll(targetTop) {
+  if (!wrapperEl) return;
+  if (wrapperScrollAnimation) return;
+
+  const startTop = wrapperEl.scrollTop || 0;
+  const distance = targetTop - startTop;
+  if (Math.abs(distance) < 1) {
+    wrapperEl.scrollTop = targetTop;
+    wrapperTodayAnchor = targetTop;
+    return;
+  }
+
+  const duration = 240;
+  const startTime = performance.now();
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const step = (now) => {
+    const elapsed = now - startTime;
+    const progress = Math.min(1, elapsed / duration);
+    wrapperEl.scrollTop = startTop + distance * easeOutCubic(progress);
+    if (progress < 1) {
+      wrapperScrollAnimation = requestAnimationFrame(step);
+    } else {
+      wrapperScrollAnimation = null;
+      wrapperEl.scrollTop = targetTop;
+      wrapperTodayAnchor = targetTop;
+    }
+  };
+  wrapperScrollAnimation = requestAnimationFrame(step);
+}

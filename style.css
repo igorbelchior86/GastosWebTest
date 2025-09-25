@@ -640,6 +640,8 @@ html[data-theme="light"] #currencyProfileModal #currencyProfileList li {
   --panel:#fff;
   --border:#d1d5db;
   --radius:8px;
+  --floating-footer-height: 96px;
+  --modal-bottom-gap: calc(var(--floating-footer-height) + env(safe-area-inset-bottom));
 
   --green:#00FF00;
   --green-soft:#32FF84;
@@ -1315,24 +1317,24 @@ summary.day-summary .icon-invoice::before{
   border: 1px solid rgba(255,255,255,.08);
   box-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
 }
-/* Ensure year selector modal starts above floating pseudo-footer/buttons */
+/* Ensure year selector uses a half-screen sheet while clearing the floating footer */
 #yearModal .bottom-modal-box {
-  margin-bottom: calc(88px + env(safe-area-inset-bottom));
-  max-height: 50vh; /* keep it half-screen like requested */
+  margin-bottom: 0;
   width: calc(100% - 16px);
   max-width: 720px;
+  max-height: min(520px, 56vh);
 }
 
-/* Make modal content scrollable so the year list can be centered reliably */
+#yearModal .bottom-modal-box .modal-content {
+  max-height: calc(100% - 68px);
+}
+
 #yearModal .modal-content {
-  max-height: calc(50vh - 72px); /* account for header and drag handle */
   overflow: auto;
 }
 
 .year-list {
-  /* ensure the year list itself can scroll if content overflows */
   overflow: auto;
-  max-height: calc(50vh - 120px);
   padding: 8px 0;
 }
 
@@ -1385,8 +1387,7 @@ html[data-theme="light"] #yearModal .modal-content::-webkit-scrollbar { width: 1
 #yearModal[data-theme="light"] .modal-content::-webkit-scrollbar-thumb,
 html[data-theme="light"] #yearModal .modal-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 8px; }
 
-/* Keep floating buttons unaffected by z-index but ensure modal appears above them */
-#yearModal { z-index: 1500; }
+/* Preserve default stacking so floating buttons remain visible above the modal backdrop */
 
 /* ===================== LIGHT THEME — START (Saldo inicial) CARD ===================== */
 html[data-theme="light"] .start-container{
@@ -1634,10 +1635,11 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   position:fixed;top:80px;left:0;width:100%;padding:0 24px 4px;box-sizing:border-box;font-weight:bold;font-size:14pt;color:#348461;
   background:var(--glass-bg-light);backdrop-filter:blur(30px) saturate(180%);
   box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.45);z-index:900;display:flex;align-items:flex-end;height:52px;border-radius:12px;
-  overflow: hidden; -webkit-clip-path: inset(0 round 12px); clip-path: inset(0 round 12px);
-  opacity:0;transform:translateY(-100%);transition:transform .25s ease,opacity .25s ease;pointer-events:none;text-shadow:0 0 6px #00FF0040;
+  overflow:hidden;-webkit-clip-path:inset(0 round 12px);clip-path:inset(0 round 12px);
+  opacity:0;visibility:hidden;pointer-events:none;text-shadow:0 0 6px #00FF0040;
+  transition:opacity .2s ease, visibility .2s ease;
 }
-.sticky-month.visible{opacity:1;transform:translateY(0);pointer-events:auto;}
+.sticky-month.visible{opacity:1;visibility:visible;pointer-events:auto;}
 
 /* ===================== EXECUTADOS / PLANEJADOS BLOCKS ===================== */
 .executed-cash{
@@ -2072,7 +2074,7 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 
 /* ===================== MODAL ===================== */
-.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1000;transition:opacity .3s ease;pointer-events:none;opacity:0;}
+.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px var(--modal-bottom-gap);box-sizing:border-box;}
 .backdrop-blur{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);} 
 .bottom-modal:not(.hidden){opacity:1;pointer-events:auto;}
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
@@ -2094,7 +2096,7 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  margin-bottom: 90px;
+  margin-bottom: 0;
   overscroll-behavior: contain;
 
   /* entry animation */
@@ -2582,19 +2584,23 @@ html[data-theme="light"] .floating-pill .pill-highlight{
 html[data-theme="light"] .pill-icon{ background:#111 !important; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important; }
 
 /* Ajustes quando o teclado estiver aberto (iOS 26):
-   apenas eleva os botões, sem mexer no header */
-html[data-vv-kb="1"] .floating-add-button{
-  bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
-}
-html[data-vv-kb="1"] .floating-home-button{
-  bottom: calc(24px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
+   os botões já acompanham o viewport reduzido, então mantemos a mesma âncora */
+html[data-vv-kb="1"] .floating-add-button,
+html[data-vv-kb="1"] .floating-home-button {
+  bottom: calc(12px + env(safe-area-inset-bottom));
 }
 .floating-add-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 .floating-home-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 /* Oculta botões flutuantes quando um modal está aberto (ficariam acima do modal) */
 html.modal-open .floating-add-button,
 html.modal-open .floating-home-button,
-html.modal-open .floating-pill { display: none !important; }
+html.modal-open .floating-pill {
+  opacity: 0.6;
+  pointer-events: auto;
+}
+html.modal-open .floating-pill .pill-option{
+  pointer-events: auto;
+}
 
 .floating-planned-button,.floating-card-button{
   position:absolute;top:18px;width:44px;height:44px;border-radius:50%;background:linear-gradient(to bottom,#00CFFF,#007AFF);
