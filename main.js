@@ -386,6 +386,14 @@ function renderSettingsModal(){
       </div>
     </div>
 
+    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Finanças</h2>
+    <div class="settings-list">
+      <button type="button" class="settings-item settings-link" id="settingsCardsBtn">
+        <span class="left">Cartões</span>
+        <span class="right"></span>
+      </button>
+    </div>
+
     <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Sobre</h2>
     <div class="settings-list">
       <div class="settings-item">
