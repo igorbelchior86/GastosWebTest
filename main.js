@@ -390,7 +390,7 @@ function renderSettingsModal(){
       </button>
     </div>
 
-    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Sobre</h2>
+    <h2 class="settings-title" style="margin:18px 0 8px 0;font-size:1rem;font-weight:700;color:var(--txt-main);">Ajustes</h2>
     <div class="settings-list">
       <div class="settings-item">
         <div class="left">
@@ -414,6 +414,7 @@ function renderSettingsModal(){
         </button>
       </div>
     </div>`;
+  settingsModalEl.setAttribute('aria-labelledby', 'settingsSheetTitle');
   const img = box.querySelector('#settingsAvatar');
   if (img) {
     if (photo) {
@@ -1055,7 +1056,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(a94)';
+const APP_VERSION = 'v1.4.9(a96)';
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
