@@ -1,48 +1,85 @@
 # Plano de Refatoração
 
+```markdown
+# Plano de Refatoração
+
 ## Objetivos Gerais
 - Externalizar lógicas utilitárias/estado global de `main.js` em módulos reutilizáveis.
 - Manter compatibilidade total com comportamento atual (refatoração sem regressões funcionais).
 - Facilitar testes automatizados e manuais ao longo das etapas.
 
-## Estado Atual (2025-09-18)
-- **Utilitários de formato**: centralizados em `js/utils/format-utils.js` e reaproveitados via import.
-- **Perfis de moeda**: lógica compartilhada em `js/utils/profile-utils.js`, consumida por `main.js` e helpers.
-- **Cache local**: criado `js/utils/cache-utils.js` com chaves escopadas por perfil.
-- **Placeholders/formatos**: sincronizados com o perfil ativo (ex.: saldo inicial).
-- **Estado (start flow)**: novo módulo `js/state/app-state.js` controla `startBalance`, `startDate`, `startSet` e `bootHydrated`, consumido por `main.js`.
-- **Perfil ↔ saldo inicial**: troca de perfil agora recarrega saldo/start específicos e limpa o input quando inexistente, evitando valores residuais.
-- **Hidratação controlada**: shimmer permanece até concluir leitura do Firebase; renderização só ocorre após hidratação completa, eliminando o flash de `R$ 0,00`.
-- **Testes manuais executados**: troca de perfis, lançamento/edição de transações, validação de modais e saldo inicial.
+## Resumo do que foi feito (até 2025-09-26)
 
-## Próximos Passos Sugeridos
-1. **Estado global (cont.)**
-   - Estender `app-state` para abranger `transactions` e `cards`, oferecendo APIs de mutação observáveis.
-   - Mapear pontos de escrita em `main.js` e substituir por chamadas centralizadas (`setTransactions`, `mutateTransactions`).
-2. **Serviços externos**
-   - Encapsular chamadas Firebase em `js/services/firebase.js` com funções puras (`loadTransactions`, `saveTransaction`).
-   - Facilitar mocks para testes e isolar dependências.
-3. **Camada de cache persistente**
-   - Unificar `cacheGet/cacheSet` com IndexedDB (`idb`) em um único módulo, expondo fallback localStorage.
-4. **Camada de UI/Render**
-   - Separar renderizações complexas (tabela, modais) em módulos/componentes puros.
-   - Introduzir testes de snapshot/smoke com Playwright ou similar.
-5. **Ferramentas de qualidade**
-   - Adicionar scripts de lint (`ESLint`) e formatação (`Prettier`) com regras mínimas.
-   - Configurar suíte de testes automatizados para fluxos críticos (ex.: saldo inicial, recorrências, faturas).
+- Centralização inicial do estado e utilitários:
+  - `js/state/app-state.js` foi adotado como fonte de verdade para operações relacionadas a estado (saldo, data inicial, boot/hydration, e APIs para `transactions`/`cards`).
+  - Utilitários (format, date, cache) já consolidados em `js/utils/`.
 
-## Estratégia de Execução
-- Trabalhar em branches pequenas/temáticas e validar via smoke/manual a cada entrega.
-- Manter compatibilidade global exportando APIs antigas enquanto módulos são migrados.
-- Documentar alterações relevantes neste arquivo conforme as fases forem concluídas.
+- Migração writes-first (concluída majoritariamente):
+  - A maioria dos pontos que adicionam/atualizam/removem transações agora usa as APIs de `app-state` (`addTransaction`, `removeTransaction`, `updateTransaction`, `setTransactions`) com fallbacks atômicos para preservar compatibilidade com o global legado quando necessário.
 
-## Métricas de Confiança
-- `npm test` / smoke tests (quando disponíveis) passam.
-- Testes manuais principais executados e sem regressões observadas.
-- Monitorar métricas de erro nos ambientes (Firebase logs) após deploys das etapas grandes.
+- Migração reads-second (em andamento):
+  - Estratégia: dentro de funções síncronas que precisam consultar o conjunto de transações, ler um snapshot pontual do estado e usar apenas esse snapshot durante a execução da função:
+    const txs = getTransactions ? getTransactions() : transactions;
+  - Alterações já aplicadas em `main.js` (exemplos):
+    - `renderAccordion()` — snapshot inserido e vários usos internos trocados para `txs`.
+    - `makeLine(tx, ...)` — snapshot inserido; heurísticas de recorrência e buscas agora consultam `(txs || [])`.
+    - `delTx`, `findMasterRuleFor`, `deleteSingleBtn`, `deleteFutureBtn`, `deleteAllBtn` — handlers de exclusão atualizados para usar snapshot.
+    - `editTx` e o listener global de edição — agora usam snapshot para localizar transação antes de abrir modal.
+    - `createCardSwipeActions` (rename) — reescrito para usar `txs` snapshot e `setTransactions` para persistência em lote (com fallback que mantém compatibilidade).
 
-## Referências Rápidas
-- Perfis: `js/utils/profile-utils.js`
-- Formatação: `js/utils/format-utils.js`
-- Cache local: `js/utils/cache-utils.js`
-- Arquivo principal legado: `main.js`
+## Estado atual e métricas
+
+- Todo list (resumido):
+  - Finish read-migration sweep — status: in-progress (varredura de leituras ainda precisa ser concluída)
+  - Convert card-rename writes safely — status: completed
+  - Run static + smoke tests — status: not-started
+
+- Verificações rápidas: após as edições aplicadas foram executadas checagens estáticas (sem erros de sintaxe). Algumas patches iniciais exigiram re-read antes de reaplicar para evitar contexto desatualizado; isso foi corrigido.
+
+## Áreas já cobertas (leitura segura via snapshot)
+- renderAccordion internals (mês/dia/fatura)
+- makeLine (linha de operação: ícones, badges, recorrência detection)
+- delTx e handlers de exclusão de recorrência
+- editTx e o listener global de edição
+- createCardSwipeActions (rename handler atualizado)
+
+## Áreas pendentes (onde continuar)
+- utilitários que ainda referenciam `transactions` diretamente: `sortTransactions`, `sanitizeTransactions`.
+- agregadores/relatórios: `groupTransactionsByMonth`, `txByDate`, `preparePlannedList`, `buildRunningBalanceMap` — revisar para garantir leituras únicas via snapshot por execução.
+- pequenas buscas/consultas espalhadas pelo arquivo (`main.js`) — aplicar o mesmo padrão de snapshot onde fazem iterações/filtragens.
+
+## Convenções e invariantes adotadas
+
+- Leitura: sempre obter um snapshot no início de funções síncronas que precisam iterar/filtrar sobre transações e usar somente esse snapshot local (evita leituras incoerentes quando o estado muda durante a execução).
+- Escrita: preferir APIs específicas (add/remove/update) para mudanças incrementais; quando for uma alteração em lote, usar `setTransactions(updatedList)`.
+- Hidratação: manter os pontos explicítos que sincronizam o global com `getTransactions()` durante boot; não alterá-los sem um plano de migração explícito.
+
+## Plano imediato (quando retomarmos)
+
+1. Continuar a varredura em `main.js` função-por-função (pequenos batches):
+   - Marcar um único todo como `in-progress` antes de tocar código.
+   - Aplicar um pequeno grupo de patches (2–6 funções relacionadas).
+   - Rodar checagem estática e uma verificação manual rápida (smoke checklist abaixo).
+   - Repetir até cobrir o arquivo.
+
+2. Pós-migração completa:
+   - Considerar remover o global `transactions` ou deixá-lo apenas como um shim read-only que aponta para `getTransactions()`.
+   - Adicionar testes de smoke automatizados (Playwright) cobrindo fluxos críticos.
+
+## Smoke-test checklist (para rodar manualmente)
+1. Adicionar transação em `Dinheiro` e verificar UI/saldo/console.
+2. Criar parcelamento de fatura (parcelas) e checar master/children e notas de fatura.
+3. Abrir modal `Planned` e validar projeções de recorrência.
+4. Editar/excluir recorrência (single/future/all) e validar comportamento.
+5. Simular offline (DevTools) e confirmar enqueue/flush de transações.
+
+## Sugestões de follow-up
+- Escrever um pequeno `README.md` para `js/state/app-state.js` com as APIs e contratos esperados (inputs/outputs, side effects), isso acelera revisões futuras.
+- Adicionar scripts simples de lint / formatação (ESLint/Prettier) para manter diffs menores e consistentes enquanto a migração prossegue.
+- Eventualmente criar um script Playwright básico que cobre os passos do smoke-test para automação contínua.
+
+## Observações finais
+
+Esta atualização documenta o que foi feito até a pausa solicitada. Quando quiser que eu continue a varredura, diga se prefere batches pequenos com smoke-tests entre eles (mais seguro) ou um sweep maior seguido por testes manuais (mais rápido). Também posso começar aplicando as funções pendentes listadas na seção "Áreas pendentes" — diga qual abordagem prefere.
+
+```

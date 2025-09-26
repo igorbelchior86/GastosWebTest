@@ -11,6 +11,10 @@ const defaultState = {
   bootHydrated: false
 };
 
+// Extend defaults for future state (transactions/cards)
+defaultState.transactions = [];
+defaultState.cards = [];
+
 const state = { ...defaultState };
 const subscribers = new Set();
 
@@ -88,6 +92,120 @@ export function setBootHydrated(value, options = {}) {
   return state.bootHydrated;
 }
 
+// Transactions API
+export function getTransactions() {
+  return state.transactions || [];
+}
+
+export function setTransactions(list = [], options = {}) {
+  const normalized = Array.isArray(list) ? list.slice() : [];
+  if (JSON.stringify(state.transactions) === JSON.stringify(normalized)) return state.transactions;
+  state.transactions = normalized;
+  if (options.emit !== false) emit(['transactions']);
+  return state.transactions;
+}
+
+export function addTransaction(tx, options = {}) {
+  if (!tx) return null;
+  const arr = Array.isArray(state.transactions) ? state.transactions.slice() : [];
+  arr.push(tx);
+  state.transactions = arr;
+  if (options.emit !== false) emit(['transactions']);
+  return tx;
+}
+
+export function updateTransaction(id, patch = {}, options = {}) {
+  if (!id) return null;
+  const arr = Array.isArray(state.transactions) ? state.transactions.slice() : [];
+  let found = null;
+  for (let i = 0; i < arr.length; i++) {
+    const t = arr[i];
+    if (t && String(t.id) === String(id)) {
+      const updated = { ...t, ...patch };
+      arr[i] = updated;
+      found = updated;
+      break;
+    }
+  }
+  if (found) {
+    state.transactions = arr;
+    if (options.emit !== false) emit(['transactions']);
+  }
+  return found;
+}
+
+export function removeTransaction(id, options = {}) {
+  if (!id) return false;
+  const arr = Array.isArray(state.transactions) ? state.transactions.slice() : [];
+  const next = arr.filter(t => !(t && String(t.id) === String(id)));
+  const changed = next.length !== arr.length;
+  if (changed) {
+    state.transactions = next;
+    if (options.emit !== false) emit(['transactions']);
+  }
+  return changed;
+}
+
+// Cards API
+export function getCards() {
+  return state.cards || [];
+}
+
+export function setCards(list = [], options = {}) {
+  const normalized = Array.isArray(list) ? list.slice() : [];
+  if (JSON.stringify(state.cards) === JSON.stringify(normalized)) return state.cards;
+  state.cards = normalized;
+  if (options.emit !== false) emit(['cards']);
+  return state.cards;
+}
+
+export function addCard(card, options = {}) {
+  if (!card) return null;
+  const arr = Array.isArray(state.cards) ? state.cards.slice() : [];
+  arr.push(card);
+  state.cards = arr;
+  if (options.emit !== false) emit(['cards']);
+  return card;
+}
+
+export function updateCard(nameOrIndex, patch = {}, options = {}) {
+  if (!nameOrIndex) return null;
+  const arr = Array.isArray(state.cards) ? state.cards.slice() : [];
+  let found = null;
+  for (let i = 0; i < arr.length; i++) {
+    const c = arr[i];
+    if (!c) continue;
+    if ((typeof nameOrIndex === 'number' && i === nameOrIndex) || (typeof nameOrIndex !== 'number' && String(c.name) === String(nameOrIndex))) {
+      const updated = { ...c, ...patch };
+      arr[i] = updated;
+      found = updated;
+      break;
+    }
+  }
+  if (found) {
+    state.cards = arr;
+    if (options.emit !== false) emit(['cards']);
+  }
+  return found;
+}
+
+export function removeCard(nameOrIndex, options = {}) {
+  const arr = Array.isArray(state.cards) ? state.cards.slice() : [];
+  let next;
+  if (typeof nameOrIndex === 'number') {
+    next = arr.slice();
+    next.splice(nameOrIndex, 1);
+  } else {
+    next = arr.filter(c => !(c && String(c.name) === String(nameOrIndex)));
+  }
+  const changed = JSON.stringify(next) !== JSON.stringify(arr);
+  if (changed) {
+    state.cards = next;
+    if (options.emit !== false) emit(['cards']);
+  }
+  return changed;
+}
+
 export function resetState(options = {}) {
   const changed = [];
   Object.keys(state).forEach(key => {
@@ -117,4 +235,30 @@ export const appState = new Proxy(state, {
 
 if (typeof window !== 'undefined') {
   window.APP_STATE = appState;
+}
+
+// Backwards-compatibility: expose commonly used helpers to the global scope
+// so non-module legacy code (e.g. main.js) can keep calling them.
+if (typeof window !== 'undefined') {
+  try {
+    window.getState = getState;
+    window.setState = setState;
+
+    window.getTransactions = getTransactions;
+    window.setTransactions = setTransactions;
+    window.addTransaction = addTransaction;
+    window.updateTransaction = updateTransaction;
+    window.removeTransaction = removeTransaction;
+
+    window.getCards = getCards;
+    window.setCards = setCards;
+    window.addCard = addCard;
+    window.updateCard = updateCard;
+    window.removeCard = removeCard;
+
+    window.subscribeState = subscribeState;
+  } catch (e) {
+    // non-fatal; keep runtime resilient
+    console && console.warn && console.warn('Failed to attach app-state globals', e);
+  }
 }

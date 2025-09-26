@@ -14,8 +14,8 @@
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1.4.9(a98)">
-  <link rel="stylesheet" href="login.css?v=1.4.9(a98)">
+  <link rel="stylesheet" href="style.css?v=1.4.9(b22)">
+  <link rel="stylesheet" href="login.css?v=1.4.9(b22)">
 
 
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
@@ -75,11 +75,11 @@
   </div>
 
   <!-- Modal Sobre -->
-  <div id="settingsModal" class="bottom-modal backdrop-blur hidden" aria-labelledby="settingsSheetTitle">
+  <div id="settingsModal" class="bottom-modal backdrop-blur hidden sheet-modal" aria-labelledby="settingsSheetTitle">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
       <button id="closeSettingsModal" class="modal-close-btn" aria-label="Fechar">✕</button>
-      <header class="settings-modal-header">
+      <header class="sheet-header settings-modal-header">
         <h2 id="settingsSheetTitle">Ajustes</h2>
       </header>
       <div class="modal-content"></div>
@@ -87,31 +87,37 @@
   </div>
 
   <!-- Modal Cartões -->
-  <div id="cardModal" class="bottom-modal backdrop-blur hidden">
+  <div id="cardModal" class="bottom-modal backdrop-blur hidden sheet-modal">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2>Novo Cartão</h2>
       <button id="closeCardModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <header class="sheet-header">
+        <h2>Novo Cartão</h2>
+      </header>
+      <div class="modal-content">
+        <input id="cardName" name="cardName" placeholder="Nome">
+        <div class="card-dates">
+          <input id="cardClose" name="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
+          <input id="cardDue" name="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+        </div>
+        <div class="card-modal-footer">
+          <button id="addCardBtn" class="add-button">Adicionar</button>
+        </div>
+        <small>Fechamento define a fatura.</small>
 
-      <input id="cardName" name="cardName" placeholder="Nome">
-      <div class="card-dates">
-        <input id="cardClose" name="cardClose" type="number" min="1" max="31" placeholder="Fechamento">
-        <input id="cardDue" name="cardDue" type="number" min="1" max="31" placeholder="Vencimento">
+        <ul id="cardList" class="card-list"></ul>
       </div>
-      <button id="addCardBtn" class="add-button">Adicionar</button>
-      <small>Fechamento define a fatura.</small>
-
-      <ul id="cardList" class="card-list"></ul>
-
     </div>
   </div>
 
   <!-- Modal Seletor de Ano -->
-  <div id="yearModal" class="bottom-modal backdrop-blur hidden">
+  <div id="yearModal" class="bottom-modal backdrop-blur hidden sheet-modal">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2>Selecionar Ano</h2>
       <button id="closeYearModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <header class="sheet-header">
+        <h2>Selecionar Ano</h2>
+      </header>
       <div class="modal-content">
         <div id="yearList" class="year-list"></div>
       </div>
@@ -119,15 +125,18 @@
   </div>
 
   <!-- Modal Transações -->
-  <div id="txModal" class="bottom-modal backdrop-blur hidden">
+  <div id="txModal" class="bottom-modal backdrop-blur hidden sheet-modal">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2>Lançar operação</h2>
       <button id="closeTxModal" class="modal-close-btn" aria-label="Fechar">✕</button>
-      <div class="form-grid">
-        <div class="value-input-wrapper">
-          <input
-            id="value"
+      <header class="sheet-header tx-modal-header">
+        <h2>Lançar operação</h2>
+      </header>
+      <div class="modal-content">
+        <div class="form-grid">
+          <div class="value-input-wrapper">
+            <input
+              id="value"
             name="value"
             type="tel"
             placeholder="Valor"
@@ -175,17 +184,23 @@
         <label class="form-row" id="invoiceParcelRow" style="display:none; align-items:center; gap:8px;">
           <input type="checkbox" id="invoiceParcel"> Parcelar
         </label>
-        <button id="addBtn" class="add-button">Adicionar</button>
+        </div>
+        <div class="sheet-footer tx-modal-footer">
+          <button id="addBtn" class="add-button">Adicionar</button>
+        </div>
+      </div>
       </div>
     </div>
   </div>
 
   <!-- Modal Planejados -->
-  <div id="plannedModal" class="bottom-modal backdrop-blur hidden">
+  <div id="plannedModal" class="bottom-modal backdrop-blur hidden sheet-modal">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2>Planejados</h2>
       <button id="closePlannedModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <header class="sheet-header">
+        <h2>Planejados</h2>
+      </header>
       <div class="modal-content">
         <ul id="plannedList" class="planned-list"></ul>
       </div>
@@ -265,11 +280,13 @@
   </div>
 
   <!-- Modal País / Moeda (profiles) -->
-  <div id="currencyProfileModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="currencyProfileTitle">
+  <div id="currencyProfileModal" class="bottom-modal backdrop-blur hidden sheet-modal" role="dialog" aria-modal="true" aria-labelledby="currencyProfileTitle">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2 id="currencyProfileTitle">País / Moeda</h2>
       <button id="closeCurrencyProfileModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <header class="sheet-header">
+        <h2 id="currencyProfileTitle">País / Moeda</h2>
+      </header>
       <div class="modal-content">
         <ul id="currencyProfileList" style="list-style:none;padding:6px 0;margin:0;display:block;">
           <!-- items injected by JS -->
@@ -346,9 +363,9 @@
   <script src="js/utils/data-utils-global.js"></script>
   <script src="js/utils/currency-profiles.js"></script>
   
-  <script type="module" src="auth.js?v=1.4.9(a98)"></script>
-  <script type="module" src="login.view.js?v=1.4.9(a98)"></script>
-  <script type="module" src="main.js?v=1.4.9(a98)"></script>
+  <script type="module" src="auth.js?v=1.4.9(b22)"></script>
+  <script type="module" src="login.view.js?v=1.4.9(b22)"></script>
+  <script type="module" src="main.js?v=1.4.9(b22)"></script>
 
   <!-- Styles moved to style.css -->
 

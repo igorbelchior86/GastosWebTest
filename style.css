@@ -447,6 +447,13 @@ html[data-theme="light"] #currencyProfileModal #currencyProfileList li {
 html[data-theme="light"] #currencyProfileModal #currencyProfileList li {
   border-bottom: 1px solid rgba(0,0,0,0.06) !important;
 }
+html[data-theme="light"] #currencyProfileModal .modal-close-btn {
+  color: #111;
+  opacity: 0.7;
+}
+html[data-theme="light"] #currencyProfileModal .modal-close-btn:hover {
+  opacity: 1;
+}
 
 /* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
 /* Planned modal layout (grid without DOM changes)
@@ -673,6 +680,53 @@ html.keyboard-open {
 html.keyboard-open.kb-lock-shift {
   transform: none !important;
   will-change: auto;
+}
+
+/* Global hard stop: if kb-lock-shift is present we never translate the root */
+html.kb-lock-shift { transform: none !important; will-change: auto !important; }
+
+/* CORREÇÃO CRÍTICA: kb-lock-shift deve funcionar independentemente de keyboard-open */
+html.kb-lock-shift {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Dupla garantia - bloquear qualquer transform quando kb-lock-shift está ativo */
+html.kb-lock-shift,
+html.kb-lock-shift.keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* FORÇA BRUTA: Modal aberto = zero transformação SEMPRE */
+html.modal-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+html.modal-open.keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Garantia tripla - qualquer combinação com modal aberto */
+html.modal-open.kb-lock-shift,
+html.modal-open.keyboard-open.kb-lock-shift {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Força wrapper fixo quando modal aberto */
+html.modal-open .wrapper {
+  transform: none !important;
+  will-change: auto !important;
+  position: relative !important;
+}
+
+html.modal-open.keyboard-open .wrapper {
+  transform: none !important;
+  will-change: auto !important;
+  position: relative !important;
 }
 
 h1,h2,h3,h4,
@@ -1327,22 +1381,6 @@ summary.day-summary .icon-invoice::before{
   border: 1px solid rgba(255,255,255,.08);
   box-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
 }
-/* Ensure year selector uses a half-screen sheet while clearing the floating footer */
-#yearModal .bottom-modal-box {
-  margin-bottom: 0;
-  width: calc(100% - 16px);
-  max-width: 720px;
-  max-height: min(520px, 56vh);
-}
-
-#yearModal .bottom-modal-box .modal-content {
-  max-height: calc(100% - 68px);
-}
-
-#yearModal .modal-content {
-  overflow: auto;
-}
-
 .year-list {
   overflow: auto;
   padding: 8px 0;
@@ -2084,7 +2122,7 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 
 /* ===================== MODAL ===================== */
-.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px var(--modal-bottom-gap);box-sizing:border-box;}
+.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px calc(var(--modal-bottom-gap) + var(--kb-offset-bottom, 0px));box-sizing:border-box;}
 .backdrop-blur{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);} 
 .bottom-modal:not(.hidden){opacity:1;pointer-events:auto;}
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
@@ -2109,7 +2147,6 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   margin-bottom: 0;
   overscroll-behavior: contain;
 
-  /* entry animation */
   transform: translateY(10px) scale(0.97);
   opacity: 0;
   transition:
@@ -2117,15 +2154,22 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
     opacity   .16s ease;
 }
 
+.bottom-modal:not(.hidden) .bottom-modal-box {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
 /* ===================== SETTINGS (Ajustes) ===================== */
-#settingsModal {
+.sheet-modal {
   top: calc(80px + constant(safe-area-inset-top));
   top: calc(80px + env(safe-area-inset-top));
   padding-top: 12px;
   align-items: flex-end;
 }
 
-#settingsModal .bottom-modal-box {
+.sheet-modal .bottom-modal-box {
+  min-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  min-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
   max-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
   max-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
 }
@@ -2134,19 +2178,25 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   padding: 0 0 24px;
 }
 
-#settingsModal .settings-modal-header {
+
+.sheet-header {
   flex: 0 0 auto;
   margin: 0 0 12px;
   padding: 8px 0 4px;
   text-align: left;
 }
 
-#settingsModal .settings-modal-header h2 {
+.sheet-header h2 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--txt-main);
   text-shadow: none;
+}
+
+#settingsModal .settings-modal-header {
+  padding-top: 10px;
+  padding-bottom: 6px;
 }
 
 #settingsModal .modal-drag {
@@ -2417,6 +2467,36 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 .modal-drag{width:40px;height:4px;background:#ccc;border-radius:2px;margin:0 auto 12px;} 
 .modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;} 
+
+#txModal .modal-content {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#txModal .form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+}
+
+.sheet-footer {
+  flex: 0 0 auto;
+}
+
+#txModal .tx-modal-footer {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+#cardModal .card-modal-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
+}
 .modal-close-btn{
   position:absolute;
   top:16px;
@@ -2779,6 +2859,10 @@ html[data-theme="light"] #settingsModal h2 { color:#111; text-shadow:none; }
 html[data-theme="light"] #settingsModal .modal-close-btn { color:#111; opacity:.7; }
 html[data-theme="light"] #settingsModal .modal-close-btn:hover{ opacity:1; }
 html[data-theme="light"] #settingsModal .modal-drag{ background:#cfcfcf; }
+html[data-theme="light"] .sheet-header h2 {
+  color: #111;
+  text-shadow: none;
+}
 
 /* Cards and list groups */
 html[data-theme="light"] #settingsModal .settings-card,
@@ -2820,6 +2904,10 @@ html[data-theme="light"] .version-number {
 html[data-theme="light"] #settingsModal .settings-item .settings-cta{ color:#111; }
 html[data-theme="light"] #settingsModal .settings-item.danger .settings-cta{ color:#ef4444; }
 html[data-theme="light"] #settingsModal .settings-item.danger .settings-icon{ background:#ef4444; }
+html[data-theme="light"] #settingsModal #settingsCardsBtn .left,
+html[data-theme="light"] #settingsModal #settingsCardsBtn .right {
+  color: #111;
+}
 
 /* ===================== LIGHT THEME — CARD MODAL ===================== */
 /* Panel */
@@ -3176,6 +3264,17 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   transform: translateX(0);
   opacity: 1;
 }
+
+#cardModal.card-slide .bottom-modal-box {
+  transform: translateX(32px);
+  opacity: 0;
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), opacity .28s ease;
+}
+
+#cardModal.card-slide.card-slide-visible .bottom-modal-box {
+  transform: translateX(0);
+  opacity: 1;
+}
 .card-content {
   display: flex;
   flex-direction: column;
@@ -3362,14 +3461,6 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   width: 100%;
   box-sizing: border-box;
 }
-
-/* Ensure the card modal is scrollable and its height constrained */
-#cardModal .bottom-modal-box {
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
- 
 
 /* Toast: prevent text wrapping for aesthetic single-line messages */
 .toast {

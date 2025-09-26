@@ -16,7 +16,12 @@ import {
   setStartBalance,
   setStartDate,
   setStartSet,
-  setBootHydrated
+  setBootHydrated,
+  setTransactions,
+  getTransactions,
+  setCards
+  , getCards
+  , subscribeState
 } from './js/state/app-state.js';
 
 const state = appState;
@@ -26,6 +31,7 @@ let startInputRef = null;
 const hydrationTargets = new Map();
 let hydrationInProgress = true;
 let reopenPlannedAfterEdit = false;
+let _hydrationFallbackTimer = null;
 const sameId = (a, b) => String(a ?? '') === String(b ?? '');
 
 function normalizeISODate(input) {
@@ -41,6 +47,18 @@ function resetHydration() {
   hydrationInProgress = true;
   hydrationTargets.clear();
   try { document.documentElement.classList.add('skeleton-boot'); } catch (_) {}
+  // Essential fallback: force completion after 4s to prevent eternal shimmer
+  try {
+    if (_hydrationFallbackTimer) clearTimeout(_hydrationFallbackTimer);
+    _hydrationFallbackTimer = setTimeout(() => {
+      if (hydrationInProgress) {
+        for (const [k, v] of hydrationTargets.entries()) {
+          if (v === false) hydrationTargets.set(k, true);
+        }
+        maybeCompleteHydration();
+      }
+    }, 4000);
+  } catch (_) {}
 }
 
 function registerHydrationTarget(key, enabled) {
@@ -66,7 +84,8 @@ function completeHydration() {
   if (!hydrationInProgress) return;
   hydrationInProgress = false;
   hydrationTargets.clear();
-  ensureStartSetFromBalance({ persist: true });
+  try { if (_hydrationFallbackTimer) { clearTimeout(_hydrationFallbackTimer); _hydrationFallbackTimer = null; } } catch (_) {}
+  try { ensureStartSetFromBalance({ persist: true }); } catch (_) {}
   try { refreshMethods(); } catch (_) {}
   try { renderCardList(); } catch (_) {}
   try { initStart(); } catch (_) {}
@@ -178,12 +197,16 @@ function ensureCashCard(list) {
 function hydrateStateFromCache(options = {}) {
   const { render = true } = options;
   const cachedTx = cacheGet('tx', []);
-  transactions = (cachedTx || [])
+  const normalizedTx = (cachedTx || [])
     .filter(Boolean)
     .map(normalizeTransactionRecord);
-  sortTransactions();
+  setTransactions(normalizedTx);
+  transactions = getTransactions();
+  try { sortTransactions(); } catch (_) {}
 
-  cards = ensureCashCard(cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]));
+  const normalizedCards = ensureCashCard(cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]));
+  setCards(normalizedCards);
+  cards = getCards ? getCards() : cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]);
   state.startBalance = cacheGet('startBal', null);
   state.startDate = normalizeISODate(cacheGet('startDate', null));
   state.startSet = cacheGet('startSet', false);
@@ -864,6 +887,16 @@ import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/fir
 // Configuração do Firebase de TESTE (arquivo separado)
 import { firebaseConfig } from './firebase.test.config.js';
 
+import * as FirebaseSvc from './js/services/firebase.js';
+
+// Initialize/Configure our Firebase service wrapper
+try {
+  FirebaseSvc.setMockMode(Boolean(USE_MOCK));
+  if (!USE_MOCK && typeof FirebaseSvc.init === 'function') {
+    FirebaseSvc.init(firebaseConfig).catch(err => { console.warn('FirebaseSvc.init failed', err); });
+  }
+} catch (e) { /* ignore init errors for now */ }
+
 // (Web Push removido)
 
 // ---- IndexedDB (idb) key/value cache ----
@@ -1056,7 +1089,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(a98)';
+const APP_VERSION = 'v1.4.9(b22)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1115,6 +1148,7 @@ if (!USE_MOCK) {
 } else {
   // Modo MOCK (LocalStorage)
   PATH = 'mock_365';
+  try { FirebaseSvc.setPath(PATH); } catch (_) {}
   save = (k, v) => {
     const scoped = scopedCacheKey(k);
     localStorage.setItem(`${PATH}_${scoped}`, JSON.stringify(v));
@@ -1315,7 +1349,7 @@ function recomputePostDates() {
     return null; // ambíguo: não altera
   };
 
-  transactions = (transactions || []).map(t => {
+  const newList = (getTransactions() || []).map(t => {
     if (!t) return t;
     const nt = { ...t };
     const inferred = inferCardForTx(nt);
@@ -1326,6 +1360,7 @@ function recomputePostDates() {
     if (desired && nt.postDate !== desired) { nt.postDate = desired; changed = true; }
     return nt;
   });
+  if (changed) setTransactions(newList);
   return changed;
 }
 
@@ -1438,6 +1473,27 @@ if (!USE_MOCK) {
 
     maybeCompleteHydration();
 
+  // keep legacy module-level variables in sync with centralized app-state
+  subscribeState((newState) => {
+    try {
+      const s = newState && newState.state ? newState.state : newState || {};
+      if (Array.isArray(s.transactions) && s.transactions !== transactions) {
+        transactions = s.transactions.slice();
+        if (typeof window.onTransactionsUpdated === 'function') {
+          try { window.onTransactionsUpdated(transactions); } catch (e) { console.error(e); }
+        }
+      }
+      if (Array.isArray(s.cards) && s.cards !== cards) {
+        cards = s.cards.slice();
+        if (typeof window.onCardsUpdated === 'function') {
+          try { window.onCardsUpdated(cards); } catch (e) { console.error(e); }
+        }
+      }
+    } catch (err) {
+      console.error('State subscription error', err);
+    }
+  });
+
   // Listen for tx changes (LWW merge per item)
   if (txRef) listeners.push(onValue(txRef, (snap) => {
     try {
@@ -1458,7 +1514,8 @@ if (!USE_MOCK) {
 
     if (navigator.onLine && !hasPendingTx) {
       // Source-of-truth: server. This allows deletions/resets from other clients to propagate.
-      transactions = remote;
+  setTransactions(remote);
+  transactions = getTransactions();
     } else {
       // Merge: keep local edits that haven't been flushed yet; remote wins on conflicts by timestamp
       const local = (transactions || []).map(norm);
@@ -1470,15 +1527,17 @@ if (!USE_MOCK) {
         const rt = Date.parse(r.modifiedAt || r.ts || 0);
         if (rt >= lt) byId.set(r.id, r);
       }
-      transactions = Array.from(byId.values());
+  setTransactions(Array.from(byId.values()));
+  transactions = getTransactions();
     }
 
     // Sanitize legacy/malformed items
-    const s = sanitizeTransactions(transactions);
-    transactions = s.list;
+  const s = sanitizeTransactions(getTransactions());
+  setTransactions(s.list);
+  transactions = getTransactions();
     // Revalida postDate/método se cartões já conhecidos
     const fixed = recomputePostDates();
-    cacheSet('tx', transactions);
+  cacheSet('tx', getTransactions());
     if (s.changed || fixed) {
       // Persist best-effort somente quando algo mudou localmente
       try { save('tx', transactions); } catch (_) {}
@@ -1501,16 +1560,18 @@ if (!USE_MOCK) {
     const raw  = snap.val() ?? [];
     const next = Array.isArray(raw) ? raw : Object.values(raw);
     try {
-      if (JSON.stringify(next) === JSON.stringify(cards)) {
+      if (JSON.stringify(next) === JSON.stringify(cacheGet('cards', []))) {
         markHydrationTargetReady('cards');
         return;
       }
 
-      cards = next;
-      if (!cards.some(c => c.name === 'Dinheiro')) {
-        cards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+      const updatedCards = Array.isArray(next) ? next : Object.values(next || {});
+      if (!updatedCards.some(c => c && c.name === 'Dinheiro')) {
+        updatedCards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
       }
-      cacheSet('cards', cards);
+  setCards(updatedCards);
+  try { cards = getCards(); } catch (_) { cards = updatedCards; }
+  cacheSet('cards', updatedCards);
       // Revalida transações à luz do cadastro de cartões atual
       const fixed = recomputePostDates();
       if (fixed) { try { save('tx', transactions); } catch (_) {} cacheSet('tx', transactions); }
@@ -1585,6 +1646,7 @@ if (!USE_MOCK) {
   if (readyUser) { 
     console.log('User already ready:', readyUser.email);
     PATH = resolvePathForUser(readyUser); 
+    try { FirebaseSvc.setPath(PATH); } catch(_) {}
     startRealtimeFn && startRealtimeFn(); 
     // Recalcula a altura do header para usuário já logado
     setTimeout(() => recalculateHeaderOffset(), 100);
@@ -1597,6 +1659,7 @@ if (!USE_MOCK) {
       if (u) { 
         document.removeEventListener('auth:state', h); 
         PATH = resolvePathForUser(u); 
+        try { FirebaseSvc.setPath(PATH); } catch(_) {}
         console.log('Starting realtime with PATH:', PATH);
         startRealtimeFn && startRealtimeFn(); 
         // Recalcula a altura do header agora que o usuário está logado e o header está visível
@@ -1604,6 +1667,7 @@ if (!USE_MOCK) {
       } else {
         console.log('User signed out, clearing PATH');
         PATH = null;
+        try { FirebaseSvc.setPath(null); } catch(_) {}
       }
     };
     document.addEventListener('auth:state', h);
@@ -1622,25 +1686,31 @@ if (!USE_MOCK) {
 
   const fixedTx = Array.isArray(liveTx) ? liveTx : Object.values(liveTx || {});
 
-  transactions = cacheGet('tx', []);
-  cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]);
-  state.startBalance = cacheGet('startBal', null);
-  state.startDate = normalizeISODate(cacheGet('startDate', null));
+  setTransactions(cacheGet('tx', []));
+  transactions = getTransactions();
+  setCards(cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]));
+  try { cards = getCards(); } catch (_) { cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]); }
+  setStartBalance(cacheGet('startBal', null));
+  setStartDate(normalizeISODate(cacheGet('startDate', null)));
   // Same normalization for mock fallback
   if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
     state.startBalance = null;
     try { cacheSet('startBal', null); } catch (_) {}
   }
 
-  if (hasLiveTx && JSON.stringify(fixedTx) !== JSON.stringify(transactions)) {
-    transactions = fixedTx;
-    cacheSet('tx', transactions);
+  if (hasLiveTx && JSON.stringify(fixedTx) !== JSON.stringify(cacheGet('tx', []))) {
+    // apply server payload into state and cache
+  setTransactions(fixedTx);
+  transactions = getTransactions();
+    cacheSet('tx', fixedTx);
     renderTable();
   }
   if (hasLiveCards && JSON.stringify(liveCards) !== JSON.stringify(cards)) {
-    cards = liveCards;
-    if (!cards.some(c => c.name === 'Dinheiro')) cards.unshift({ name:'Dinheiro', close:0, due:0 });
-    cacheSet('cards', cards);
+    const updatedCards = Array.isArray(liveCards) ? liveCards : Object.values(liveCards || {});
+    if (!updatedCards.some(c => c && c.name === 'Dinheiro')) updatedCards.unshift({ name:'Dinheiro', close:0, due:0 });
+  setCards(updatedCards);
+  try { cards = getCards(); } catch (_) { cards = updatedCards; }
+    cacheSet('cards', updatedCards);
     refreshMethods(); renderCardList(); renderTable();
   }
   if (liveBal !== state.startBalance) {
@@ -1797,15 +1867,13 @@ function updateModalOpenState() {
   const open = !!document.querySelector('.bottom-modal:not(.hidden)');
   const root = document.documentElement || document.body;
 
-  // Add/remove the existing modal-open class (used by CSS)
+  // Reflect modal-open state for CSS
   if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
 
-  if (root) {
-    const txModalEl = document.getElementById('txModal');
-    const txOpen = !!(txModalEl && !txModalEl.classList.contains('hidden'));
-    if (txOpen) root.classList.add('kb-lock-shift');
-    else root.classList.remove('kb-lock-shift');
-  }
+  // Only lock keyboard shift for the Transaction modal specifically
+  const txModalEl = document.getElementById('txModal');
+  const txOpen = !!(txModalEl && !txModalEl.classList.contains('hidden'));
+  if (txOpen) root.classList.add('kb-lock-shift'); else root.classList.remove('kb-lock-shift');
 
   if (wrapperEl) {
     try {
@@ -2116,21 +2184,34 @@ document.addEventListener('wheel', (e) => {
     lastTopOffset = rawOffsetTop;
     lastPageTop = rawPageTop;
 
+    // CORREÇÃO: Se há modal aberto, não aplicar transformações do teclado
+    const hasModalOpen = !!document.querySelector('.bottom-modal:not(.hidden)');
+    console.log('📱 Keyboard detected - Modal open:', hasModalOpen);
+
     if (root) {
       root.dataset.vvKb = '1';
       root.classList.add('keyboard-open');
       root.dataset.kbGap = String(measured);
       root.dataset.kbTop = String(rawOffsetTop);
       root.dataset.kbPage = String(rawPageTop);
-      const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
-      const baselineOffset = lockedTopOffset != null ? lockedTopOffset : rawOffsetTop;
-      const baselinePage = lockedPageTop != null ? lockedPageTop : rawPageTop;
-      const diffOffset = Math.max(0, rawOffsetTop - baselineOffset);
-      const diffPage = Math.max(0, rawPageTop - baselinePage);
-      const shift = Math.max(diffOffset, diffPage);
-      root.style.setProperty('--kb-offset-bottom', effective + 'px');
-      root.style.setProperty('--kb-offset-top', shift + 'px');
-
+      
+      // Só aplicar transformações se NÃO há modal aberto
+      if (!hasModalOpen) {
+        const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
+        const baselineOffset = lockedTopOffset != null ? lockedTopOffset : rawOffsetTop;
+        const baselinePage = lockedPageTop != null ? lockedPageTop : rawPageTop;
+        const diffOffset = Math.max(0, rawOffsetTop - baselineOffset);
+        const diffPage = Math.max(0, rawPageTop - baselinePage);
+        const shift = Math.max(diffOffset, diffPage);
+        root.style.setProperty('--kb-offset-bottom', effective + 'px');
+        root.style.setProperty('--kb-offset-top', shift + 'px');
+        console.log('🔧 Applied keyboard transforms - bottom:', effective, 'top:', shift);
+      } else {
+        // Modal aberto - força transformações zeradas
+        root.style.setProperty('--kb-offset-bottom', '0px');
+        root.style.setProperty('--kb-offset-top', '0px');
+        console.log('🚫 Modal open - keyboard transforms disabled');
+      }
     }
   };
 
@@ -2206,6 +2287,16 @@ document.addEventListener('wheel', (e) => {
   window.__unlockKeyboardGap = unlockGap;
 
   const update = () => {
+    // When txModal is open we mark the root with kb-lock-shift. In this state
+    // we must NOT translate the root (header/footer must remain fixed).
+    if (root && root.classList && root.classList.contains('kb-lock-shift')) {
+      // Ensure any previous keyboard-open state is cleared promptly
+      if (root.classList.contains('keyboard-open')) {
+        try { applyKeyboardClosed(); } catch(_) { root.classList.remove('keyboard-open'); }
+      }
+      return; // Skip all keyboard shift logic while locked
+    }
+
     const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
     const isKb = IS_IOS && gap > THRESH;
     if (isKb) {
@@ -2495,7 +2586,9 @@ try {
   val.setAttribute('pattern', '[0-9.,]*');
 } catch (_) {}
 
-if (val && typeof window !== 'undefined') {
+function attachKeyboardGapLock(input) {
+  if (!input || typeof window === 'undefined') return;
+
   let keyboardLockTimer = null;
   let keyboardLockAttempts = 0;
 
@@ -2514,7 +2607,7 @@ if (val && typeof window !== 'undefined') {
     keyboardLockTimer = window.setTimeout(attemptKeyboardLock, 90);
   };
 
-  val.addEventListener('focus', () => {
+  input.addEventListener('focus', () => {
     keyboardLockAttempts = 0;
     if (keyboardLockTimer) {
       clearTimeout(keyboardLockTimer);
@@ -2523,13 +2616,16 @@ if (val && typeof window !== 'undefined') {
     keyboardLockTimer = window.setTimeout(attemptKeyboardLock, 90);
   });
 
-  val.addEventListener('blur', () => {
+  input.addEventListener('blur', () => {
     if (keyboardLockTimer) {
       clearTimeout(keyboardLockTimer);
       keyboardLockTimer = null;
     }
   });
 }
+
+attachKeyboardGapLock(val);
+attachKeyboardGapLock(desc);
 
 // Auto-format value input using the active currency profile while typing
 val.addEventListener('input', () => {
@@ -2687,24 +2783,24 @@ function ensureStartSetFromBalance(options = {}) {
 async function performResetAllData(askConfirm = true) {
   if (askConfirm && !confirm('Deseja realmente APAGAR TODOS OS DADOS? Esta ação é irreversível.')) return;
   try {
-    // Clear in-memory
-    transactions = [];
-    cards = [{ name: 'Dinheiro', close: 0, due: 0 }];
+    // Clear in-memory (via app-state)
+    setTransactions([]);
+    setCards([{ name: 'Dinheiro', close: 0, due: 0 }]);
     state.startBalance = null;
     state.startDate = null;
   state.startSet = false;
     syncStartInputFromState();
 
     // Clear caches (best-effort)
-    try { cacheSet('tx', transactions); } catch (_) {}
-    try { cacheSet('cards', cards); } catch (_) {}
+    try { cacheSet('tx', getTransactions()); } catch (_) {}
+    try { cacheSet('cards', getCards()); } catch (_) {}
     try { cacheSet('startBal', state.startBalance); } catch (_) {}
     try { cacheSet('startDate', state.startDate); } catch (_) {}
     try { cacheSet('dirtyQueue', []); } catch (_) {}
 
     // Try persist (best effort)
-    try { await save('tx', transactions); } catch (_) {}
-    try { await save('cards', cards); } catch (_) {}
+    try { await save('tx', getTransactions()); } catch (_) {}
+    try { await save('cards', getCards()); } catch (_) {}
     try { await save('startBal', state.startBalance); } catch (_) {}
     try { await save('startDate', state.startDate); } catch (_) {}
   try { cacheSet('startSet', false); } catch (_) {}
@@ -2843,7 +2939,7 @@ const togglePlanned = async (id, iso) => {
         ts: new Date().toISOString(),
         modifiedAt: new Date().toISOString()
       };
-      transactions.push(execTx);
+  try { addTransaction(execTx); } catch (_) { setTransactions((getTransactions()||[]).concat([execTx])); }
       // Exibe toast quando a ocorrência recorrente vai para a fatura (cartão)
       if (execTx.method !== 'Dinheiro') {
         const [, mm, dd] = execTx.postDate.split('-');
@@ -2877,7 +2973,7 @@ const togglePlanned = async (id, iso) => {
       toastMsg = `Movida para fatura de ${dd}/${mm}`;
     }
   }
-  save('tx', transactions);
+  try { save('tx', getTransactions()); } catch (_) {}
   renderTable();
   if (shouldRefreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -2954,6 +3050,8 @@ function showCardModal(options = {}) {
     cardModal.dataset.origin = 'settings';
     cardModal.classList.add('from-settings');
     cardModal.classList.remove('from-settings-visible');
+    cardModal.classList.remove('card-slide');
+    cardModal.classList.remove('card-slide-visible');
     cardModal.classList.remove('hidden');
     void cardModal.offsetWidth;
     cardModal.classList.add('from-settings-visible');
@@ -2961,7 +3059,11 @@ function showCardModal(options = {}) {
     cardModal.dataset.origin = 'default';
     cardModal.classList.remove('from-settings');
     cardModal.classList.remove('from-settings-visible');
+    cardModal.classList.add('card-slide');
+    cardModal.classList.remove('card-slide-visible');
     cardModal.classList.remove('hidden');
+    void cardModal.offsetWidth;
+    cardModal.classList.add('card-slide-visible');
   }
 
   updateModalOpenState();
@@ -2976,8 +3078,14 @@ function hideCardModal() {
   if (!cardModal) return;
   cardModal.classList.add('hidden');
   cardModal.classList.remove('from-settings-visible');
+  cardModal.classList.remove('card-slide-visible');
   if (!cardModal.dataset.origin || cardModal.dataset.origin !== 'settings') {
     cardModal.classList.remove('from-settings');
+    setTimeout(() => {
+      if (cardModal.classList.contains('hidden')) {
+        cardModal.classList.remove('card-slide');
+      }
+    }, 320);
   } else {
     setTimeout(() => {
       if (cardModal.classList.contains('hidden')) {
@@ -3028,14 +3136,29 @@ function createCardSwipeActions(card) {
     card.name  = newName;
     card.close = newClose;
     card.due   = newDue;
-    transactions.forEach(t => {
-      if (t.method === oldName) {
-        t.method   = newName;
-        t.postDate = post(t.opDate, newName);
+    // Use snapshot from app-state for a consistent read, then persist via setTransactions
+    const txsSnapshot = getTransactions ? getTransactions() : transactions;
+    const updatedTxs = (txsSnapshot || []).map(t => {
+      if (t && t.method === oldName) {
+        return { ...t, method: newName, postDate: post(t.opDate, newName), modifiedAt: new Date().toISOString() };
       }
+      return t;
     });
+    try {
+      // Prefer atomic replace via app-state for bulk updates
+      setTransactions(updatedTxs);
+    } catch (_) {
+      // Fallback: mutate legacy global and save
+      (transactions || []).forEach(t => {
+        if (t && t.method === oldName) {
+          t.method = newName;
+          t.postDate = post(t.opDate, newName);
+        }
+      });
+      try { save('tx', transactions); } catch(_) {}
+    }
     save('cards', cards);
-    save('tx', transactions);
+    try { save('tx', getTransactions ? getTransactions() : transactions); } catch (_) { try { save('tx', transactions); } catch(_) {} }
     refreshMethods();
     renderCardList();
     renderTable();
@@ -3143,6 +3266,7 @@ function isDetachedOccurrence(tx) {
 
 function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   // Create swipe wrapper
+  const txs = getTransactions ? getTransactions() : transactions;
   const wrap = document.createElement('div');
   wrap.className = 'swipe-wrapper';
 
@@ -3150,9 +3274,9 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const actions = document.createElement('div');
   actions.className = 'swipe-actions';
 
-  const existsInStore = transactions.some(item => item && String(item.id) === String(tx.id));
+  const existsInStore = (txs || []).some(item => item && String(item.id) === String(tx.id));
   const actionTargetId = existsInStore ? tx.id : (tx.parentId || tx.id);
-  const actionTargetTx = transactions.find(item => item && String(item.id) === String(actionTargetId)) || tx;
+  const actionTargetTx = (txs || []).find(item => item && String(item.id) === String(actionTargetId)) || tx;
 
   // Edit button
   const editBtn = document.createElement('button');
@@ -3269,10 +3393,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     const hasRecurrence = (() => {
       if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
       if (t.parentId) {
-        const master = transactions.find(p => sameId(p.id, t.parentId));
+        const master = (txs || []).find(p => sameId(p.id, t.parentId));
         if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
       }
-      for (const p of transactions) {
+      for (const p of (txs || [])) {
         if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
           if (occursOn(p, t.opDate)) {
             if (p.desc === t.desc || p.val === t.val) return true;
@@ -3292,7 +3416,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const t = tx;
       const hasRecurrenceFinal =
         (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
-        (t.parentId && transactions.some(p =>
+        (t.parentId && (txs || []).some(p =>
           sameId(p.id, t.parentId) &&
           typeof p.recurrence === 'string' &&
           p.recurrence.trim() !== ''
@@ -3329,22 +3453,22 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     leftText.appendChild(ts);
     left.appendChild(leftText);
     // Recurrence icon
-    const t = tx;
-    const hasRecurrence = (() => {
-      if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
-      if (t.parentId) {
-        const master = transactions.find(p => p.id === t.parentId);
-        if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
-      }
-      for (const p of transactions) {
-        if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
-          if (occursOn(p, t.opDate)) {
-            if (p.desc === t.desc || p.val === t.val) return true;
+      const t = tx;
+      const hasRecurrence = (() => {
+        if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
+        if (t.parentId) {
+          const master = (txs || []).find(p => p.id === t.parentId);
+          if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
+        }
+        for (const p of (txs || [])) {
+          if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
+            if (occursOn(p, t.opDate)) {
+              if (p.desc === t.desc || p.val === t.val) return true;
+            }
           }
         }
-      }
-      return false;
-    })();
+        return false;
+      })();
     if (hasRecurrence) {
       const recIcon = document.createElement('span');
       recIcon.className = 'icon-repeat';
@@ -3356,7 +3480,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const t = tx;
       const hasRecurrenceFinal =
         (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
-        (t.parentId && transactions.some(p =>
+        (t.parentId && (txs || []).some(p =>
           p.id === t.parentId &&
           typeof p.recurrence === 'string' &&
           p.recurrence.trim() !== ''
@@ -3537,7 +3661,7 @@ async function addTx() {
           t.exceptions.push(pendingEditTxIso);
         }
         // Create standalone edited transaction
-        transactions.push({
+        try { addTransaction({
           id: Date.now(),
           parentId: t.parentId || t.id,
           desc: newDesc,
@@ -3550,13 +3674,13 @@ async function addTx() {
           planned: newOpDate > todayISO(),
           ts: new Date().toISOString(),
           modifiedAt: new Date().toISOString()
-        });
+        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id:Date.now(), parentId:t.parentId||t.id, desc:newDesc, val:newVal, method:newMethod, opDate:newOpDate, postDate:newPostDate, recurrence:'', installments:1, planned:newOpDate>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
         break;
       case 'future':
         // End original series at this occurrence
         t.recurrenceEnd = pendingEditTxIso;
         // Create new series starting from this occurrence
-        transactions.push({
+        try { addTransaction({
           id: Date.now(),
           parentId: null,
           desc: newDesc,
@@ -3569,7 +3693,7 @@ async function addTx() {
           planned: pendingEditTxIso > todayISO(),
           ts: new Date().toISOString(),
           modifiedAt: new Date().toISOString()
-        });
+        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id:Date.now(), parentId:null, desc:newDesc, val:newVal, method:newMethod, opDate:pendingEditTxIso, postDate:newPostDate, recurrence:newRecurrence, installments:newInstallments, planned:pendingEditTxIso>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
         break;
       case 'all': {
         {
@@ -3637,20 +3761,26 @@ async function addTx() {
   // Modo especial: pagamento/parcelamento de fatura
   if (isPayInvoiceMode && pendingInvoiceCtx) {
     const ctx = pendingInvoiceCtx;
-    const rawVal = safeParseCurrency(val.value) || 0;
-    const amount = Math.abs(rawVal); // valor informado, sempre positivo
-    if (amount <= 0) { showToast('Informe um valor válido.'); return; }
-    const remaining = Number(ctx.remaining) || 0;
-    const payVal = Math.min(amount, remaining);
-    const payDate = date.value || todayISO();
-    const nowIso = new Date().toISOString();
+  const rawVal = safeParseCurrency(val.value) || 0;
+  const amount = Math.abs(rawVal); // valor informado, sempre positivo
+  if (amount <= 0) { showToast('Informe um valor válido.'); return; }
+  const remaining = Number(ctx.remaining) || 0;
+  const payDate = date.value || todayISO();
+  const nowIso = new Date().toISOString();
+  // If parceling is enabled, the UI shows the per-installment value in the
+  // input field. In that case interpret `amount` as one installment and
+  // compute the total to be paid as amount * n. Otherwise `amount` is the
+  // intended total payment.
 
     if (invoiceParcelCheckbox && invoiceParcelCheckbox.checked && (parseInt(installments.value,10) || 1) > 1) {
       // Parcelamento: criar ajuste no dueISO e parcelas futuras (recorrência mensal)
       const n = Math.min(24, Math.max(2, parseInt(installments.value, 10) || 2));
-      const perParcel = +(payVal / n).toFixed(2);
+      // Determine the total amount being paid. If the UI showed per-installment
+      // value in the input, multiply by n. Otherwise treat `amount` as total.
+      const totalPayVal = Math.min(amount * (invoiceParcelCheckbox && invoiceParcelCheckbox.checked ? n : 1), remaining);
+      const perParcel = +(totalPayVal / n).toFixed(2);
       // 1) Ajuste que neutraliza parte da fatura no vencimento (somente o valor pago)
-      transactions.push({
+      try { addTransaction({
         id: Date.now(),
         desc: `Ajuste fatura – ${ctx.card}`,
         val: 0,
@@ -3658,58 +3788,123 @@ async function addTx() {
         opDate: ctx.dueISO,
         postDate: ctx.dueISO,
         planned: false,
-        invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: payVal },
+        invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: totalPayVal },
         ts: nowIso,
         modifiedAt: nowIso
-      });
+      }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now(), desc: `Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:totalPayVal}, ts:nowIso, modifiedAt:nowIso }])); }
       // 2) Série mensal de parcelas (Dinheiro) que impactam o saldo nas datas das parcelas
-      transactions.push({
-        id: Date.now()+1,
-        desc: `Parcela fatura – ${ctx.card}`,
-        val: -perParcel,
-        method: 'Dinheiro',
-        opDate: payDate,
-        postDate: payDate,
-        recurrence: 'M',
-        installments: n,
-        planned: payDate > todayISO(),
-        invoiceParcelOf: { card: ctx.card, dueISO: ctx.dueISO },
-        ts: nowIso,
-        modifiedAt: nowIso
-      });
+      // The installment series should start on the card due date (ctx.dueISO)
+      // and stop after `n` installments. Do NOT treat creation as the
+      // execution of the first installment.
+      // Create installment series deterministically. We always compute a
+      // recurrenceEnd so the series stops after `n` occurrences. We also
+      // distribute any rounding remainder into the first installment by
+      // creating a single child occurrence and adding the date to master
+      // `exceptions` so the projected/generated occurrence is replaced.
+      {
+        const baseDue = new Date(ctx.dueISO + 'T00:00:00');
+        const by = baseDue.getFullYear();
+        const bm = baseDue.getMonth();
+        const bd = baseDue.getDate();
+        const lastMonthIndex = bm + (n - 1);
+        const lastDayOfTarget = new Date(by, lastMonthIndex + 1, 0).getDate();
+        const lastInstDate = new Date(by, lastMonthIndex, Math.min(bd, lastDayOfTarget));
+        const recurrenceEndDate = new Date(lastInstDate);
+        recurrenceEndDate.setDate(recurrenceEndDate.getDate() + 1);
+        const recurrenceEndISO = recurrenceEndDate.toISOString().slice(0,10);
+
+        const firstInstISO = ctx.dueISO;
+
+        // Distribute cents: make base installment floor(total/n) and put
+        // any remainder into the first installment.
+        const totalCents = Math.round(totalPayVal * 100);
+        const perBaseCents = Math.floor(totalCents / n);
+        const remainderCents = totalCents - (perBaseCents * n);
+        const perBase = perBaseCents / 100;
+        const remainder = remainderCents / 100;
+
+        // Master rule uses the base installment amount (negative value)
+        const masterId = Date.now() + 1;
+        const masterTx = {
+          id: masterId,
+          desc: `Parcela fatura – ${ctx.card}`,
+          val: -perBase,
+          method: 'Dinheiro',
+          opDate: firstInstISO,
+          postDate: firstInstISO,
+          recurrence: 'M',
+          installments: n,
+          planned: firstInstISO > todayISO(),
+          recurrenceEnd: recurrenceEndISO,
+          invoiceParcelOf: { card: ctx.card, dueISO: ctx.dueISO },
+          ts: nowIso,
+          modifiedAt: nowIso
+        };
+
+        // If we have a remainder, add it to the first installment by
+        // creating a child occurrence for that date and adding the date
+        // to `exceptions` on the master rule so the generated occurrence
+        // is skipped.
+        if (remainderCents > 0) {
+          masterTx.exceptions = masterTx.exceptions || [];
+          if (!masterTx.exceptions.includes(firstInstISO)) masterTx.exceptions.push(firstInstISO);
+          try { addTransaction(masterTx); } catch (_) { setTransactions((getTransactions()||[]).concat([masterTx])); }
+
+          const childTx = {
+            id: masterId + 1,
+            parentId: masterId,
+            desc: masterTx.desc,
+            val: -(perBase + remainder),
+            method: masterTx.method,
+            opDate: firstInstISO,
+            postDate: firstInstISO,
+            recurrence: '',
+            installments: 1,
+            planned: masterTx.planned,
+            ts: nowIso,
+            modifiedAt: nowIso
+          };
+          try { addTransaction(childTx); } catch (_) { setTransactions((getTransactions()||[]).concat([childTx])); }
+        } else {
+          // No remainder: single master is enough
+          try { addTransaction(masterTx); } catch (_) { setTransactions((getTransactions()||[]).concat([masterTx])); }
+        }
+      }
   } else {
       // Pagamento sem parcelar
       // a) Ajuste no vencimento atual que zera o impacto da fatura
       const totalAbs = Number(ctx.totalAbs) || 0;
       const adjustedBefore = Number(ctx.adjustedBefore) || 0;
       const adjustAmount = Math.max(0, totalAbs - adjustedBefore);
-      transactions.push({
-        id: Date.now(),
-        desc: `Ajuste fatura – ${ctx.card}`,
-        val: 0,
-        method: 'Dinheiro',
-        opDate: ctx.dueISO,
-        postDate: ctx.dueISO,
-        planned: false,
-        invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: adjustAmount },
-        ts: nowIso,
-        modifiedAt: nowIso
-      });
+        try { addTransaction({
+          id: Date.now(),
+          desc: `Ajuste fatura – ${ctx.card}`,
+          val: 0,
+          method: 'Dinheiro',
+          opDate: ctx.dueISO,
+          postDate: ctx.dueISO,
+          planned: false,
+          invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: adjustAmount },
+          ts: nowIso,
+          modifiedAt: nowIso
+          }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now(), desc:`Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:adjustAmount}, ts:nowIso, modifiedAt:nowIso }])); }
       // b) Registro de pagamento (confirmação)
-      transactions.push({
-        id: Date.now()+1,
-        desc: `Pagamento fatura – ${ctx.card}`,
-        val: -payVal,
-        method: 'Dinheiro',
-        opDate: payDate,
-        postDate: payDate,
-        planned: payDate > todayISO(),
-        invoicePayment: { card: ctx.card, dueISO: ctx.dueISO },
-        ts: nowIso,
-        modifiedAt: nowIso
-      });
+        // Determine the actual paid amount (can't exceed remaining)
+        const payVal = Math.min(amount, remaining);
+  try { addTransaction({
+  id: Date.now()+1,
+  desc: `Pagamento fatura – ${ctx.card}`,
+  val: -payVal,
+  method: 'Dinheiro',
+  opDate: payDate,
+  postDate: payDate,
+  planned: payDate > todayISO(),
+  invoicePayment: { card: ctx.card, dueISO: ctx.dueISO },
+  ts: nowIso,
+  modifiedAt: nowIso
+  }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now()+1, desc:`Pagamento fatura – ${ctx.card}`, val:-payVal, method:'Dinheiro', opDate:payDate, postDate:payDate, planned:payDate>todayISO(), invoicePayment:{card:ctx.card,dueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
       // c) Se pagamento parcial, rola o restante para a próxima fatura
-      const remainingAfter = Math.max(0, remaining - payVal);
+  const remainingAfter = Math.max(0, remaining - payVal);
       if (remainingAfter > 0) {
         // Calcula próximo vencimento (mesmo dia do mês, ajustando para o último dia se necessário)
         const base = new Date(ctx.dueISO + 'T00:00:00');
@@ -3722,7 +3917,7 @@ async function addTx() {
         // Rollover para a próxima fatura com rótulo amigável (ex.: "Pendente da fatura de Setembro")
         const monthName = base.toLocaleDateString('pt-BR', { month: 'long' });
         const monthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        transactions.push({
+        try { addTransaction({
           id: Date.now()+2,
           desc: `Pendente da fatura de ${monthLabel}`,
           val: -remainingAfter,
@@ -3733,7 +3928,7 @@ async function addTx() {
           invoiceRolloverOf: { card: ctx.card, fromDueISO: ctx.dueISO },
           ts: nowIso,
           modifiedAt: nowIso
-        });
+        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now()+2, desc: `Pendente da fatura de ${monthLabel}`, val:-remainingAfter, method:ctx.card, opDate:ctx.dueISO, postDate:nextDueISO, planned:false, invoiceRolloverOf:{card:ctx.card,fromDueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
       }
     }
     // Persist & UI
@@ -3809,10 +4004,25 @@ function buildTransaction(data) {
 async function finalizeTransaction(tx) {
   let batch = tx.recurrence ? [tx] : [tx];
 
-  // Atualiza UI/estado imediatamente
-  transactions.push(...batch);
+  // Atualiza UI/estado imediatamente via app-state
+  try {
+    if (batch.length === 1) {
+      try { addTransaction(batch[0]); } catch (_) { setTransactions((getTransactions() || []).concat([batch[0]])); }
+    } else {
+      // multiple items: try to add each via app-state to emit incremental updates
+      try {
+        for (const t of batch) addTransaction(t);
+      } catch (_) {
+        // fallback to atomic concat if addTransaction not available
+        setTransactions((getTransactions() || []).concat(batch));
+      }
+    }
+  } catch (_) {
+    // Fallback: set via app-state to keep single source of truth
+    try { setTransactions((getTransactions() || []).concat(batch)); } catch (__) { /* last resort ignored to avoid divergent global state */ }
+  }
   sortTransactions();
-  cacheSet('tx', transactions);
+  try { cacheSet('tx', getTransactions()); } catch (_) { cacheSet('tx', transactions); }
 
   try {
     if (!navigator.onLine) {
@@ -3827,9 +4037,9 @@ async function finalizeTransaction(tx) {
     for (const t of batch) queueTx(t); // fire-and-forget
     flushQueue().catch(err => console.error('flushQueue (async) failed:', err));
 
-    updatePendingBadge();
-    renderTable();
-    save('tx', transactions);
+  updatePendingBadge();
+  renderTable();
+  try { save('tx', getTransactions()); } catch (_) { try { save('tx', transactions); } catch(_) {} }
   } catch (e) {
     console.error('finalizeTransaction error:', e);
   }
@@ -3843,7 +4053,8 @@ function resetTxForm() {
   toggleTxModal();
   // Custom save confirmation toast
   // Recupera última transação para mensagem
-  let last = transactions[transactions.length - 1];
+  const txList = getTransactions ? getTransactions() : transactions;
+  let last = txList && txList.length ? txList[txList.length - 1] : null;
   const formattedVal = last && typeof last.val === 'number'
     ? safeFmtCurrency(last.val)
     : '';
@@ -3915,13 +4126,14 @@ function formatDateISO(date) {
 
 // Delete a transaction (with options for recurring rules)
 function delTx(id, iso) {
-  const t = transactions.find(x => sameId(x.id, id));
+  const txs = getTransactions ? getTransactions() : transactions;
+  const t = txs.find(x => sameId(x.id, id));
   if (!t) return;
 
   // Se NÃO for recorrente (nem ocorrência destacada), exclui direto
   if (!t.recurrence && !t.parentId) {
-    transactions = transactions.filter(x => !sameId(x.id, id));
-    save('tx', transactions);
+    try { removeTransaction(id); } catch (_) { setTransactions((getTransactions() || []).filter(x => !sameId(x.id, id))); }
+    try { save('tx', getTransactions()); } catch (_) {}
     renderTable();
     if (plannedModal && !plannedModal.classList.contains('hidden')) {
       try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -3952,11 +4164,12 @@ function findMasterRuleFor(tx, iso) {
   if (!tx) return null;
   if (tx.recurrence && tx.recurrence.trim() !== '') return tx;
   if (tx.parentId) {
-    const parent = transactions.find(p => sameId(p.id, tx.parentId));
+    const txs = getTransactions ? getTransactions() : transactions;
+    const parent = txs.find(p => sameId(p.id, tx.parentId));
     if (parent) return parent;
   }
   // Heuristic: find a rule that occurs on the same date and looks like this tx
-  for (const p of transactions) {
+  for (const p of txs) {
     if (!p.recurrence || !p.recurrence.trim()) continue;
     if (!occursOn(p, iso)) continue;
     const sameMethod = (p.method || '') === (tx.method || '');
@@ -3968,25 +4181,32 @@ function findMasterRuleFor(tx, iso) {
 }
 
 deleteSingleBtn.onclick = () => {
-  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
+  const txs = getTransactions ? getTransactions() : transactions;
+  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, iso);
-  if (master) {
-    master.exceptions = master.exceptions || [];
-    if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
-    // Remove any materialized child occurrence for this exact date
-    // This covers cases where the occurrence was previously edited/created
-    // as a standalone item (with parentId) and would otherwise remain visible.
-    transactions = transactions.filter(x => !(sameId(x.parentId, master.id) && x.opDate === iso));
-    showToast('Ocorrência excluída!', 'success');
-  } else {
-    // fallback: not a recurrence → hard delete
-    transactions = transactions.filter(x => !sameId(x.id, tx.id));
-    showToast('Operação excluída.', 'success');
-  }
-  save('tx', transactions);
+    if (master) {
+      master.exceptions = master.exceptions || [];
+      if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
+      // Remove any materialized child occurrence for this exact date
+      // This covers cases where the occurrence was previously edited/created
+      // as a standalone item (with parentId) and would otherwise remain visible.
+      try {
+        // find child by parentId and opDate and remove
+        const child = (getTransactions() || []).find(x => sameId(x.parentId, master.id) && x.opDate === iso);
+        if (child) removeTransaction(child.id);
+      } catch (_) {
+        setTransactions((getTransactions() || []).filter(x => !(sameId(x.parentId, master.id) && x.opDate === iso)));
+      }
+      showToast('Ocorrência excluída!', 'success');
+    } else {
+      // fallback: not a recurrence → hard delete
+      try { removeTransaction(tx.id); } catch (_) { setTransactions((getTransactions() || []).filter(x => !sameId(x.id, tx.id))); }
+      showToast('Operação excluída.', 'success');
+    }
+    try { save('tx', getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -3995,20 +4215,21 @@ deleteSingleBtn.onclick = () => {
 };
 
 deleteFutureBtn.onclick = () => {
-  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
+  const txs = getTransactions ? getTransactions() : transactions;
+  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, iso);
   if (master) {
     master.recurrenceEnd = iso;
-  showToast('Esta e futuras excluídas!', 'success');
+    showToast('Esta e futuras excluídas!', 'success');
   } else {
     // fallback: not a recurrence → delete only this occurrence
-    transactions = transactions.filter(x => !sameId(x.id, tx.id));
+    try { removeTransaction(tx.id); } catch (_) { setTransactions((getTransactions() || []).filter(x => !sameId(x.id, tx.id))); }
     showToast('Operação excluída.', 'success');
   }
-  save('tx', transactions);
+  try { save('tx', getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -4017,13 +4238,22 @@ deleteFutureBtn.onclick = () => {
 };
 
 deleteAllBtn.onclick = () => {
-  const tx = transactions.find(t => sameId(t.id, pendingDeleteTxId));
+  const txs = getTransactions ? getTransactions() : transactions;
+  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
   if (!tx) { closeDeleteModal(); return; }
   const master = findMasterRuleFor(tx, pendingDeleteTxIso) || tx;
   // Remove both master rule and any occurrences with parentId
-  transactions = transactions.filter(t => !sameId(t.id, master.id) && !sameId(t.parentId, master.id));
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
-  save('tx', transactions);
+  try {
+    // remove master and any child occurrences
+    removeTransaction(master.id);
+    // also remove children
+    const children = (getTransactions() || []).filter(t => sameId(t.parentId, master.id));
+    for (const c of children) removeTransaction(c.id);
+  } catch (_) {
+    setTransactions((getTransactions() || []).filter(t => !sameId(t.id, master.id) && !sameId(t.parentId, master.id)));
+  }
+  try { save('tx', getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -4063,7 +4293,8 @@ editAllBtn.onclick = () => {
   editTx(pendingEditTxId);
 };
 const editTx = id => {
-  const t = transactions.find(x => x.id === id);
+  const txs = getTransactions ? getTransactions() : transactions;
+  const t = txs.find(x => x.id === id);
   if (!t) return;
 
   // 1) Hard reset para não herdar estado da edição anterior
@@ -4145,7 +4376,8 @@ document.addEventListener('click', (e) => {
   const id = txEl ? Number(txEl.dataset.txId) : null;
   if (!id) return;
 
-  const t = transactions.find(x => x.id === id);
+  const txs = getTransactions ? getTransactions() : transactions;
+  const t = txs.find(x => x.id === id);
   if (!t) return;
 
   pendingEditTxId  = id;
@@ -4204,7 +4436,8 @@ function groupTransactionsByMonth() {
   // Agrupa transações por mês (YYYY-MM)
   const groups = new Map();
   sortTransactions();
-  for (const tx of transactions) {
+  const txs = getTransactions ? getTransactions() : transactions;
+  for (const tx of txs) {
     // Usa postDate para agrupamento por mês, com fallback seguro
     const pd = tx.postDate || (tx.opDate && tx.method ? post(tx.opDate, tx.method) : tx.opDate);
     if (!pd || typeof pd.slice !== 'function') continue; // ignora itens malformados
@@ -4246,7 +4479,8 @@ function txByDate(iso) {
     if (singleCard) return singleCard;
     return null;
   };
-  transactions.forEach(t => {
+  const txs = getTransactions ? getTransactions() : transactions;
+  txs.forEach(t => {
     if (t.recurrence) return;            // só não-recorrentes aqui
     if (t.opDate !== iso) return;        // renderiza sempre no opDate
     // Oculta movimentos internos da fatura (pagamento/ajuste)
@@ -4272,7 +4506,7 @@ function txByDate(iso) {
   });
 
   // ================= RECURRING RULES =================
-  transactions
+  txs
     .filter(t => t.recurrence)
     .forEach(master => {
       if (!occursOn(master, iso)) return; // materializa somente a ocorrência do dia
@@ -4377,7 +4611,8 @@ function openYearModal() {
     const extraYears = new Set(availableYears);
 
     // Busca anos em todas as transações de forma mais agressiva
-    transactions.forEach(tx => {
+    const txs = getTransactions ? getTransactions() : transactions;
+    (txs || []).forEach(tx => {
       // Verifica todas as propriedades que podem conter data
       Object.values(tx).forEach(value => {
         if (typeof value === 'string') {
@@ -4468,7 +4703,8 @@ function selectYear(year) {
 
 // Calcula o range real de datas baseado nas transações
 function calculateDateRange() {
-  if (!Array.isArray(transactions) || transactions.length === 0) {
+  const txs = getTransactions ? getTransactions() : transactions;
+  if (!Array.isArray(txs) || txs.length === 0) {
     // Se não há transações, usa range padrão do ano selecionado (VIEW_YEAR)
     const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
     return {
@@ -4483,7 +4719,7 @@ function calculateDateRange() {
   // Analisa todas as transações (incluindo recorrências expandidas)
   const allExpandedTx = [];
   
-  transactions.forEach(tx => {
+  txs.forEach(tx => {
     if (!tx.recurrence) {
       // Transação única - usa opDate e postDate
       allExpandedTx.push({
@@ -4571,6 +4807,7 @@ function buildRunningBalanceMap() {
     runningBalance = (state.startBalance != null) ? state.startBalance : 0;
   }
   
+  const txs = getTransactions ? getTransactions() : transactions;
   for (let currentDate = new Date(startDateObj); currentDate <= endDateObj; currentDate.setDate(currentDate.getDate() + 1)) {
     const iso = currentDate.toISOString().slice(0, 10);
     // If we have an explicit anchor, ensure days before anchor are zero (and don't start runningBalance until anchor)
@@ -4587,7 +4824,7 @@ function buildRunningBalanceMap() {
       runningBalance = (state.startBalance != null) ? state.startBalance : 0;
     }
     // Calcula o impacto do dia usando a lógica existente
-    const dayTx = txByDate(iso);
+  const dayTx = txByDate(iso);
     
     // 1) Dinheiro impacta no opDate
     const cashImpact = dayTx
@@ -4601,8 +4838,8 @@ function buildRunningBalanceMap() {
       invoicesByCard[cardName].push(tx);
     };
 
-    // Não-recorrentes de cartão: vencem hoje
-    transactions.forEach(t => {
+  // Não-recorrentes de cartão: vencem hoje
+  txs.forEach(t => {
       if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
         const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
         if (!validCard) return;
@@ -4613,7 +4850,7 @@ function buildRunningBalanceMap() {
     // Recorrentes de cartão: varre 60 dias p/ trás por ocorrências cujo postDate == hoje
     const _scanStart = new Date(iso);
     _scanStart.setDate(_scanStart.getDate() - 60);
-    for (const master of transactions.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+  for (const master of txs.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
       const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
       if (!validCard) continue;
       for (let d2 = new Date(_scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
@@ -4638,7 +4875,7 @@ function buildRunningBalanceMap() {
     });
 
     // Soma ajustes positivos que deslocam parte da fatura deste dueISO
-    const sumAdjustFor = (cardName, dueISO) => transactions
+    const sumAdjustFor = (cardName, dueISO) => txs
       .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
       .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
     
@@ -4678,6 +4915,7 @@ function renderAccordion() {
 
   // Constrói o mapa de saldos contínuos uma única vez
   const balanceMap = buildRunningBalanceMap();
+  const txs = getTransactions ? getTransactions() : transactions;
   
   // Salva quais <details> estão abertos
   const openKeys = Array.from(acc.querySelectorAll('details[open]'))
@@ -4703,10 +4941,10 @@ function renderAccordion() {
     });
 
     // Metadados: pagamentos (dinheiro), ajustes e parcelamento
-    const paidAbs = transactions
+    const paidAbs = (txs || [])
       .filter(t => t.invoicePayment && t.invoicePayment.card === cardName && t.invoicePayment.dueISO === dueISO)
       .reduce((s, t) => s + Math.abs(Number(t.val) || 0), 0);
-    const parcel = transactions.find(t => t.invoiceParcelOf && t.invoiceParcelOf.card === cardName && t.invoiceParcelOf.dueISO === dueISO);
+    const parcel = (txs || []).find(t => t.invoiceParcelOf && t.invoiceParcelOf.card === cardName && t.invoiceParcelOf.dueISO === dueISO);
     const totalAbs = Math.abs(cardTotalAmount);
 
     // Regras de exibição: só marcar como pago/strike após uma ação do usuário (pagamento ou parcelamento)
@@ -4755,7 +4993,7 @@ function renderAccordion() {
     const windowEnd   = new Date(targetYear, targetMonth + 1, 0); // último dia do mês seguinte
 
     // Percorre todas as transações já persistidas
-    transactions.forEach(tx => {
+    (getTransactions ? getTransactions() : transactions).forEach(tx => {
       if (tx.method !== cardName) return;
 
       // 1. Operações únicas --------------------------------------------
@@ -4842,21 +5080,21 @@ function renderAccordion() {
       mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
     }
     // Month total = sum of all tx in that month
-    const monthTotal = transactions
+    const monthTotal = (txs || [])
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     // Cabeçalho flutuante dos meses
     let mSum = mDet.querySelector('summary.month-divider');
     if (!mSum) { mSum = document.createElement('summary'); mSum.className = 'month-divider'; }
 
-    const monthActual = transactions
+    const monthActual = (txs || [])
       .filter(t => {
         const pd = new Date(t.postDate);
         return pd.getMonth() === mIdx && !t.planned;
       })
       .reduce((s, t) => s + t.val, 0);
 
-    const monthPlanned = transactions
+    const monthPlanned = (txs || [])
       .filter(t => {
         const pd = new Date(t.postDate);
         return pd.getMonth() === mIdx && t.planned;
@@ -4906,7 +5144,7 @@ const addToGroup = (cardName, tx) => {
 };
 
 // Não-recorrentes de cartão: vencem hoje
-transactions.forEach(t => {
+(txs || []).forEach(t => {
   if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
     // Garantir que o método refere-se a um cartão existente (evita fatura fantasma)
     const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
@@ -4918,7 +5156,7 @@ transactions.forEach(t => {
 // Recorrentes de cartão: varre 60 dias p/ trás por ocorrências cujo postDate == hoje
 const _scanStart = new Date(iso);
 _scanStart.setDate(_scanStart.getDate() - 60);
-for (const master of transactions.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+for (const master of (txs || []).filter(t => t.recurrence && t.method !== 'Dinheiro')) {
   // Pula séries que apontam para um cartão inexistente
   const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
   if (!validCard) continue;
@@ -4940,13 +5178,13 @@ for (const master of transactions.filter(t => t.recurrence && t.method !== 'Dinh
 
 // 1) Dinheiro impacta o saldo no dia da operação (inclui invoicePayment; exclui invoiceAdjust)
 //    Agora considera também as ocorrências de recorrências em Dinheiro no dia
-const cashNonRecurring = transactions
+const cashNonRecurring = (txs || [])
   .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso)
   .filter(t => !t.invoiceAdjust) // ajustes da fatura têm val=0 e não devem afetar caixa
   .reduce((s, t) => s + (Number(t.val) || 0), 0);
 
 // Soma das recorrências de Dinheiro que ocorrem neste dia
-const cashRecurring = transactions
+const cashRecurring = (txs || [])
   .filter(t => t.method === 'Dinheiro' && t.recurrence)
   .filter(t => occursOn(t, iso))
   .reduce((s, t) => s + (Number(t.val) || 0), 0);
@@ -4959,7 +5197,7 @@ Object.keys(invoicesByCard).forEach(card => {
   invoiceTotals[card] = invoicesByCard[card].reduce((s, t) => s + t.val, 0);
 });
 // Soma ajustes positivos que deslocam parte da fatura deste dueISO
-const sumAdjustFor = (cardName, dueISO) => transactions
+const sumAdjustFor = (cardName, dueISO) => (txs || [])
   .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
   .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
 let cardImpact = 0;
@@ -5108,9 +5346,9 @@ const dayTotal = cashImpact + cardImpact;
         payBtn.addEventListener('click', () => {
           const dueISO = iso;
           const total = invoiceTotals[cardName] || 0;
-          const paid = transactions.filter(t => t.invoicePayment && t.invoicePayment.card===cardName && t.invoicePayment.dueISO===dueISO)
+          const paid = (txs || []).filter(t => t.invoicePayment && t.invoicePayment.card===cardName && t.invoicePayment.dueISO===dueISO)
             .reduce((s,t)=> s + Math.abs(t.val||0), 0);
-          const adjusted = transactions.filter(t => t.invoiceAdjust && t.invoiceAdjust.card===cardName && t.invoiceAdjust.dueISO===dueISO)
+          const adjusted = (txs || []).filter(t => t.invoiceAdjust && t.invoiceAdjust.card===cardName && t.invoiceAdjust.dueISO===dueISO)
             .reduce((s,t)=> s + Math.abs(Number(t.invoiceAdjust.amount)||0), 0);
           const remaining = Math.max(0, Math.abs(total) - paid - adjusted);
           openPayInvoiceModal(cardName, dueISO, remaining, Math.abs(total), adjusted);
@@ -5421,17 +5659,19 @@ if (cardModal) {
       if (hasLiveTx) {
         // Sanitize and persist if needed (one-time migration path on boot)
         const s = sanitizeTransactions(fixedTx);
-        if (JSON.stringify(s.list) !== JSON.stringify(transactions)) {
-          transactions = s.list;
-          cacheSet('tx', transactions);
-          if (s.changed) { try { save('tx', transactions); } catch (_) {} }
+        const current = getTransactions ? getTransactions() : transactions;
+        if (JSON.stringify(s.list) !== JSON.stringify(current)) {
+          setTransactions(s.list);
+          try { cacheSet('tx', getTransactions()); } catch (_) { cacheSet('tx', s.list); }
+          if (s.changed) { try { save('tx', getTransactions()); } catch (_) {} }
           renderTable();
         }
       }
-      if (hasLiveCards && JSON.stringify(liveCards) !== JSON.stringify(cards)) {
-        cards = liveCards;
-        if(!cards.some(c=>c.name==='Dinheiro'))cards.unshift({name:'Dinheiro',close:0,due:0});
-        cacheSet('cards', cards);
+      if (hasLiveCards) {
+        const normalized = Array.isArray(liveCards) ? liveCards : Object.values(liveCards || {});
+        if (!normalized.some(c => c && c.name === 'Dinheiro')) normalized.unshift({ name: 'Dinheiro', close: 0, due: 0 });
+        setCards(normalized);
+        try { cacheSet('cards', getCards()); } catch (_) { cacheSet('cards', normalized); }
         refreshMethods(); renderCardList(); renderTable();
       }
       if (liveBal !== state.startBalance) {
@@ -5536,16 +5776,17 @@ function preparePlannedList() {
   };
 
   const today = todayISO();
+  const txs = getTransactions ? getTransactions() : transactions;
 
   // 1) Planejados já salvos (a partir de hoje)
-  for (const tx of transactions) {
+  for (const tx of txs) {
     if (!tx) continue;
     if (tx.planned && tx.opDate && tx.opDate >= today) add(tx);
   }
 
   // 2) Filhas de recorrência projetadas para os próximos 90 dias
   const DAYS_AHEAD = 90;
-  for (const master of transactions) {
+  for (const master of txs) {
     if (!master || !master.recurrence) continue;
 
     for (let i = 1; i <= DAYS_AHEAD; i++) {           // começa em amanhã; hoje nasce executada
@@ -5568,7 +5809,7 @@ function preparePlannedList() {
 
       // If there is already a recorded transaction (planned or executed) for this date
       // that matches this master (by parentId or desc/method/val), skip projection.
-      const exists = transactions.some(t =>
+      const exists = txs.some(t =>
         t && t.opDate === iso && (
           (t.parentId && sameId(t.parentId, master.id)) ||
           ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
