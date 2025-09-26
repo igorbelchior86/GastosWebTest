@@ -665,6 +665,11 @@ html[data-theme="light"] #currencyProfileModal #currencyProfileList li {
   --kb-offset-bottom: 0px;
 }
 
+html.keyboard-open {
+  transform: translate3d(0, var(--kb-offset-top, 0px), 0);
+  will-change: transform;
+}
+
 h1,h2,h3,h4,
 .executed-header,
 .planned-header,
