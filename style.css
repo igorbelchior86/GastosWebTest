@@ -670,6 +670,11 @@ html.keyboard-open {
   will-change: transform;
 }
 
+html.keyboard-open.kb-lock-shift {
+  transform: none !important;
+  will-change: auto;
+}
+
 h1,h2,h3,h4,
 .executed-header,
 .planned-header,
