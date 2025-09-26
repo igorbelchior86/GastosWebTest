@@ -1056,7 +1056,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(a97)';
+const APP_VERSION = 'v1.4.9(a98)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1799,6 +1799,13 @@ function updateModalOpenState() {
 
   // Add/remove the existing modal-open class (used by CSS)
   if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
+
+  if (root) {
+    const txModalEl = document.getElementById('txModal');
+    const txOpen = !!(txModalEl && !txModalEl.classList.contains('hidden'));
+    if (txOpen) root.classList.add('kb-lock-shift');
+    else root.classList.remove('kb-lock-shift');
+  }
 
   if (wrapperEl) {
     try {
