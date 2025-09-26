@@ -1056,7 +1056,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(a96)';
+const APP_VERSION = 'v1.4.9(a97)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1710,6 +1710,9 @@ function resetTxModal() {
 function toggleTxModal() {
   const isOpening = txModal.classList.contains('hidden');
   if (isOpening) {
+    if (typeof window !== 'undefined' && typeof window.__unlockKeyboardGap === 'function') {
+      try { window.__unlockKeyboardGap(); } catch (_) {}
+    }
     if (!isEditing) {
       resetTxModal();
     }
@@ -1732,6 +1735,9 @@ function toggleTxModal() {
     pendingEditMode = null;
     pendingEditTxId = null;
     pendingEditTxIso = null;
+    if (typeof window !== 'undefined' && typeof window.__unlockKeyboardGap === 'function') {
+      try { window.__unlockKeyboardGap(); } catch (_) {}
+    }
   }
 }
 
@@ -2065,13 +2071,22 @@ document.addEventListener('wheel', (e) => {
 
 // iOS 26: detectar teclado via VisualViewport, mas só ajustar botões inferiores
 (function setupKbOffsets(){
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const root = document.documentElement;
+  if (!root) return;
+
+  const noop = () => {};
+  if (typeof window.__lockKeyboardGap !== 'function') window.__lockKeyboardGap = noop;
+  if (typeof window.__unlockKeyboardGap !== 'function') window.__unlockKeyboardGap = noop;
+
   const vv = window.visualViewport;
   if (!vv) return;
-  const root = document.documentElement;
   const THRESH = 140; // px
   const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   let keyboardOpen = false;
   let closeTimer = null;
+  let lastGap = 0;
+  let lockedGap = null;
 
   const applyKeyboardOpen = (gap) => {
     keyboardOpen = true;
@@ -2079,10 +2094,14 @@ document.addEventListener('wheel', (e) => {
       clearTimeout(closeTimer);
       closeTimer = null;
     }
+    const measured = Math.max(0, Math.round(gap || 0));
+    lastGap = measured;
     if (root) {
       root.dataset.vvKb = '1';
       root.classList.add('keyboard-open');
-      root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
+      root.dataset.kbGap = String(measured);
+      const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
+      root.style.setProperty('--kb-offset-bottom', effective + 'px');
     }
   };
 
@@ -2090,24 +2109,55 @@ document.addEventListener('wheel', (e) => {
     if (closeTimer) clearTimeout(closeTimer);
     closeTimer = setTimeout(() => {
       keyboardOpen = false;
+      lockedGap = null;
+      lastGap = 0;
       if (root) {
         delete root.dataset.vvKb;
         root.classList.remove('keyboard-open');
         root.style.removeProperty('--kb-offset-bottom');
+        delete root.dataset.kbGap;
+        delete root.dataset.kbLock;
       }
       flushKeyboardDeferredTasks();
     }, 200);
   };
+
+  const parseGap = (value) => {
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return null;
+      return Math.max(0, Math.round(value));
+    }
+    if (typeof value === 'string' && value) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return Math.max(0, Math.round(parsed));
+    }
+    return null;
+  };
+
+  const lockGap = (value) => {
+    const candidate = parseGap(value ?? lastGap ?? root.dataset.kbGap);
+    if (candidate == null) return;
+    lockedGap = candidate;
+    if (root) root.dataset.kbLock = String(candidate);
+    if (keyboardOpen) applyKeyboardOpen(lastGap);
+  };
+
+  const unlockGap = () => {
+    lockedGap = null;
+    if (root) delete root.dataset.kbLock;
+    if (keyboardOpen) applyKeyboardOpen(lastGap);
+  };
+
+  window.__lockKeyboardGap = lockGap;
+  window.__unlockKeyboardGap = unlockGap;
 
   const update = () => {
     const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
     const isKb = IS_IOS && gap > THRESH;
     if (isKb) {
       applyKeyboardOpen(gap);
-    } else {
-      if (keyboardOpen || root?.dataset?.vvKb === '1') {
-        applyKeyboardClosed();
-      }
+    } else if (keyboardOpen || root?.dataset?.vvKb === '1') {
+      applyKeyboardClosed();
     }
   };
 
@@ -2390,6 +2440,42 @@ try {
   val.setAttribute('enterkeyhint', 'done');
   val.setAttribute('pattern', '[0-9.,]*');
 } catch (_) {}
+
+if (val && typeof window !== 'undefined') {
+  let keyboardLockTimer = null;
+  let keyboardLockAttempts = 0;
+
+  const attemptKeyboardLock = () => {
+    keyboardLockAttempts += 1;
+    if (typeof window.__lockKeyboardGap !== 'function') {
+      keyboardLockTimer = null;
+      return;
+    }
+    const rootEl = typeof document !== 'undefined' ? document.documentElement : null;
+    if ((rootEl?.dataset?.vvKb === '1') || keyboardLockAttempts >= 5) {
+      try { window.__lockKeyboardGap(); } catch (_) {}
+      keyboardLockTimer = null;
+      return;
+    }
+    keyboardLockTimer = window.setTimeout(attemptKeyboardLock, 90);
+  };
+
+  val.addEventListener('focus', () => {
+    keyboardLockAttempts = 0;
+    if (keyboardLockTimer) {
+      clearTimeout(keyboardLockTimer);
+      keyboardLockTimer = null;
+    }
+    keyboardLockTimer = window.setTimeout(attemptKeyboardLock, 90);
+  });
+
+  val.addEventListener('blur', () => {
+    if (keyboardLockTimer) {
+      clearTimeout(keyboardLockTimer);
+      keyboardLockTimer = null;
+    }
+  });
+}
 
 // Auto-format value input using the active currency profile while typing
 val.addEventListener('input', () => {
