@@ -2108,7 +2108,40 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 
 /* ===================== SETTINGS (Ajustes) ===================== */
-#settingsModal .modal-content{padding:0 0 0 0;}
+#settingsModal {
+  top: calc(80px + constant(safe-area-inset-top));
+  top: calc(80px + env(safe-area-inset-top));
+  padding-top: 12px;
+  align-items: flex-end;
+}
+
+#settingsModal .bottom-modal-box {
+  max-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  max-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+}
+
+#settingsModal .modal-content {
+  padding: 0 18px 24px;
+}
+
+#settingsModal .settings-modal-header {
+  flex: 0 0 auto;
+  margin: 0 18px 12px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+#settingsModal .settings-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--txt-main);
+  text-shadow: none;
+}
+
+#settingsModal .modal-drag {
+  margin-bottom: 6px;
+}
 /* Settings modal – alignment and avatar fallback */
 #settingsModal .settings-card{ padding:14px; }
 #settingsModal .settings-list{ margin-top:12px; }
@@ -2723,6 +2756,14 @@ html[data-theme="light"] #settingsModal .bottom-modal-box{
   backdrop-filter: blur(16px) saturate(140%);
   border: 1px solid rgba(0,0,0,0.12);
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #settingsModal .settings-modal-header {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+html[data-theme="light"] #settingsModal .settings-modal-header h2 {
+  color: #111;
 }
 html[data-theme="light"] #settingsModal h2 { color:#111; text-shadow:none; }
 html[data-theme="light"] #settingsModal .modal-close-btn { color:#111; opacity:.7; }

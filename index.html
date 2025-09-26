@@ -14,8 +14,8 @@
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1.4.9(a94)">
-  <link rel="stylesheet" href="login.css?v=1.4.9(a94)">
+  <link rel="stylesheet" href="style.css?v=1.4.9(a95)">
+  <link rel="stylesheet" href="login.css?v=1.4.9(a95)">
 
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
@@ -74,15 +74,14 @@
   </div>
 
   <!-- Modal Sobre -->
-  <div id="settingsModal" class="bottom-modal backdrop-blur hidden">
+  <div id="settingsModal" class="bottom-modal backdrop-blur hidden" aria-labelledby="settingsSheetTitle">
     <div class="bottom-modal-box">
       <div class="modal-drag"></div>
-      <h2>Sobre</h2>
       <button id="closeSettingsModal" class="modal-close-btn" aria-label="Fechar">✕</button>
-      <div class="modal-content">
-  <button id="toggleThemeBtn" class="theme-toggle-btn">Modo Claro/Escuro</button>
-  <!-- conteúdo futuro -->
-      </div>
+      <header class="settings-modal-header">
+        <h2 id="settingsSheetTitle">Ajustes</h2>
+      </header>
+      <div class="modal-content"></div>
     </div>
   </div>
 
@@ -346,9 +345,9 @@
   <script src="js/utils/data-utils-global.js"></script>
   <script src="js/utils/currency-profiles.js"></script>
   
-  <script type="module" src="auth.js?v=1.4.9(a94)"></script>
-  <script type="module" src="login.view.js?v=1.4.9(a94)"></script>
-  <script type="module" src="main.js?v=1.4.9(a94)"></script>
+  <script type="module" src="auth.js?v=1.4.9(a95)"></script>
+  <script type="module" src="login.view.js?v=1.4.9(a95)"></script>
+  <script type="module" src="main.js?v=1.4.9(a95)"></script>
   <!-- Styles moved to style.css -->
 
   <!-- Toast de erro -->
