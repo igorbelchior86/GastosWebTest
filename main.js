@@ -355,10 +355,6 @@ function renderSettingsModal(){
   const email = u && u.email ? u.email : '';
   const photo = u && u.photoURL ? u.photoURL : '';
   box.innerHTML = `
-    <header class="settings-modal-header">
-      <h2 id="settingsSheetTitle">Ajustes</h2>
-    </header>
-
     <div class="settings-card">
       <div class="settings-profile">
         <div class="settings-avatar">
@@ -418,7 +414,6 @@ function renderSettingsModal(){
         </button>
       </div>
     </div>`;
-  settingsModalEl.setAttribute('aria-labelledby', 'settingsSheetTitle');
   const img = box.querySelector('#settingsAvatar');
   if (img) {
     if (photo) {
