@@ -2108,6 +2108,7 @@ document.addEventListener('wheel', (e) => {
     lastGap = measured;
     lastTopOffset = rawOffsetTop;
     lastPageTop = rawPageTop;
+
     if (root) {
       root.dataset.vvKb = '1';
       root.classList.add('keyboard-open');
@@ -2122,6 +2123,7 @@ document.addEventListener('wheel', (e) => {
       const shift = Math.max(diffOffset, diffPage);
       root.style.setProperty('--kb-offset-bottom', effective + 'px');
       root.style.setProperty('--kb-offset-top', shift + 'px');
+
     }
   };
 
@@ -2135,6 +2137,7 @@ document.addEventListener('wheel', (e) => {
       lastGap = 0;
       lastTopOffset = 0;
       lastPageTop = 0;
+
       if (root) {
         delete root.dataset.vvKb;
         root.classList.remove('keyboard-open');
@@ -2146,6 +2149,7 @@ document.addEventListener('wheel', (e) => {
         delete root.dataset.kbLock;
         delete root.dataset.kbLockTop;
         delete root.dataset.kbLockPage;
+
       }
       flushKeyboardDeferredTasks();
     }, 200);
@@ -2174,6 +2178,7 @@ document.addEventListener('wheel', (e) => {
       if (lockedTopOffset != null) root.dataset.kbLockTop = String(lockedTopOffset);
       if (lockedPageTop != null) root.dataset.kbLockPage = String(lockedPageTop);
     }
+
     if (keyboardOpen) applyKeyboardOpen(lastGap);
   };
 
@@ -2186,6 +2191,7 @@ document.addEventListener('wheel', (e) => {
       delete root.dataset.kbLockTop;
       delete root.dataset.kbLockPage;
     }
+
     if (keyboardOpen) applyKeyboardOpen(lastGap);
   };
 
