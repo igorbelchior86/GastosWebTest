@@ -807,42 +807,61 @@ html.modal-open.keyboard-open .wrapper {
   }
 }
 
-/* ===================== iOS PWA RADICAL FIX ===================== */
+/* ===================== iOS PWA ULTIMATE FREEZE FIX ===================== */
 
-/* When iOS PWA keyboard fix is active, ensure absolute positioning works */
-html.ios-pwa-keyboard-fix {
-  /* Prevent any viewport-based positioning */
+/* When interface is frozen, prevent ALL movement and interaction */
+html.ios-interface-frozen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
   height: 100vh !important;
   overflow: hidden !important;
 }
 
-html.ios-pwa-keyboard-fix body {
-  /* Lock body during keyboard to prevent scroll issues */
+html.ios-interface-frozen body {
   position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  touch-action: none !important;
+}
+
+html.ios-interface-frozen .wrapper {
+  position: absolute !important;
+  top: 0 !important;
   width: 100% !important;
   height: 100vh !important;
-  overflow: hidden !important;
+  overflow: visible !important;
+  /* Transform will be set by JS to maintain scroll position */
 }
 
-html.ios-pwa-keyboard-fix .wrapper {
-  /* Allow internal scrolling only in wrapper */
-  position: relative !important;
-  height: calc(100vh - 160px) !important; /* Account for header + footer */
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-  margin-top: 100px !important; /* Space for fixed header */
-  margin-bottom: 80px !important; /* Space for fixed buttons */
-}
-
-/* Force absolute positioning when iOS PWA fix is active */
-html.ios-pwa-keyboard-fix .app-header,
-html.ios-pwa-keyboard-fix .floating-pill,
-html.ios-pwa-keyboard-fix .floating-add-button,
-html.ios-pwa-keyboard-fix .floating-home-button {
-  position: absolute !important;
-  z-index: 9999 !important;
+/* Ensure fixed elements stay frozen in place */
+html.ios-interface-frozen .app-header,
+html.ios-interface-frozen .floating-pill,
+html.ios-interface-frozen .floating-add-button,
+html.ios-interface-frozen .floating-home-button {
+  position: fixed !important;
+  z-index: 99999 !important;
   transform: none !important;
   -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* Ensure modals still work while frozen */
+html.ios-interface-frozen .bottom-modal {
+  position: fixed !important;
+  z-index: 100000 !important;
+}
+
+/* Allow input interaction within modals */
+html.ios-interface-frozen .bottom-modal input,
+html.ios-interface-frozen .bottom-modal textarea,
+html.ios-interface-frozen .bottom-modal select {
+  touch-action: auto !important;
+  pointer-events: auto !important;
 }
 
 h1,h2,h3,h4,

@@ -2210,6 +2210,18 @@ function updateModalOpenState() {
     }
   }
 
+  // iOS PWA Ultimate Fix: Ensure interface is unfrozen when modal closes
+  if (!open && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    if (root.classList.contains('ios-interface-frozen')) {
+      console.log('🚪 Modal closed via updateModalOpenState - forcing unfreeze');
+      setTimeout(() => {
+        if (typeof window.__unfreezeInterface === 'function') {
+          window.__unfreezeInterface();
+        }
+      }, 50);
+    }
+  }
+
   // Safari iOS fix: Force scroll state cleanup when all modals are closed
   // Fixes bug where accordion scroll becomes unresponsive after opening/closing modals
   if (!open && /Safari/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
@@ -2462,208 +2474,228 @@ document.addEventListener('wheel', (e) => {
   e.preventDefault();
 }, { passive: false });
 
-// iOS 26 PWA Radical Fix: Absolute positioning to prevent interface elevation
-(function setupIOSPWAFix(){
+// iOS PWA Ultimate Fix: Complete interface freeze during input focus
+(function setupIOSUltimateFix(){
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  const root = document.documentElement;
-  if (!root) return;
-
-  const IS_IOS_PWA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  
+  const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const IS_PWA = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   
-  if (!IS_IOS_PWA || !IS_PWA) {
-    // Fallback to original system for non-iOS PWA
-    const noop = () => {};
-    if (typeof window.__lockKeyboardGap !== 'function') window.__lockKeyboardGap = noop;
-    if (typeof window.__unlockKeyboardGap !== 'function') window.__unlockKeyboardGap = noop;
+  if (!IS_IOS || !IS_PWA) {
+    // Non-iOS PWA: use noop functions
+    window.__lockKeyboardGap = () => {};
+    window.__unlockKeyboardGap = () => {};
     return;
   }
 
-  // iOS PWA: Store initial positions and force absolute positioning
-  let initialViewportHeight = window.innerHeight;
-  let initialPositions = new Map();
-  let isKeyboardOpen = false;
+  console.log('🍎 iOS PWA Ultimate Fix: Initializing interface freeze system');
   
-  const captureInitialPositions = () => {
-    initialViewportHeight = window.innerHeight;
+  // State tracking
+  let isInterfaceFrozen = false;
+  let originalScrollTop = 0;
+  let originalBodyStyles = {};
+  let originalWrapperStyles = {};
+  let frozenSnapshot = null;
+  
+  const freezeInterface = () => {
+    if (isInterfaceFrozen) return;
+    
+    console.log('❄️ FREEZING interface completely');
+    isInterfaceFrozen = true;
+    
+    const root = document.documentElement;
+    const body = document.body;
+    const wrapper = document.querySelector('.wrapper');
+    
+    // Store current scroll position
+    originalScrollTop = wrapper ? wrapper.scrollTop : window.scrollY;
+    
+    // Store original styles for restoration
+    originalBodyStyles = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      width: body.style.width,
+      height: body.style.height,
+      overflow: body.style.overflow,
+      touchAction: body.style.touchAction
+    };
+    
+    if (wrapper) {
+      originalWrapperStyles = {
+        position: wrapper.style.position,
+        top: wrapper.style.top,
+        transform: wrapper.style.transform,
+        overflow: wrapper.style.overflow,
+        height: wrapper.style.height
+      };
+    }
+    
+    // NUCLEAR OPTION: Freeze everything
+    root.style.position = 'fixed';
+    root.style.top = '0';
+    root.style.left = '0';
+    root.style.width = '100vw';
+    root.style.height = '100vh';
+    root.style.overflow = 'hidden';
+    
+    body.style.position = 'fixed';
+    body.style.top = '0';
+    body.style.left = '0';  
+    body.style.width = '100vw';
+    body.style.height = '100vh';
+    body.style.overflow = 'hidden';
+    body.style.touchAction = 'none';
+    
+    if (wrapper) {
+      wrapper.style.position = 'absolute';
+      wrapper.style.top = '0';
+      wrapper.style.transform = `translateY(-${originalScrollTop}px)`;
+      wrapper.style.width = '100%';
+      wrapper.style.height = '100vh';
+      wrapper.style.overflow = 'visible';
+    }
+    
+    // Force all fixed elements to stay absolutely positioned
     const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-    
-    console.log('📐 Capturing initial positions - viewport height:', initialViewportHeight);
-    
     fixedElements.forEach(el => {
       const rect = el.getBoundingClientRect();
-      const computed = window.getComputedStyle(el);
-      const position = {
-        top: rect.top,
-        bottom: window.innerHeight - rect.bottom,
-        left: rect.left, 
-        right: window.innerWidth - rect.right,
-        position: computed.position
-      };
-      
-      initialPositions.set(el, position);
-      console.log(`📍 ${el.className}:`, position);
-    });
-  };
-  
-  // Expose function for manual triggering if needed
-  window.__capturePWAPositions = captureInitialPositions;
-  
-  const forceAbsolutePositioning = () => {
-    const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-    
-    fixedElements.forEach(el => {
-      const initial = initialPositions.get(el);
-      if (!initial) return;
-      
-      // Force absolute positioning with calculated pixel values
-      el.style.position = 'absolute';
-      el.style.zIndex = '9999';
-      el.style.transform = 'none';
-      el.style.webkitTransform = 'none';
-      el.style.willChange = 'auto';
-      
-      // Lock to initial viewport positions
-      if (el.classList.contains('app-header')) {
-        el.style.top = '0px';
-        el.style.left = '0px';
-        el.style.right = '0px';
-        el.style.bottom = 'auto';
-      } else {
-        // Bottom elements - lock to initial bottom position
-        el.style.top = 'auto';
-        el.style.bottom = `${initial.bottom}px`;
-        if (el.classList.contains('floating-pill')) {
-          el.style.left = `${initial.left}px`;
-          el.style.right = 'auto';
-        } else {
-          el.style.left = 'auto';
-          el.style.right = `${initial.right}px`;
-        }
-      }
-    });
-  };
-
-  const detectKeyboard = () => {
-    const vv = window.visualViewport;
-    if (!vv) return false;
-    
-    const currentHeight = vv.height + (vv.offsetTop || 0);
-    const heightDiff = initialViewportHeight - currentHeight;
-    const keyboardDetected = heightDiff > 150; // More than 150px difference = keyboard
-    
-    if (keyboardDetected && !isKeyboardOpen) {
-      console.log('🔒 iOS PWA: Keyboard detected, forcing absolute positioning');
-      console.log('📊 Heights - Initial:', initialViewportHeight, 'Current:', currentHeight, 'Diff:', heightDiff);
-      isKeyboardOpen = true;
-      forceAbsolutePositioning();
-      root.classList.add('ios-pwa-keyboard-fix');
-      
-      // Visual debug indicator
-      document.body.style.borderTop = '3px solid red';
-      
-      // Disable body scrolling during keyboard
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${window.scrollY}px`;
-      document.body.style.width = '100%';
-      
-    } else if (!keyboardDetected && isKeyboardOpen) {
-      console.log('🔓 iOS PWA: Keyboard hidden, restoring fixed positioning');
-      isKeyboardOpen = false;
-      restoreFixedPositioning();
-      root.classList.remove('ios-pwa-keyboard-fix');
-      
-      // Remove visual debug indicator
-      document.body.style.borderTop = '';
-      
-      // Restore body scrolling
-      const scrollY = document.body.style.top;
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, parseInt(scrollY || '0') * -1);
-    }
-  };
-  
-  const restoreFixedPositioning = () => {
-    const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-    
-    fixedElements.forEach(el => {
       el.style.position = 'fixed';
-      el.style.zIndex = '';
-      el.style.top = '';
-      el.style.bottom = '';
-      el.style.left = '';
-      el.style.right = '';
-      el.style.transform = '';
-      el.style.webkitTransform = '';
+      el.style.top = `${rect.top}px`;
+      el.style.left = `${rect.left}px`;
+      el.style.width = `${rect.width}px`;
+      el.style.height = `${rect.height}px`;
+      el.style.zIndex = '99999';
+      el.style.transform = 'none';
+      el.style.willChange = 'auto';
     });
+    
+    // Add class for CSS targeting
+    root.classList.add('ios-interface-frozen');
+    
+    // Visual debug
+    body.style.borderTop = '4px solid lime';
+    
+    console.log('❄️ Interface FROZEN at scroll position:', originalScrollTop);
   };
   
-  // Monitor for modals and keyboard
-  const monitorModalAndKeyboard = () => {
-    const hasModal = !!document.querySelector('.bottom-modal:not(.hidden)');
+  const unfreezeInterface = () => {
+    if (!isInterfaceFrozen) return;
     
-    if (hasModal) {
-      detectKeyboard();
-    }
+    console.log('🔥 UNFREEZING interface');
+    isInterfaceFrozen = false;
     
-    // Continue monitoring while modal is open
-    if (hasModal || isKeyboardOpen) {
-      requestAnimationFrame(monitorModalAndKeyboard);
-    }
-  };
-  
-  // Initialize on page load - ensure elements are ready
-  const initializePWAFix = () => {
-    if (document.querySelector('.app-header')) {
-      captureInitialPositions();
-      console.log('🍎 iOS PWA Fix initialized - positions captured');
+    const root = document.documentElement;
+    const body = document.body;
+    const wrapper = document.querySelector('.wrapper');
+    
+    // Restore root
+    root.style.position = '';
+    root.style.top = '';
+    root.style.left = '';
+    root.style.width = '';
+    root.style.height = '';
+    root.style.overflow = '';
+    
+    // Restore body
+    Object.assign(body.style, originalBodyStyles);
+    
+    // Restore wrapper and scroll position
+    if (wrapper) {
+      Object.assign(wrapper.style, originalWrapperStyles);
+      setTimeout(() => {
+        wrapper.scrollTop = originalScrollTop;
+      }, 0);
     } else {
-      setTimeout(initializePWAFix, 200);
+      window.scrollTo(0, originalScrollTop);
     }
+    
+    // Restore fixed elements
+    const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+    fixedElements.forEach(el => {
+      el.style.position = '';
+      el.style.top = '';
+      el.style.left = '';
+      el.style.width = '';
+      el.style.height = '';
+      el.style.zIndex = '';
+      el.style.transform = '';
+      el.style.willChange = '';
+    });
+    
+    // Remove class
+    root.classList.remove('ios-interface-frozen');
+    
+    // Remove debug
+    body.style.borderTop = '';
+    
+    console.log('🔥 Interface UNFROZEN, scroll restored to:', originalScrollTop);
   };
   
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializePWAFix);
-  } else {
-    setTimeout(initializePWAFix, 100);
-  }
-  
-  // Start monitoring when modal opens
-  document.addEventListener('focusin', () => {
-    setTimeout(() => {
-      if (document.querySelector('.bottom-modal:not(.hidden)')) {
-        console.log('🎯 Focus detected in modal - starting monitoring');
-        monitorModalAndKeyboard();
-      }
-    }, 50);
+  // Detect when input gets focus inside modal
+  document.addEventListener('focusin', (e) => {
+    const isInModal = e.target.closest('.bottom-modal:not(.hidden)');
+    const isInput = e.target.matches('input, textarea, select, [contenteditable]');
+    
+    if (isInModal && isInput) {
+      console.log('� Input focused in modal - FREEZING interface');
+      freezeInterface(); // Immediate freeze
+    }
   });
   
-  // Additional monitoring trigger for input focus
-  document.addEventListener('touchstart', () => {
-    setTimeout(() => {
-      if (document.querySelector('.bottom-modal:not(.hidden)')) {
-        monitorModalAndKeyboard();
-      }
-    }, 100);
+  // Detect when input loses focus
+  document.addEventListener('focusout', (e) => {
+    const isInModal = e.target.closest('.bottom-modal:not(.hidden)');
+    const isInput = e.target.matches('input, textarea, select, [contenteditable]');
+    
+    if (isInModal && isInput) {
+      console.log('👋 Input unfocused in modal - UNFREEZING interface');
+      setTimeout(unfreezeInterface, 100);
+    }
   });
   
-  // Visual viewport monitoring
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', detectKeyboard);
-  }
+  // Additional touchstart detection for inputs to freeze even earlier
+  document.addEventListener('touchstart', (e) => {
+    const isInModal = e.target.closest('.bottom-modal:not(.hidden)');
+    const isInput = e.target.matches('input, textarea, select, [contenteditable]');
+    
+    if (isInModal && isInput && !isInterfaceFrozen) {
+      console.log('👆 Input touched in modal - PRE-FREEZING interface');
+      setTimeout(freezeInterface, 10); // Very fast freeze
+    }
+  }, { passive: true });
   
-  // Fallback keyboard detection
-  window.addEventListener('resize', () => {
-    setTimeout(detectKeyboard, 100);
+  // Also unfreeze when modal closes
+  const originalUpdateModalOpenState = window.updateModalOpenState || function(){};
+  window.updateModalOpenState = function() {
+    const wasOpen = !!document.querySelector('.bottom-modal:not(.hidden)');
+    const result = originalUpdateModalOpenState.apply(this, arguments);
+    const isOpen = !!document.querySelector('.bottom-modal:not(.hidden)');
+    
+    if (wasOpen && !isOpen && isInterfaceFrozen) {
+      console.log('🚪 Modal closed - UNFREEZING interface');
+      unfreezeInterface();
+    }
+    
+    return result;
+  };
+  
+  // Emergency unfreeze on escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isInterfaceFrozen) {
+      console.log('🆘 Emergency unfreeze via Escape');
+      unfreezeInterface();
+    }
   });
   
-  // Noop functions for compatibility
+  // Expose functions globally for integration
+  window.__freezeInterface = freezeInterface;
+  window.__unfreezeInterface = unfreezeInterface;
   window.__lockKeyboardGap = () => {};
   window.__unlockKeyboardGap = () => {};
   
-  return; // Exit early for iOS PWA - use new system
+  console.log('🍎 iOS PWA Ultimate Fix: Interface freeze system ready');
+  return; // Exit early for iOS PWA
 })();
 
 // Original keyboard system (non-iOS PWA)
