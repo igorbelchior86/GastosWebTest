@@ -2075,8 +2075,35 @@ function resetTxModal() {
  * Toggle the visibility of the transaction modal.
  */
 function toggleTxModal() {
+  console.log('🔲 [MODAL DEBUG] toggleTxModal chamado');
+  
   const isOpening = txModal.classList.contains('hidden');
+  console.log('🔲 [MODAL DEBUG] Modal estado:', isOpening ? 'ABRINDO' : 'FECHANDO');
+  
+  // Verificar posição ANTES da mudança
+  const modalRect = txModal.getBoundingClientRect();
+  const header = document.querySelector('.app-header');
+  const headerRect = header ? header.getBoundingClientRect() : null;
+  
+  console.log('🔲 [MODAL DEBUG] Posições ANTES:', {
+    modal: {
+      top: modalRect.top,
+      bottom: modalRect.bottom,
+      height: modalRect.height
+    },
+    header: headerRect ? {
+      top: headerRect.top,
+      position: getComputedStyle(header).position,
+      transform: getComputedStyle(header).transform
+    } : null,
+    viewport: {
+      innerHeight: window.innerHeight,
+      visualViewportHeight: window.visualViewport ? window.visualViewport.height : 'N/A'
+    }
+  });
+
   if (isOpening) {
+    console.log('🔲 [MODAL DEBUG] Preparando abertura...');
     if (typeof window !== 'undefined' && typeof window.__unlockKeyboardGap === 'function') {
       try { window.__unlockKeyboardGap(); } catch (_) {}
     }
@@ -2085,17 +2112,53 @@ function toggleTxModal() {
     }
     // Não travar o body; overlay já bloqueia a interação
   } else {
+    console.log('🔲 [MODAL DEBUG] Preparando fechamento...');
     // Restore scrolling
     // sem alterações no body
   }
+  
   txModal.classList.toggle('hidden');
+  console.log('🔲 [MODAL DEBUG] Classe hidden toggled');
+  
   // Rotate the floating button to indicate state
   if (openTxBtn) {
     openTxBtn.style.transform = isOpening ? 'rotate(45deg)' : 'rotate(0deg)';
   }
-  if (isOpening) focusValueField();
+  
+  if (isOpening) {
+    console.log('🔲 [MODAL DEBUG] Focando campo valor...');
+    focusValueField();
+  }
+  
   // Reflect global modal-open state (used by CSS to hide floating buttons/footer)
+  console.log('🔲 [MODAL DEBUG] Atualizando modal open state...');
   updateModalOpenState();
+  
+  // Verificar posição DEPOIS da mudança
+  setTimeout(() => {
+    const modalRectAfter = txModal.getBoundingClientRect();
+    const headerRectAfter = header ? header.getBoundingClientRect() : null;
+    
+    console.log('🔲 [MODAL DEBUG] Posições DEPOIS:', {
+      modal: {
+        top: modalRectAfter.top,
+        bottom: modalRectAfter.bottom,
+        height: modalRectAfter.height,
+        visible: !txModal.classList.contains('hidden')
+      },
+      header: headerRectAfter ? {
+        top: headerRectAfter.top,
+        position: getComputedStyle(header).position,
+        transform: getComputedStyle(header).transform
+      } : null,
+      viewport: {
+        innerHeight: window.innerHeight,
+        visualViewportHeight: window.visualViewport ? window.visualViewport.height : 'N/A'
+      },
+      htmlClasses: document.documentElement.className,
+      bodyClasses: document.body.className
+    });
+  }, 100);
   // Ao fechar o modal, sempre limpar estado de edição para evitar reabrir em modo editar
   if (!isOpening) {
     isEditing = null;
@@ -2162,7 +2225,23 @@ if (openTxBtn) openTxBtn.onclick = () => {
 function updateModalOpenState() {
   const open = !!document.querySelector('.bottom-modal:not(.hidden)');
   const root = document.documentElement || document.body;
-  if (open) root.classList.add('modal-open'); else root.classList.remove('modal-open');
+  
+  console.log('🔄 [MODAL STATE DEBUG] updateModalOpenState:', {
+    open,
+    beforeClasses: root.className,
+    action: open ? 'ADICIONANDO modal-open' : 'REMOVENDO modal-open'
+  });
+  
+  if (open) {
+    root.classList.add('modal-open');
+  } else {
+    root.classList.remove('modal-open');
+  }
+  
+  console.log('🔄 [MODAL STATE DEBUG] Classes após mudança:', {
+    afterClasses: root.className,
+    hasModalOpen: root.classList.contains('modal-open')
+  });
 }
 if (closeTxModal) closeTxModal.onclick = toggleTxModal;
 if (txModal) {
@@ -2400,28 +2479,177 @@ document.addEventListener('wheel', (e) => {
   e.preventDefault();
 }, { passive: false });
 
-// iOS: detectar teclado via VisualViewport (versão simplificada do backup)
-(function setupKbOffsets(){
+// iOS: detectar teclado via VisualViewport (COM DEBUG EXTENSIVO)
+(function setupKbOffsetsWithDebug(){
+  console.log('🔧 [KEYBOARD DEBUG] Inicializando detecção de teclado...');
+  
   const vv = window.visualViewport;
-  if (!vv) return;
+  if (!vv) {
+    console.log('❌ [KEYBOARD DEBUG] VisualViewport não disponível');
+    return;
+  }
+  console.log('✅ [KEYBOARD DEBUG] VisualViewport disponível');
+
   const root = document.documentElement;
   const THRESH = 140; // px
+  
   const update = () => {
-    const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
-    const isKb = gap > THRESH && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const windowHeight = window.innerHeight || 0;
+    const vvHeight = vv.height || 0;
+    const vvOffsetTop = vv.offsetTop || 0;
+    const gap = windowHeight - (vvHeight + vvOffsetTop);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isKb = gap > THRESH && isIOS;
+    
+    console.log('📱 [KEYBOARD DEBUG] Atualização:', {
+      windowHeight,
+      vvHeight,
+      vvOffsetTop,
+      gap,
+      isIOS,
+      isKb,
+      THRESH
+    });
+    
+    // Verificar posição atual do header ANTES da mudança
+    const header = document.querySelector('.app-header');
+    if (header) {
+      const headerRect = header.getBoundingClientRect();
+      console.log('📋 [HEADER DEBUG] Posição ANTES:', {
+        top: headerRect.top,
+        position: getComputedStyle(header).position,
+        transform: getComputedStyle(header).transform,
+        zIndex: getComputedStyle(header).zIndex
+      });
+    }
+
     if (isKb) {
+      console.log('⌨️ [KEYBOARD DEBUG] TECLADO DETECTADO! Aplicando offset:', Math.max(0, Math.round(gap)) + 'px');
       root.dataset.vvKb = '1';
       root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
     } else {
+      console.log('📱 [KEYBOARD DEBUG] Teclado fechado, removendo offset');
       delete root.dataset.vvKb;
       root.style.removeProperty('--kb-offset-bottom');
     }
+    
+    // Verificar posição do header DEPOIS da mudança
+    if (header) {
+      setTimeout(() => {
+        const headerRect = header.getBoundingClientRect();
+        console.log('📋 [HEADER DEBUG] Posição DEPOIS:', {
+          top: headerRect.top,
+          position: getComputedStyle(header).position,
+          transform: getComputedStyle(header).transform,
+          zIndex: getComputedStyle(header).zIndex
+        });
+      }, 10);
+    }
+    
+    // Verificar se modal está aberto e sua posição
+    const modal = document.querySelector('.bottom-modal:not(.hidden)');
+    if (modal) {
+      const modalRect = modal.getBoundingClientRect();
+      console.log('🔲 [MODAL DEBUG] Posição do modal:', {
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        height: modalRect.height,
+        windowHeight: window.innerHeight
+      });
+    }
   };
+  
+  console.log('🎯 [KEYBOARD DEBUG] Primeira execução...');
   update();
-  vv.addEventListener('resize', update);
-  window.addEventListener('orientationchange', () => setTimeout(update, 50));
-  window.addEventListener('focusin', () => setTimeout(update, 0));
-  window.addEventListener('focusout', () => setTimeout(update, 50));
+  
+  console.log('📡 [KEYBOARD DEBUG] Registrando event listeners...');
+  vv.addEventListener('resize', () => {
+    console.log('🔄 [KEYBOARD DEBUG] VisualViewport resize event');
+    update();
+  });
+  
+  window.addEventListener('orientationchange', () => {
+    console.log('🔄 [KEYBOARD DEBUG] Orientation change event');
+    setTimeout(update, 50);
+  });
+  
+  window.addEventListener('focusin', () => {
+    console.log('🔄 [KEYBOARD DEBUG] Focus in event');
+    setTimeout(update, 0);
+  });
+  
+  window.addEventListener('focusout', () => {
+    console.log('🔄 [KEYBOARD DEBUG] Focus out event');  
+    setTimeout(update, 50);
+  });
+  
+  console.log('✅ [KEYBOARD DEBUG] Setup completo!');
+})();
+
+// Debug visual na tela
+(function createDebugPanel() {
+  const debugPanel = document.createElement('div');
+  debugPanel.id = 'debug-panel';
+  debugPanel.style.cssText = `
+    position: fixed;
+    top: 70px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ff00;
+    padding: 10px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 11px;
+    z-index: 10000;
+    max-width: 300px;
+    border: 1px solid #00ff00;
+  `;
+  document.body.appendChild(debugPanel);
+  
+  function updateDebugInfo() {
+    const vv = window.visualViewport;
+    const header = document.querySelector('.app-header');
+    const modal = document.querySelector('.bottom-modal:not(.hidden)');
+    const root = document.documentElement;
+    
+    const headerRect = header ? header.getBoundingClientRect() : null;
+    const modalRect = modal ? modal.getBoundingClientRect() : null;
+    
+    debugPanel.innerHTML = `
+      <strong>📱 VIEWPORT:</strong><br>
+      Window: ${window.innerHeight}px<br>
+      Visual: ${vv ? vv.height : 'N/A'}px<br>
+      VV Top: ${vv ? vv.offsetTop : 'N/A'}px<br>
+      Gap: ${vv ? (window.innerHeight - (vv.height + vv.offsetTop)) : 'N/A'}px<br>
+      <br>
+      <strong>📋 HEADER:</strong><br>
+      Top: ${headerRect ? headerRect.top : 'N/A'}px<br>
+      Position: ${header ? getComputedStyle(header).position : 'N/A'}<br>
+      Transform: ${header ? getComputedStyle(header).transform : 'N/A'}<br>
+      <br>
+      <strong>🔲 MODAL:</strong><br>
+      Estado: ${modal ? 'ABERTO' : 'FECHADO'}<br>
+      Top: ${modalRect ? modalRect.top : 'N/A'}px<br>
+      Bottom: ${modalRect ? modalRect.bottom : 'N/A'}px<br>
+      <br>
+      <strong>🎯 CSS:</strong><br>
+      vv-kb: ${root.dataset.vvKb || 'não'}<br>
+      modal-open: ${root.classList.contains('modal-open') ? 'sim' : 'não'}<br>
+      kb-offset: ${root.style.getPropertyValue('--kb-offset-bottom') || '0px'}<br>
+    `;
+  }
+  
+  // Atualizar a cada 100ms
+  setInterval(updateDebugInfo, 100);
+  
+  // Também atualizar em eventos importantes
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateDebugInfo);
+  }
+  window.addEventListener('focus', updateDebugInfo);
+  window.addEventListener('blur', updateDebugInfo);
+  
+  console.log('📊 [DEBUG PANEL] Painel visual criado');
 })();
 
 const currency = (v) => safeFmtCurrency(v);
