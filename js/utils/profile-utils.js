@@ -35,15 +35,26 @@ function getCurrentProfileId() {
 function scopedCacheKey(key) {
   if (!PROFILE_CACHE_KEYS.has(key)) return key;
   const profileId = getCurrentProfileId();
-  if (!profileId || profileId === LEGACY_PROFILE_ID) return key;
-  return `${profileId}::${key}`;
+  if (!profileId) return key;
+  const result = `${profileId}::${key}`;
+  console.log(`🔑 scopedCacheKey: key=${key} profileId=${profileId} result=${result}`);
+  return result;
 }
 
 function scopedDbSegment(key) {
   if (!PROFILE_DATA_KEYS.has(key)) return key;
   const profileId = getCurrentProfileId();
-  if (!profileId || profileId === LEGACY_PROFILE_ID) return key;
-  return `profiles/${profileId}/${key}`;
+  if (!profileId) return key;
+  
+  // LEGACY: BR profile data is stored in root, not under profiles/BR/
+  if (profileId === LEGACY_PROFILE_ID) {
+    console.log(`📂 scopedDbSegment: key=${key} profileId=${profileId} result=${key} (legacy root)`);
+    return key;
+  }
+  
+  const result = `profiles/${profileId}/${key}`;
+  console.log(`📂 scopedDbSegment: key=${key} profileId=${profileId} result=${result}`);
+  return result;
 }
 
 export {

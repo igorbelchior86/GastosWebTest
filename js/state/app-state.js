@@ -102,6 +102,13 @@ export function setTransactions(list = [], options = {}) {
   if (JSON.stringify(state.transactions) === JSON.stringify(normalized)) return state.transactions;
   state.transactions = normalized;
   if (options.emit !== false) emit(['transactions']);
+  // Backwards-compatibility: keep legacy global and hooks in sync immediately.
+  try {
+    if (typeof window !== 'undefined') {
+      try { window.transactions = state.transactions; } catch (_) {}
+      try { if (typeof window.onTransactionsUpdated === 'function') window.onTransactionsUpdated(state.transactions); } catch (_) {}
+    }
+  } catch (_) {}
   return state.transactions;
 }
 
