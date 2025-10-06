@@ -2526,6 +2526,29 @@ document.addEventListener('wheel', (e) => {
   update();
 })();
 
+// Header compensation: se o visualViewport deslocar (offsetTop>0), aplicamos translateY inverso
+(function compensateHeaderShift(){
+  const vv = window.visualViewport; if(!vv) return;
+  const header = document.querySelector('.app-header');
+  if(!header) return;
+  let lastApplied = 0;
+  function apply(){
+    const off = vv.offsetTop || 0;
+    if(off !== lastApplied){
+      // Usa translate3d para evitar reflow e manter stacking
+      if(off>0){
+        header.style.transform = `translate3d(0, ${off}px, 0)`;
+      } else {
+        header.style.transform = '';
+      }
+      lastApplied = off;
+    }
+  }
+  vv.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', ()=>setTimeout(apply,50));
+  apply();
+})();
+
 // Debug visual na tela
 (function createDebugPanel() {
   const debugPanel = document.createElement('div');
