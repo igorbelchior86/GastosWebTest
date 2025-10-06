@@ -672,19 +672,12 @@ html[data-theme="light"] #currencyProfileModal .modal-close-btn:hover {
   --kb-offset-bottom: 0px;
 }
 
+/* DISABLED: This was causing fixed elements to move with keyboard
 html.keyboard-open {
   transform: translate3d(0, var(--kb-offset-top, 0px), 0);
   will-change: transform;
 }
-
-/* iOS PWA Critical Fix: Never apply transforms to fixed elements during keyboard */
-html.keyboard-open .app-header,
-html.keyboard-open .floating-pill, 
-html.keyboard-open .floating-add-button,
-html.keyboard-open .floating-home-button {
-  transform: translate3d(0, 0, 0) !important;
-  will-change: auto !important;
-}
+*/
 
 html.keyboard-open.kb-lock-shift {
   transform: none !important;
@@ -807,62 +800,7 @@ html.modal-open.keyboard-open .wrapper {
   }
 }
 
-/* ===================== iOS PWA ULTIMATE FREEZE FIX ===================== */
 
-/* When interface is frozen, prevent ALL movement and interaction */
-html.ios-interface-frozen {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-}
-
-html.ios-interface-frozen body {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
-  touch-action: none !important;
-}
-
-html.ios-interface-frozen .wrapper {
-  position: absolute !important;
-  top: 0 !important;
-  width: 100% !important;
-  height: 100vh !important;
-  overflow: visible !important;
-  /* Transform will be set by JS to maintain scroll position */
-}
-
-/* Ensure fixed elements stay frozen in place */
-html.ios-interface-frozen .app-header,
-html.ios-interface-frozen .floating-pill,
-html.ios-interface-frozen .floating-add-button,
-html.ios-interface-frozen .floating-home-button {
-  position: fixed !important;
-  z-index: 99999 !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  will-change: auto !important;
-}
-
-/* Ensure modals still work while frozen */
-html.ios-interface-frozen .bottom-modal {
-  position: fixed !important;
-  z-index: 100000 !important;
-}
-
-/* Allow input interaction within modals */
-html.ios-interface-frozen .bottom-modal input,
-html.ios-interface-frozen .bottom-modal textarea,
-html.ios-interface-frozen .bottom-modal select {
-  touch-action: auto !important;
-  pointer-events: auto !important;
-}
 
 h1,h2,h3,h4,
 .executed-header,
