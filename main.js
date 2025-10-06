@@ -2113,6 +2113,13 @@ function toggleTxModal() {
     // Não travar o body; overlay já bloqueia a interação
   } else {
     console.log('🔲 [MODAL DEBUG] Preparando fechamento...');
+    // CORREÇÃO: Forçar reset do header quando modal fecha
+    const header = document.querySelector('.app-header');
+    if (header) {
+      header.style.transform = '';
+      header.style.top = '';
+      console.log('🔲 [MODAL DEBUG] Reset forçado do header');
+    }
     // Restore scrolling
     // sem alterações no body
   }
@@ -2497,7 +2504,8 @@ document.addEventListener('wheel', (e) => {
     const windowHeight = window.innerHeight || 0;
     const vvHeight = vv.height || 0;
     const vvOffsetTop = vv.offsetTop || 0;
-    const gap = windowHeight - (vvHeight + vvOffsetTop);
+    // CORREÇÃO: Usar apenas diferença de altura, ignorar offsetTop
+    const gap = windowHeight - vvHeight;
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isKb = gap > THRESH && isIOS;
     
