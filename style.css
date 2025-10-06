@@ -807,6 +807,44 @@ html.modal-open.keyboard-open .wrapper {
   }
 }
 
+/* ===================== iOS PWA RADICAL FIX ===================== */
+
+/* When iOS PWA keyboard fix is active, ensure absolute positioning works */
+html.ios-pwa-keyboard-fix {
+  /* Prevent any viewport-based positioning */
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+html.ios-pwa-keyboard-fix body {
+  /* Lock body during keyboard to prevent scroll issues */
+  position: fixed !important;
+  width: 100% !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+html.ios-pwa-keyboard-fix .wrapper {
+  /* Allow internal scrolling only in wrapper */
+  position: relative !important;
+  height: calc(100vh - 160px) !important; /* Account for header + footer */
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin-top: 100px !important; /* Space for fixed header */
+  margin-bottom: 80px !important; /* Space for fixed buttons */
+}
+
+/* Force absolute positioning when iOS PWA fix is active */
+html.ios-pwa-keyboard-fix .app-header,
+html.ios-pwa-keyboard-fix .floating-pill,
+html.ios-pwa-keyboard-fix .floating-add-button,
+html.ios-pwa-keyboard-fix .floating-home-button {
+  position: absolute !important;
+  z-index: 9999 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
 h1,h2,h3,h4,
 .executed-header,
 .planned-header,
