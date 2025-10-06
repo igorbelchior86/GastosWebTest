@@ -24,6 +24,8 @@ import {
   , subscribeState
 } from './js/state/app-state.js';
 
+import { sortTransactions as sortTransactionsCore, sanitizeTransactions as sanitizeTransactionsCore } from './js/core/transactions-utils.js';
+
 const state = appState;
 
 let startInputRef = null;
@@ -165,7 +167,15 @@ function safeFmtNumber(value, options = {}) {
 function profileRef(key) {
   if (!firebaseDb || !PATH) return null;
   const segment = scopedDbSegment(key);
-  return ref(firebaseDb, `${PATH}/${segment}`);
+  const fullPath = `${PATH}/${segment}`;
+  console.debug('📍 profileRef created:', {
+    key,
+    currentProfileId: getCurrentProfileId(),
+    segment,
+    fullPath,
+    PATH
+  });
+  return ref(firebaseDb, fullPath);
 }
 
 function safeParseCurrency(raw) {
@@ -196,12 +206,33 @@ function ensureCashCard(list) {
 
 function hydrateStateFromCache(options = {}) {
   const { render = true } = options;
+  const currentProfile = getCurrentProfileId();
+  const scopedKey = scopedCacheKey('tx');
+  
+  // Debug: Show all cache keys for transactions
+  try {
+    const allKeys = Object.keys(localStorage).filter(k => k.startsWith('cache_') && k.includes('tx'));
+    console.log(`🗂️ All tx cache keys in localStorage: ${JSON.stringify(allKeys)}`);
+  } catch(_) {}
+  
+  try { console.debug('hydrateStateFromCache -> profileId=', currentProfile, 'scopedTxKey=', scopedKey); } catch(_) {}
+  
   const cachedTx = cacheGet('tx', []);
+  console.log(`🗃️ hydrateStateFromCache -> raw cached value exists: ${cachedTx ? 'YES' : 'NO'}, isArray: ${Array.isArray(cachedTx)}, length: ${Array.isArray(cachedTx) ? cachedTx.length : 'n/a'}`);
+  try { console.debug('hydrateStateFromCache -> cachedTx length=', Array.isArray(cachedTx) ? cachedTx.length : 'n/a', 'from key=', scopedKey); } catch(_) {}
+  
   const normalizedTx = (cachedTx || [])
     .filter(Boolean)
     .map(normalizeTransactionRecord);
+  console.debug('hydrateStateFromCache -> setting transactions length=', normalizedTx.length);
   setTransactions(normalizedTx);
   transactions = getTransactions();
+  
+  // CRITICAL: Force module-level sync after profile-scoped cache read
+  if (transactions !== normalizedTx) {
+    console.debug('🔄 hydrateStateFromCache: forcing transactions sync');
+    transactions = getTransactions();
+  }
   try { sortTransactions(); } catch (_) {}
 
   const normalizedCards = ensureCashCard(cacheGet('cards', [{ name: 'Dinheiro', close: 0, due: 0 }]));
@@ -237,6 +268,206 @@ function hydrateStateFromCache(options = {}) {
   }
   updatePendingBadge();
 }
+
+// Debug helpers to assist importing/exporting test data at runtime.
+// Exposed on window.GastosDebug for easy use from DevTools.
+try {
+  if (typeof window !== 'undefined') {
+    window.GastosDebug = window.GastosDebug || {};
+
+    window.GastosDebug.dumpState = function() {
+      try {
+        const txs = (typeof getTransactions === 'function') ? getTransactions() : (window.APP_STATE && window.APP_STATE.transactions) || [];
+        const cardsList = (typeof getCards === 'function') ? getCards() : (window.APP_STATE && window.APP_STATE.cards) || [];
+        const cached = (typeof cacheGet === 'function') ? cacheGet('tx') : null;
+        const appStateSnapshot = window.APP_STATE ? { ...window.APP_STATE } : null;
+        console.log('GastosDebug.dumpState ->', {
+          txsLength: Array.isArray(txs) ? txs.length : 'n/a',
+          cardsLength: Array.isArray(cardsList) ? cardsList.length : 'n/a',
+          cacheTx: cached ? (Array.isArray(cached) ? cached.length : cached) : cached,
+          appState: appStateSnapshot,
+          firstTxs: Array.isArray(txs) ? txs.slice(0,5) : txs
+        });
+        return { txs, cards: cardsList, cacheTx: cached, appState: appStateSnapshot };
+      } catch (e) {
+        console.error('GastosDebug.dumpState failed', e);
+        return null;
+      }
+    };
+
+    window.GastosDebug.injectTxs = function(txsArray, opts = {}) {
+      try {
+        if (!Array.isArray(txsArray)) { console.error('injectTxs expects an array'); return false; }
+        const normalized = txsArray.filter(Boolean).map(normalizeTransactionRecord);
+        setTransactions(normalized);
+        try { cacheSet('tx', normalized); } catch (_) {}
+        try { if (Array.isArray(opts.cards)) { setCards(ensureCashCard(opts.cards)); } } catch (_) {}
+        try { sortTransactions(); } catch (_) {}
+        try { transactions = getTransactions(); } catch (_) {}
+        try { if (typeof renderCardList === 'function') renderCardList(); } catch (_) {}
+        try { if (typeof renderTable === 'function') renderTable(); } catch (_) {}
+        console.log('GastosDebug.injectTxs -> imported', normalized.length, 'txs');
+        try { window.GastosDebug._lastInjected = Date.now(); window.GastosDebug._lastInjectedCount = normalized.length; } catch(_) {}
+        return true;
+      } catch (e) {
+        console.error('GastosDebug.injectTxs failed', e);
+        return false;
+      }
+    };
+
+    window.GastosDebug.injectExport = function(expObj) {
+      try {
+        if (!expObj) { console.error('No object provided to injectExport'); return false; }
+        // Prefer direct arrays at top-level
+        if (Array.isArray(expObj.tx)) return window.GastosDebug.injectTxs(expObj.tx, { cards: expObj.cards || expObj.card || null });
+        if (Array.isArray(expObj.transactions)) return window.GastosDebug.injectTxs(expObj.transactions, { cards: expObj.cards || expObj.card || null });
+
+        // Otherwise, scan nested objects for the first 'tx' or 'transactions' array
+        const queue = [expObj];
+        while (queue.length) {
+          const node = queue.shift();
+          if (!node || typeof node !== 'object') continue;
+          if (Array.isArray(node.tx)) return window.GastosDebug.injectTxs(node.tx, { cards: node.cards || node.card || expObj.cards || expObj.card || null });
+          if (Array.isArray(node.transactions)) return window.GastosDebug.injectTxs(node.transactions, { cards: node.cards || node.card || expObj.cards || expObj.card || null });
+          for (const k of Object.keys(node)) {
+            try { const v = node[k]; if (v && typeof v === 'object') queue.push(v); } catch (_) {}
+          }
+        }
+
+        // As last resort, if the root is an array-like object, attempt to convert
+        if (Array.isArray(expObj)) return window.GastosDebug.injectTxs(expObj, {});
+
+        console.error('No transactions array found in provided object');
+        return false;
+      } catch (e) {
+        console.error('GastosDebug.injectExport failed', e);
+        return false;
+      }
+    };
+
+    window.GastosDebug.importExportFile = function(path) {
+      if (!path) { console.error('importExportFile requires a path'); return Promise.reject('path required'); }
+      return fetch(path)
+        .then(r => r.json())
+        .then(obj => {
+          const ok = window.GastosDebug.injectExport(obj);
+          if (!ok) console.warn('importExportFile: import returned false');
+          return ok;
+        })
+        .catch(e => { console.error('importExportFile failed', e); throw e; });
+    };
+
+    // Profile leakage diagnostic
+    window.GastosDebug.listCachedTxProfiles = function() {
+      try {
+        const profiles = window.CURRENCY_PROFILES || {};
+        const currentProfile = getCurrentProfileId();
+        console.log('🔍 Profile leakage diagnostic:');
+        console.log('Current profile:', currentProfile);
+        
+        Object.keys(profiles).forEach(profileId => {
+          const key = profileId === 'BR' ? 'tx' : `${profileId}::tx`;
+          const storageKey = `cache_${key}`;
+          let cached = null;
+          try {
+            cached = JSON.parse(localStorage.getItem(storageKey) || 'null');
+          } catch (_) {}
+          
+          console.log(`Profile ${profileId} (${profiles[profileId].currency}):`, {
+            cacheKey: key,
+            storageKey: storageKey,
+            txCount: Array.isArray(cached) ? cached.length : 'no-cache',
+            sampleTx: Array.isArray(cached) && cached.length > 0 ? cached[0] : null
+          });
+        });
+        
+        const runtimeTx = getTransactions ? getTransactions() : transactions;
+        console.log('Runtime transactions:', Array.isArray(runtimeTx) ? runtimeTx.length : 'no-runtime');
+        return { currentProfile, profiles: Object.keys(profiles) };
+      } catch (e) {
+        console.error('Profile diagnostic failed', e);
+        return null;
+      }
+    };
+  }
+} catch (e) {
+  console.warn('Could not register GastosDebug helpers', e);
+}
+
+// Conditional auto-import: if runtime has zero transactions, try to fetch an
+// exported JSON file from the app root and inject it. This runs only on
+// localhost, file:// protocol, or when window.GastosDebug.AUTO_IMPORT === true.
+// NOTE: defer the actual import until after auth + hydration completes so
+// realtime listeners won't immediately overwrite an injected dataset.
+try {
+  if (typeof window !== 'undefined') {
+    (function tryAutoImport() {
+      try {
+        const shouldAuto = (window.location && (window.location.hostname === 'localhost' || window.location.protocol === 'file:')) ||
+          (window.GastosDebug && window.GastosDebug.AUTO_IMPORT === true);
+        if (!shouldAuto) return;
+
+        const path = '/gastosweb-e7356-default-rtdb-export.json';
+        const runImport = () => {
+          try {
+            const txsNow = (typeof getTransactions === 'function') ? getTransactions() : (window.APP_STATE && window.APP_STATE.transactions) || [];
+            if (Array.isArray(txsNow) && txsNow.length > 0) {
+              console.debug('Auto-import skipped: runtime already has transactions=', txsNow.length);
+              return;
+            }
+            console.debug('Attempting auto-import from', path);
+            fetch(path, { cache: 'no-store' })
+              .then(r => {
+                if (!r.ok) throw new Error('Fetch failed: ' + r.status + ' ' + r.statusText);
+                return r.json();
+              })
+              .then(obj => {
+                try {
+                  if (window.GastosDebug && typeof window.GastosDebug.injectExport === 'function') {
+                    const ok = window.GastosDebug.injectExport(obj);
+                    console.debug('Auto-import result ->', ok ? 'imported' : 'failed to import');
+                  } else {
+                    console.warn('Auto-import: GastosDebug.injectExport not available');
+                  }
+                } catch (e) { console.error('Auto-import injection failed', e); }
+              })
+              .catch(err => { console.debug('Auto-import fetch failed', err); });
+          } catch (e) { console.warn('Auto-import runImport failed', e); }
+        };
+
+        // If user already signed in, wait for hydration to finish and then import.
+        const scheduleAfterHydration = () => {
+          const attempt = () => {
+            try {
+              if (!hydrationInProgress) {
+                runImport();
+              } else {
+                setTimeout(attempt, 250);
+              }
+            } catch (e) { console.warn('Auto-import wait failed', e); }
+          };
+          attempt();
+        };
+
+        const curUser = window.Auth && window.Auth.currentUser;
+        if (curUser) {
+          // If already authed, wait for hydration then import
+          scheduleAfterHydration();
+        } else {
+          // Wait for auth:state event and then wait for hydration before importing.
+          const handler = (e) => {
+            const u = e && e.detail && e.detail.user;
+            if (!u) return; // ignore sign-out events
+            try { document.removeEventListener('auth:state', handler); } catch(_) {}
+            // Give realtime/startRealtime bootstrap a moment (startRealtime is invoked by other listeners)
+            scheduleAfterHydration();
+          };
+          document.addEventListener('auth:state', handler);
+        }
+      } catch (e) { console.warn('Auto-import bootstrap failed', e); }
+    })();
+  }
+} catch (e) {}
 
 const keyboardDeferredTasks = new Set();
 
@@ -791,11 +1022,20 @@ initThemeFromStorage();
  */
 function applyCurrencyProfile(profileId, options = {}){
   const { notify = false } = options;
+  try {
+    const pid = profileId || (window.APP_PROFILE && window.APP_PROFILE.id) || getCurrentProfileId();
+    console.debug('applyCurrencyProfile -> requested profileId=', profileId, 'resolved pid=', pid);
+  } catch(_) {}
   if (!window.CURRENCY_PROFILES) return;
   const p = window.CURRENCY_PROFILES[profileId] || Object.values(window.CURRENCY_PROFILES)[0];
   if (!p) return;
   resetHydration();
+  
+  // CRITICAL: Set profile BEFORE checking cache keys to avoid race condition
   window.APP_PROFILE = p;
+  localStorage.setItem('ui:profile', p.id);
+  
+  try { console.debug('After profile set - cache keys: tx=', scopedCacheKey('tx'), 'cards=', scopedCacheKey('cards')); } catch(_) {}
   const profileDecimals = Number.isFinite(p.decimalPlaces) ? p.decimalPlaces : 2;
   try{
     window.APP_FMT = new Intl.NumberFormat(p.locale, { style: 'currency', currency: p.currency, minimumFractionDigits: profileDecimals, maximumFractionDigits: profileDecimals });
@@ -810,8 +1050,6 @@ function applyCurrencyProfile(profileId, options = {}){
   }catch(e){
     window.APP_NUM = { format: v => Number(v ?? 0).toFixed(profileDecimals) };
   }
-  localStorage.setItem('ui:profile', p.id);
-
   // toggle invoice parcel row if present
   const invoiceRow = document.getElementById('invoiceParcelRow');
   if (invoiceRow){
@@ -841,13 +1079,19 @@ function applyCurrencyProfile(profileId, options = {}){
     syncStartInputFromState();
   }
 
+  // Force profile context for cache reads
+  const actualProfileId = p.id; // Use the resolved profile ID
+  console.debug(`🔧 Reading cache with profile context: ${actualProfileId}`);
+  
   const newStartDate = normalizeISODate(cacheGet('startDate', null));
   const newStartBalanceRaw = cacheGet('startBal', null);
+  const newStartSet = cacheGet('startSet', false);
+  console.log(`🎯 applyCurrencyProfile -> startDate=${newStartDate} startBal=${newStartBalanceRaw} startSet=${newStartSet} profileId=${profileId}`);
   state.startDate = newStartDate;
   state.startBalance = (newStartDate == null && (newStartBalanceRaw === 0 || newStartBalanceRaw === '0'))
     ? null
     : newStartBalanceRaw;
-  state.startSet = cacheGet('startSet', false);
+  state.startSet = newStartSet;
   ensureStartSetFromBalance({ persist: false });
   syncStartInputFromState();
 
@@ -1284,44 +1528,40 @@ const txModalTitle = document.querySelector('#txModal h2');
 // computeEndPad removido – espaço final constante pelo CSS
 
 // Helper: sort transactions by opDate (YYYY-MM-DD) then by timestamp (ts) so UI is always chronological
+// Delegate to core utilities (accepts optional args for pure usage)
 function sortTransactions() {
-  transactions.sort((a, b) => {
-    const d = a.opDate.localeCompare(b.opDate);
-    if (d !== 0) return d;
-    // Fallback: compare timestamps when same date
-    return (a.ts || '').localeCompare(b.ts || '');
-  });
+  try {
+    // use snapshot from app-state to preserve legacy behavior
+    const txs = getTransactions ? getTransactions() : transactions;
+    const sorted = sortTransactionsCore ? sortTransactionsCore(txs) : sortTransactions(txs);
+    // If core returned a result, persist it in legacy spots
+    if (Array.isArray(sorted)) {
+      try { setTransactions(sorted); } catch (_) {}
+      if (window.transactions) window.transactions = sorted;
+    }
+    return sorted;
+  } catch (e) {
+    // Fallback to in-place sort to avoid breaking behavior
+    try {
+      transactions.sort((a, b) => {
+        const d = (a.opDate || '').localeCompare(b.opDate || '');
+        if (d !== 0) return d;
+        return (a.ts || '').localeCompare(b.ts || '');
+      });
+    } catch (_) {}
+    return transactions;
+  }
 }
 
-// Sanitize legacy transactions: ensure postDate/opDate/planned exist
+// Legacy sanitizer wrapper
 function sanitizeTransactions(list) {
-  let changed = false;
-  const out = (list || []).map((t) => {
-    if (!t) return t;
-    const nt = { ...t };
-    // Ensure opDate exists; fallback to date from ts
-    if (!nt.opDate) {
-      if (nt.ts) {
-        try { nt.opDate = new Date(nt.ts).toISOString().slice(0, 10); } catch { nt.opDate = todayISO(); }
-      } else {
-        nt.opDate = todayISO();
-      }
-      changed = true;
-    }
-    // Ensure postDate exists; compute with card rule
-    if (!nt.postDate) {
-      const method = nt.method || 'Dinheiro';
-      try { nt.postDate = post(nt.opDate, method); } catch { nt.postDate = nt.opDate; }
-      changed = true;
-    }
-    // Ensure planned flag exists
-    if (typeof nt.planned === 'undefined' && nt.opDate) {
-      nt.planned = nt.opDate > todayISO();
-      changed = true;
-    }
-    return nt;
-  });
-  return { list: out, changed };
+  // If called without args, legacy callers expect { list, changed }
+  if (typeof list === 'undefined') {
+    const s = sanitizeTransactionsCore ? sanitizeTransactionsCore() : sanitizeTransactions();
+    return s;
+  }
+  // pure usage: return deduped array
+  return sanitizeTransactionsCore ? sanitizeTransactionsCore(list) : sanitizeTransactions(list);
 }
 
 // Revalida postDate e normaliza método de cartão para dados legados
@@ -1410,7 +1650,13 @@ function buildSaveToast(tx) {
 if (!USE_MOCK) {
   // Start realtime listeners only after user is authenticated
   const startRealtime = async () => {
-    console.log('Starting realtime listeners for PATH:', PATH);
+    console.log('🚀 Starting realtime listeners for PATH:', PATH);
+    console.debug('Profile context at startRealtime:', {
+      currentProfileId: getCurrentProfileId(),
+      windowAppProfile: window.APP_PROFILE?.id || 'none',
+      localStorage: localStorage.getItem('ui:profile'),
+      PATH
+    });
     cleanupProfileListeners();
     resetHydration();
 
@@ -1497,6 +1743,13 @@ if (!USE_MOCK) {
   // Listen for tx changes (LWW merge per item)
   if (txRef) listeners.push(onValue(txRef, (snap) => {
     try {
+    console.debug('🔄 Realtime tx onValue fired:', {
+      currentProfileId: getCurrentProfileId(),
+      scopedCacheKey: scopedCacheKey('tx'),
+      txRefPath: txRef?.toString?.() || 'unknown-ref',
+      snapSize: snap.exists() ? (Array.isArray(snap.val()) ? snap.val().length : Object.keys(snap.val() || {}).length) : 0
+    });
+    
     const raw  = snap.val() ?? [];
     const incoming = Array.isArray(raw) ? raw : Object.values(raw);
 
@@ -1514,8 +1767,41 @@ if (!USE_MOCK) {
 
     if (navigator.onLine && !hasPendingTx) {
       // Source-of-truth: server. This allows deletions/resets from other clients to propagate.
-  setTransactions(remote);
-  transactions = getTransactions();
+      // However, protect against overwriting local data with empty remote data in several cases:
+      // 1. Recent debug import
+      // 2. Local cache has data but remote is empty (likely profile sync issue)
+      try {
+        const lastInjected = window.GastosDebug && window.GastosDebug._lastInjected;
+        const lastCount = window.GastosDebug && window.GastosDebug._lastInjectedCount;
+        const currentTxs = getTransactions ? getTransactions() : transactions;
+        const hasLocalData = Array.isArray(currentTxs) && currentTxs.length > 0;
+        const remoteIsEmpty = Array.isArray(remote) && remote.length === 0;
+        const now = Date.now();
+        
+        const skipOverwrite = remoteIsEmpty && (
+          // Recent debug import protection
+          (lastInjected && (now - lastInjected) < 7000 && lastCount && lastCount > 0) ||
+          // Local data protection - don't overwrite existing data with empty remote
+          hasLocalData
+        );
+        
+        if (skipOverwrite) {
+          console.debug('🔄 Skipping remote-empty overwrite:', {
+            hasLocalData,
+            localCount: hasLocalData ? currentTxs.length : 0,
+            remoteCount: remote.length,
+            recentImport: lastInjected && (now - lastInjected) < 7000
+          });
+          return; // Skip all processing when protecting local data
+        } else {
+          setTransactions(remote);
+          transactions = getTransactions();
+        }
+      } catch (e) {
+        // Fallback to applying remote if guard check fails
+        setTransactions(remote);
+        transactions = getTransactions();
+      }
     } else {
       // Merge: keep local edits that haven't been flushed yet; remote wins on conflicts by timestamp
       const local = (transactions || []).map(norm);
@@ -1532,12 +1818,23 @@ if (!USE_MOCK) {
     }
 
     // Sanitize legacy/malformed items
-  const s = sanitizeTransactions(getTransactions());
-  setTransactions(s.list);
+  const txs = getTransactions ? getTransactions() : transactions;
+  console.debug('🧹 Before sanitize:', Array.isArray(txs) ? txs.length : 'not-array', 'remote.length:', remote.length);
+  const s = sanitizeTransactions(txs);
+  console.debug('🧹 After sanitize:', typeof s, Array.isArray(s) ? `array[${s.length}]` : (s && s.list ? `obj.list[${s.list.length}]` : 'unknown'));
+  
+  // Handle both return formats: array (pure) or {list, changed} (legacy)
+  const sanitized = Array.isArray(s) ? s : (s && s.list ? s.list : txs);
+  setTransactions(sanitized);
   transactions = getTransactions();
     // Revalida postDate/método se cartões já conhecidos
     const fixed = recomputePostDates();
-  cacheSet('tx', getTransactions());
+    try {
+      // Cache with correct profile-scoped key
+      const finalTxs = getTransactions ? getTransactions() : transactions;
+      try { console.debug('realtime tx onValue -> profileId=', getCurrentProfileId(), 'scopedTxKey=', scopedCacheKey('tx'), 'finalTxs.length=', Array.isArray(finalTxs)?finalTxs.length:'n/a'); } catch(_) {}
+      cacheSet('tx', finalTxs);
+    } catch (_) {}
     if (s.changed || fixed) {
       // Persist best-effort somente quando algo mudou localmente
       try { save('tx', transactions); } catch (_) {}
@@ -2791,18 +3088,19 @@ async function performResetAllData(askConfirm = true) {
   state.startSet = false;
     syncStartInputFromState();
 
-    // Clear caches (best-effort)
-    try { cacheSet('tx', getTransactions()); } catch (_) {}
-    try { cacheSet('cards', getCards()); } catch (_) {}
-    try { cacheSet('startBal', state.startBalance); } catch (_) {}
-    try { cacheSet('startDate', state.startDate); } catch (_) {}
-    try { cacheSet('dirtyQueue', []); } catch (_) {}
+  // Clear caches (best-effort)
+  const txs = getTransactions ? getTransactions() : transactions;
+  try { cacheSet('tx', txs); } catch (_) {}
+  try { cacheSet('cards', getCards()); } catch (_) {}
+  try { cacheSet('startBal', state.startBalance); } catch (_) {}
+  try { cacheSet('startDate', state.startDate); } catch (_) {}
+  try { cacheSet('dirtyQueue', []); } catch (_) {}
 
-    // Try persist (best effort)
-    try { await save('tx', getTransactions()); } catch (_) {}
-    try { await save('cards', getCards()); } catch (_) {}
-    try { await save('startBal', state.startBalance); } catch (_) {}
-    try { await save('startDate', state.startDate); } catch (_) {}
+  // Try persist (best effort)
+  try { await save('tx', txs); } catch (_) {}
+  try { await save('cards', getCards()); } catch (_) {}
+  try { await save('startBal', state.startBalance); } catch (_) {}
+  try { await save('startDate', state.startDate); } catch (_) {}
   try { cacheSet('startSet', false); } catch (_) {}
   try { await save('startSet', false); } catch (_) {}
 
@@ -2901,7 +3199,8 @@ const notify = (msg, type = 'error') => {
 };
 
 const togglePlanned = async (id, iso) => {
-  const master = transactions.find(x => sameId(x.id, id));
+  const txs = getTransactions ? getTransactions() : transactions;
+  const master = (txs || []).find(x => sameId(x.id, id));
   const shouldRefreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   // ← memoriza quais faturas estavam abertas
   const openInvoices = Array.from(
@@ -2973,7 +3272,7 @@ const togglePlanned = async (id, iso) => {
       toastMsg = `Movida para fatura de ${dd}/${mm}`;
     }
   }
-  try { save('tx', getTransactions()); } catch (_) {}
+  try { save('tx', txs); } catch (_) {}
   renderTable();
   if (shouldRefreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -2990,13 +3289,14 @@ const togglePlanned = async (id, iso) => {
 
 function openEditFlow(tx, iso) {
   if (!tx) return;
+  const txs = getTransactions ? getTransactions() : transactions;
   const hasRecurrence = (() => {
     if (tx.recurrence && tx.recurrence.trim()) return true;
     if (tx.parentId) {
-      const parent = transactions.find(p => p.id === tx.parentId);
+      const parent = (txs || []).find(p => p.id === tx.parentId);
       if (parent && parent.recurrence && parent.recurrence.trim()) return true;
     }
-    for (const p of transactions) {
+    for (const p of (txs || [])) {
       if (!p.recurrence || !p.recurrence.trim()) continue;
       if (!occursOn(p, iso)) continue;
       const sameMethod = (p.method || '') === (tx.method || '');
@@ -3014,7 +3314,7 @@ function openEditFlow(tx, iso) {
       updateModalOpenState();
     }
     if (isDetachedOccurrence(tx)) pendingEditMode = null;
-    editTx(id);
+    editTx(id, txs);
   };
 
   // helper to open recurrence modal safely
@@ -3264,9 +3564,10 @@ function isDetachedOccurrence(tx) {
   return !tx.recurrence && !!tx.parentId;
 }
 
-function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
+function makeLine(tx, disableSwipe = false, isInvoiceContext = false, txs) {
   // Create swipe wrapper
-  const txs = getTransactions ? getTransactions() : transactions;
+  // Use provided snapshot when available to avoid repeated global reads
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions);
   const wrap = document.createElement('div');
   wrap.className = 'swipe-wrapper';
 
@@ -3274,9 +3575,9 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const actions = document.createElement('div');
   actions.className = 'swipe-actions';
 
-  const existsInStore = (txs || []).some(item => item && String(item.id) === String(tx.id));
+  const existsInStore = (_txs || []).some(item => item && String(item.id) === String(tx.id));
   const actionTargetId = existsInStore ? tx.id : (tx.parentId || tx.id);
-  const actionTargetTx = (txs || []).find(item => item && String(item.id) === String(actionTargetId)) || tx;
+  const actionTargetTx = (_txs || []).find(item => item && String(item.id) === String(actionTargetId)) || tx;
 
   // Edit button
   const editBtn = document.createElement('button');
@@ -3298,7 +3599,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
   const delIconDiv = document.createElement('div');
   delIconDiv.className = 'icon-action icon-delete';
   delBtn.appendChild(delIconDiv);
-  delBtn.onclick = () => delTx(actionTargetId, tx.opDate);
+  delBtn.onclick = () => {
+    const txs = getTransactions ? getTransactions() : transactions;
+    delTx(actionTargetId, tx.opDate, txs);
+  };
   actions.appendChild(delBtn);
 
   // Operation line
@@ -3393,10 +3697,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
     const hasRecurrence = (() => {
       if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
       if (t.parentId) {
-        const master = (txs || []).find(p => sameId(p.id, t.parentId));
+        const master = (_txs || []).find(p => sameId(p.id, t.parentId));
         if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
       }
-      for (const p of (txs || [])) {
+      for (const p of (_txs || [])) {
         if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
           if (occursOn(p, t.opDate)) {
             if (p.desc === t.desc || p.val === t.val) return true;
@@ -3457,10 +3761,10 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const hasRecurrence = (() => {
         if (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') return true;
         if (t.parentId) {
-          const master = (txs || []).find(p => p.id === t.parentId);
+            const master = (_txs || []).find(p => p.id === t.parentId);
           if (master && typeof master.recurrence === 'string' && master.recurrence.trim() !== '') return true;
         }
-        for (const p of (txs || [])) {
+          for (const p of (_txs || [])) {
           if (typeof p.recurrence === 'string' && p.recurrence.trim() !== '') {
             if (occursOn(p, t.opDate)) {
               if (p.desc === t.desc || p.val === t.val) return true;
@@ -3480,7 +3784,7 @@ function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
       const t = tx;
       const hasRecurrenceFinal =
         (typeof t.recurrence === 'string' && t.recurrence.trim() !== '') ||
-        (t.parentId && (txs || []).some(p =>
+        (t.parentId && (_txs || []).some(p =>
           p.id === t.parentId &&
           typeof p.recurrence === 'string' &&
           p.recurrence.trim() !== ''
@@ -3629,10 +3933,11 @@ if (installments) {
 
 // Localized addTx and helpers
 async function addTx() {
+  const txs = getTransactions ? getTransactions() : transactions;
   // Edit mode
   if (isEditing !== null) {
     // (mantém lógica de edição original)
-    const t = transactions.find(x => x.id === isEditing);
+    const t = (txs || []).find(x => x.id === isEditing);
     if (!t) {
       console.error('Transaction not found for editing:', isEditing);
       // reset edit state
@@ -3674,7 +3979,7 @@ async function addTx() {
           planned: newOpDate > todayISO(),
           ts: new Date().toISOString(),
           modifiedAt: new Date().toISOString()
-        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id:Date.now(), parentId:t.parentId||t.id, desc:newDesc, val:newVal, method:newMethod, opDate:newOpDate, postDate:newPostDate, recurrence:'', installments:1, planned:newOpDate>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
+  }); } catch (_) { setTransactions((txs||[]).concat([{ id:Date.now(), parentId:t.parentId||t.id, desc:newDesc, val:newVal, method:newMethod, opDate:newOpDate, postDate:newPostDate, recurrence:'', installments:1, planned:newOpDate>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
         break;
       case 'future':
         // End original series at this occurrence
@@ -3693,7 +3998,7 @@ async function addTx() {
           planned: pendingEditTxIso > todayISO(),
           ts: new Date().toISOString(),
           modifiedAt: new Date().toISOString()
-        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id:Date.now(), parentId:null, desc:newDesc, val:newVal, method:newMethod, opDate:pendingEditTxIso, postDate:newPostDate, recurrence:newRecurrence, installments:newInstallments, planned:pendingEditTxIso>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
+  }); } catch (_) { setTransactions((txs||[]).concat([{ id:Date.now(), parentId:null, desc:newDesc, val:newVal, method:newMethod, opDate:pendingEditTxIso, postDate:newPostDate, recurrence:newRecurrence, installments:newInstallments, planned:pendingEditTxIso>todayISO(), ts:new Date().toISOString(), modifiedAt:new Date().toISOString() }])); }
         break;
       case 'all': {
         {
@@ -3702,7 +4007,7 @@ async function addTx() {
              passadas.  Se o registro clicado for uma ocorrência gerada,
              subimos para o pai; caso contrário usamos o próprio. */
           const master = t.parentId
-            ? transactions.find(tx => sameId(tx.id, t.parentId))
+            ? (txs || []).find(tx => sameId(tx.id, t.parentId))
             : t;
           if (master) {
             master.desc         = newDesc;
@@ -3791,7 +4096,7 @@ async function addTx() {
         invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: totalPayVal },
         ts: nowIso,
         modifiedAt: nowIso
-      }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now(), desc: `Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:totalPayVal}, ts:nowIso, modifiedAt:nowIso }])); }
+  }); } catch (_) { setTransactions((txs||[]).concat([{ id: Date.now(), desc: `Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:totalPayVal}, ts:nowIso, modifiedAt:nowIso }])); }
       // 2) Série mensal de parcelas (Dinheiro) que impactam o saldo nas datas das parcelas
       // The installment series should start on the card due date (ctx.dueISO)
       // and stop after `n` installments. Do NOT treat creation as the
@@ -3848,7 +4153,7 @@ async function addTx() {
         if (remainderCents > 0) {
           masterTx.exceptions = masterTx.exceptions || [];
           if (!masterTx.exceptions.includes(firstInstISO)) masterTx.exceptions.push(firstInstISO);
-          try { addTransaction(masterTx); } catch (_) { setTransactions((getTransactions()||[]).concat([masterTx])); }
+          try { addTransaction(masterTx); } catch (_) { setTransactions((txs||[]).concat([masterTx])); }
 
           const childTx = {
             id: masterId + 1,
@@ -3864,10 +4169,10 @@ async function addTx() {
             ts: nowIso,
             modifiedAt: nowIso
           };
-          try { addTransaction(childTx); } catch (_) { setTransactions((getTransactions()||[]).concat([childTx])); }
+          try { addTransaction(childTx); } catch (_) { setTransactions((txs||[]).concat([childTx])); }
         } else {
           // No remainder: single master is enough
-          try { addTransaction(masterTx); } catch (_) { setTransactions((getTransactions()||[]).concat([masterTx])); }
+          try { addTransaction(masterTx); } catch (_) { setTransactions((txs||[]).concat([masterTx])); }
         }
       }
   } else {
@@ -3887,7 +4192,7 @@ async function addTx() {
           invoiceAdjust: { card: ctx.card, dueISO: ctx.dueISO, amount: adjustAmount },
           ts: nowIso,
           modifiedAt: nowIso
-          }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now(), desc:`Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:adjustAmount}, ts:nowIso, modifiedAt:nowIso }])); }
+          }); } catch (_) { setTransactions((txs||[]).concat([{ id: Date.now(), desc:`Ajuste fatura – ${ctx.card}`, val:0, method:'Dinheiro', opDate:ctx.dueISO, postDate:ctx.dueISO, planned:false, invoiceAdjust:{card:ctx.card,dueISO:ctx.dueISO,amount:adjustAmount}, ts:nowIso, modifiedAt:nowIso }])); }
       // b) Registro de pagamento (confirmação)
         // Determine the actual paid amount (can't exceed remaining)
         const payVal = Math.min(amount, remaining);
@@ -3902,7 +4207,7 @@ async function addTx() {
   invoicePayment: { card: ctx.card, dueISO: ctx.dueISO },
   ts: nowIso,
   modifiedAt: nowIso
-  }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now()+1, desc:`Pagamento fatura – ${ctx.card}`, val:-payVal, method:'Dinheiro', opDate:payDate, postDate:payDate, planned:payDate>todayISO(), invoicePayment:{card:ctx.card,dueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
+  }); } catch (_) { setTransactions((txs||[]).concat([{ id: Date.now()+1, desc:`Pagamento fatura – ${ctx.card}`, val:-payVal, method:'Dinheiro', opDate:payDate, postDate:payDate, planned:payDate>todayISO(), invoicePayment:{card:ctx.card,dueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
       // c) Se pagamento parcial, rola o restante para a próxima fatura
   const remainingAfter = Math.max(0, remaining - payVal);
       if (remainingAfter > 0) {
@@ -3928,7 +4233,7 @@ async function addTx() {
           invoiceRolloverOf: { card: ctx.card, fromDueISO: ctx.dueISO },
           ts: nowIso,
           modifiedAt: nowIso
-        }); } catch (_) { setTransactions((getTransactions()||[]).concat([{ id: Date.now()+2, desc: `Pendente da fatura de ${monthLabel}`, val:-remainingAfter, method:ctx.card, opDate:ctx.dueISO, postDate:nextDueISO, planned:false, invoiceRolloverOf:{card:ctx.card,fromDueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
+  }); } catch (_) { setTransactions((txs||[]).concat([{ id: Date.now()+2, desc: `Pendente da fatura de ${monthLabel}`, val:-remainingAfter, method:ctx.card, opDate:ctx.dueISO, postDate:nextDueISO, planned:false, invoiceRolloverOf:{card:ctx.card,fromDueISO:ctx.dueISO}, ts:nowIso, modifiedAt:nowIso }])); }
       }
     }
     // Persist & UI
@@ -3952,7 +4257,7 @@ async function addTx() {
   const formData = collectTxFormData();
   if (!formData) return;
   const tx = buildTransaction(formData);
-  const _promise = finalizeTransaction(tx); // fire-and-forget
+  const _promise = finalizeTransaction(tx, txs); // fire-and-forget
   resetTxForm();                            // fecha o modal já
   _promise.catch(err => console.error('finalizeTransaction failed:', err));
 }
@@ -4001,28 +4306,29 @@ function buildTransaction(data) {
 }
 
 // 3. Adiciona ao array global, salva e renderiza
-async function finalizeTransaction(tx) {
+async function finalizeTransaction(tx, txs) {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
   let batch = tx.recurrence ? [tx] : [tx];
 
   // Atualiza UI/estado imediatamente via app-state
   try {
     if (batch.length === 1) {
-      try { addTransaction(batch[0]); } catch (_) { setTransactions((getTransactions() || []).concat([batch[0]])); }
+  try { addTransaction(batch[0]); } catch (_) { setTransactions((_txs || []).concat([batch[0]])); }
     } else {
       // multiple items: try to add each via app-state to emit incremental updates
-      try {
+        try {
         for (const t of batch) addTransaction(t);
       } catch (_) {
         // fallback to atomic concat if addTransaction not available
-        setTransactions((getTransactions() || []).concat(batch));
+        setTransactions((_txs || []).concat(batch));
       }
     }
   } catch (_) {
     // Fallback: set via app-state to keep single source of truth
-    try { setTransactions((getTransactions() || []).concat(batch)); } catch (__) { /* last resort ignored to avoid divergent global state */ }
+  try { setTransactions((_txs || []).concat(batch)); } catch (__) { /* last resort ignored to avoid divergent global state */ }
   }
   sortTransactions();
-  try { cacheSet('tx', getTransactions()); } catch (_) { cacheSet('tx', transactions); }
+  try { const snapshot = getTransactions ? getTransactions() : transactions; cacheSet('tx', snapshot); } catch (_) { try { cacheSet('tx', transactions); } catch(_) {} }
 
   try {
     if (!navigator.onLine) {
@@ -4039,7 +4345,7 @@ async function finalizeTransaction(tx) {
 
   updatePendingBadge();
   renderTable();
-  try { save('tx', getTransactions()); } catch (_) { try { save('tx', transactions); } catch(_) {} }
+  try { const snapshot = getTransactions ? getTransactions() : transactions; try { save('tx', snapshot); } catch (_) { try { save('tx', transactions); } catch(_) {} } } catch (_) {}
   } catch (e) {
     console.error('finalizeTransaction error:', e);
   }
@@ -4125,9 +4431,9 @@ function formatDateISO(date) {
 }
 
 // Delete a transaction (with options for recurring rules)
-function delTx(id, iso) {
-  const txs = getTransactions ? getTransactions() : transactions;
-  const t = txs.find(x => sameId(x.id, id));
+function delTx(id, iso, txs) {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
+  const t = (_txs || []).find(x => sameId(x.id, id));
   if (!t) return;
 
   // Se NÃO for recorrente (nem ocorrência destacada), exclui direto
@@ -4160,16 +4466,16 @@ cancelDeleteRecurrence.onclick = closeDeleteModal;
 deleteRecurrenceModal.onclick = e => { if (e.target === deleteRecurrenceModal) closeDeleteModal(); };
 
 // Helper: find the master recurring rule for a given tx/iso
-function findMasterRuleFor(tx, iso) {
+function findMasterRuleFor(tx, iso, txs) {
   if (!tx) return null;
   if (tx.recurrence && tx.recurrence.trim() !== '') return tx;
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
   if (tx.parentId) {
-    const txs = getTransactions ? getTransactions() : transactions;
-    const parent = txs.find(p => sameId(p.id, tx.parentId));
+    const parent = (_txs || []).find(p => sameId(p.id, tx.parentId));
     if (parent) return parent;
   }
   // Heuristic: find a rule that occurs on the same date and looks like this tx
-  for (const p of txs) {
+  for (const p of (_txs || [])) {
     if (!p.recurrence || !p.recurrence.trim()) continue;
     if (!occursOn(p, iso)) continue;
     const sameMethod = (p.method || '') === (tx.method || '');
@@ -4182,31 +4488,31 @@ function findMasterRuleFor(tx, iso) {
 
 deleteSingleBtn.onclick = () => {
   const txs = getTransactions ? getTransactions() : transactions;
-  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
+  const tx = (txs || []).find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
-  const master = findMasterRuleFor(tx, iso);
-    if (master) {
-      master.exceptions = master.exceptions || [];
-      if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
-      // Remove any materialized child occurrence for this exact date
-      // This covers cases where the occurrence was previously edited/created
-      // as a standalone item (with parentId) and would otherwise remain visible.
-      try {
-        // find child by parentId and opDate and remove
-        const child = (getTransactions() || []).find(x => sameId(x.parentId, master.id) && x.opDate === iso);
-        if (child) removeTransaction(child.id);
-      } catch (_) {
-        setTransactions((getTransactions() || []).filter(x => !(sameId(x.parentId, master.id) && x.opDate === iso)));
-      }
-      showToast('Ocorrência excluída!', 'success');
-    } else {
-      // fallback: not a recurrence → hard delete
-      try { removeTransaction(tx.id); } catch (_) { setTransactions((getTransactions() || []).filter(x => !sameId(x.id, tx.id))); }
-      showToast('Operação excluída.', 'success');
+  const master = findMasterRuleFor(tx, iso, txs);
+  if (master) {
+    master.exceptions = master.exceptions || [];
+    if (!master.exceptions.includes(iso)) master.exceptions.push(iso);
+    // Remove any materialized child occurrence for this exact date
+    // This covers cases where the occurrence was previously edited/created
+    // as a standalone item (with parentId) and would otherwise remain visible.
+    try {
+      // find child by parentId and opDate and remove
+      const child = (txs || []).find(x => sameId(x.parentId, master.id) && x.opDate === iso);
+      if (child) removeTransaction(child.id);
+    } catch (_) {
+      setTransactions((txs || []).filter(x => !(sameId(x.parentId, master.id) && x.opDate === iso)));
     }
-    try { save('tx', getTransactions()); } catch (_) {}
+    showToast('Ocorrência excluída!', 'success');
+  } else {
+    // fallback: not a recurrence → hard delete
+    try { removeTransaction(tx.id); } catch (_) { setTransactions((txs || []).filter(x => !sameId(x.id, tx.id))); }
+    showToast('Operação excluída.', 'success');
+  }
+  try { save('tx', txs || getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -4216,20 +4522,20 @@ deleteSingleBtn.onclick = () => {
 
 deleteFutureBtn.onclick = () => {
   const txs = getTransactions ? getTransactions() : transactions;
-  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
+  const tx = (txs || []).find(t => sameId(t.id, pendingDeleteTxId));
   const iso = pendingDeleteTxIso;
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   if (!tx) { closeDeleteModal(); return; }
-  const master = findMasterRuleFor(tx, iso);
+  const master = findMasterRuleFor(tx, iso, txs);
   if (master) {
     master.recurrenceEnd = iso;
     showToast('Esta e futuras excluídas!', 'success');
   } else {
     // fallback: not a recurrence → delete only this occurrence
-    try { removeTransaction(tx.id); } catch (_) { setTransactions((getTransactions() || []).filter(x => !sameId(x.id, tx.id))); }
+    try { removeTransaction(tx.id); } catch (_) { setTransactions((txs || []).filter(x => !sameId(x.id, tx.id))); }
     showToast('Operação excluída.', 'success');
   }
-  try { save('tx', getTransactions()); } catch (_) {}
+  try { save('tx', txs || getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -4239,21 +4545,21 @@ deleteFutureBtn.onclick = () => {
 
 deleteAllBtn.onclick = () => {
   const txs = getTransactions ? getTransactions() : transactions;
-  const tx = txs.find(t => sameId(t.id, pendingDeleteTxId));
+  const tx = (txs || []).find(t => sameId(t.id, pendingDeleteTxId));
   if (!tx) { closeDeleteModal(); return; }
-  const master = findMasterRuleFor(tx, pendingDeleteTxIso) || tx;
+  const master = findMasterRuleFor(tx, pendingDeleteTxIso, txs) || tx;
   // Remove both master rule and any occurrences with parentId
   const refreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
   try {
     // remove master and any child occurrences
     removeTransaction(master.id);
     // also remove children
-    const children = (getTransactions() || []).filter(t => sameId(t.parentId, master.id));
+    const children = (txs || []).filter(t => sameId(t.parentId, master.id));
     for (const c of children) removeTransaction(c.id);
   } catch (_) {
-    setTransactions((getTransactions() || []).filter(t => !sameId(t.id, master.id) && !sameId(t.parentId, master.id)));
+    setTransactions((txs || []).filter(t => !sameId(t.id, master.id) && !sameId(t.parentId, master.id)));
   }
-  try { save('tx', getTransactions()); } catch (_) {}
+  try { save('tx', txs || getTransactions()); } catch (_) {}
   renderTable();
   if (refreshPlannedModal) {
     try { renderPlannedModal(); } catch (err) { console.error('renderPlannedModal failed', err); }
@@ -4280,21 +4586,24 @@ editRecurrenceModal.onclick = e => { if (e.target === editRecurrenceModal) close
 editSingleBtn.onclick = () => {
   pendingEditMode = 'single';
   closeEditModal();
-  editTx(pendingEditTxId);
+  const txs = getTransactions ? getTransactions() : transactions;
+  editTx(pendingEditTxId, txs);
 };
 editFutureBtn.onclick = () => {
   pendingEditMode = 'future';
   closeEditModal();
-  editTx(pendingEditTxId);
+  const txs = getTransactions ? getTransactions() : transactions;
+  editTx(pendingEditTxId, txs);
 };
 editAllBtn.onclick = () => {
   pendingEditMode = 'all';
   closeEditModal();
-  editTx(pendingEditTxId);
-};
-const editTx = id => {
   const txs = getTransactions ? getTransactions() : transactions;
-  const t = txs.find(x => x.id === id);
+  editTx(pendingEditTxId, txs);
+};
+const editTx = (id, txs) => {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
+  const t = (_txs || []).find(x => x.id === id);
   if (!t) return;
 
   // 1) Hard reset para não herdar estado da edição anterior
@@ -4377,7 +4686,7 @@ document.addEventListener('click', (e) => {
   if (!id) return;
 
   const txs = getTransactions ? getTransactions() : transactions;
-  const t = txs.find(x => x.id === id);
+  const t = (txs || []).find(x => x.id === id);
   if (!t) return;
 
   pendingEditTxId  = id;
@@ -4388,7 +4697,7 @@ document.addEventListener('click', (e) => {
     editRecurrenceModal.classList.remove('hidden');
   } else {
     // não recorrente → vai direto para edição
-    editTx(id);
+    editTx(id, txs);
   }
 
   e.preventDefault();
@@ -4404,8 +4713,9 @@ function renderTable() {
   clearTableContent();
   const acc = document.getElementById('accordion');
   if (acc) acc.dataset.state = 'skeleton';
-  const groups = groupTransactionsByMonth();
-  renderTransactionGroups(groups);
+  const txs = getTransactions ? getTransactions() : transactions;
+  const groups = groupTransactionsByMonth(txs);
+  renderTransactionGroups(groups, txs);
   if (acc) delete acc.dataset.state;
   
   // Tenta criar o sticky header após renderizar conteúdo
@@ -4432,12 +4742,12 @@ function clearTableContent() {
 }
 
 // 2. Agrupa as transações globais por mês (YYYY-MM) e retorna um Map ordenado por data.
-function groupTransactionsByMonth() {
+function groupTransactionsByMonth(txs) {
   // Agrupa transações por mês (YYYY-MM)
   const groups = new Map();
-  sortTransactions();
-  const txs = getTransactions ? getTransactions() : transactions;
-  for (const tx of txs) {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions);
+  sortTransactions(_txs);
+  for (const tx of _txs) {
     // Usa postDate para agrupamento por mês, com fallback seguro
     const pd = tx.postDate || (tx.opDate && tx.method ? post(tx.opDate, tx.method) : tx.opDate);
     if (!pd || typeof pd.slice !== 'function') continue; // ignora itens malformados
@@ -4450,18 +4760,16 @@ function groupTransactionsByMonth() {
 }
 
 // 3. Recebe o Map agrupado e itera renderizando os meses em ordem decrescente, usando renderAccordion
-function renderTransactionGroups(groups) {
-  // Aqui, para manter compatibilidade com a UI, apenas chama renderAccordion
-  // que já monta o acordeão por mês/dia/fatura, usando os dados globais.
-  // Se desejar, pode passar os grupos para renderAccordion para customização.
-  renderAccordion();
+function renderTransactionGroups(groups, txs) {
+  // Pass the txs snapshot down to the accordion renderer so it can reuse it
+  renderAccordion(groups, txs);
 }
 
 
 // -----------------------------------------------------------------------------
 // Acordeão: mês → dia → fatura
 // Helper function to get all transactions of a specific ISO date
-function txByDate(iso) {
+function txByDate(iso, txs) {
   const list = [];
   const today = todayISO();
 
@@ -4479,8 +4787,8 @@ function txByDate(iso) {
     if (singleCard) return singleCard;
     return null;
   };
-  const txs = getTransactions ? getTransactions() : transactions;
-  txs.forEach(t => {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions);
+  _txs.forEach(t => {
     if (t.recurrence) return;            // só não-recorrentes aqui
     if (t.opDate !== iso) return;        // renderiza sempre no opDate
     // Oculta movimentos internos da fatura (pagamento/ajuste)
@@ -4506,7 +4814,7 @@ function txByDate(iso) {
   });
 
   // ================= RECURRING RULES =================
-  txs
+  _txs
     .filter(t => t.recurrence)
     .forEach(master => {
       if (!occursOn(master, iso)) return; // materializa somente a ocorrência do dia
@@ -4702,9 +5010,9 @@ function selectYear(year) {
 }
 
 // Calcula o range real de datas baseado nas transações
-function calculateDateRange() {
-  const txs = getTransactions ? getTransactions() : transactions;
-  if (!Array.isArray(txs) || txs.length === 0) {
+function calculateDateRange(txs) {
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
+  if (!Array.isArray(_txs) || _txs.length === 0) {
     // Se não há transações, usa range padrão do ano selecionado (VIEW_YEAR)
     const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
     return {
@@ -4719,7 +5027,7 @@ function calculateDateRange() {
   // Analisa todas as transações (incluindo recorrências expandidas)
   const allExpandedTx = [];
   
-  txs.forEach(tx => {
+  _txs.forEach(tx => {
     if (!tx.recurrence) {
       // Transação única - usa opDate e postDate
       allExpandedTx.push({
@@ -4786,8 +5094,11 @@ function calculateDateRange() {
 }
 
 // Constrói um mapa de saldos contínuos dia-a-dia
-function buildRunningBalanceMap() {
-  const { minDate, maxDate } = calculateDateRange();
+function buildRunningBalanceMap(txs) {
+  // txs: optional snapshot. If omitted, fall back to global getter.
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
+  const txsLocal = _txs;
+  const { minDate, maxDate } = calculateDateRange(txsLocal);
   const balanceMap = new Map();
   // Anchor semantics: if startDate is set, balances before that date are treated as 0.
   // The running balance should begin at startDate with startBalance.
@@ -4807,7 +5118,6 @@ function buildRunningBalanceMap() {
     runningBalance = (state.startBalance != null) ? state.startBalance : 0;
   }
   
-  const txs = getTransactions ? getTransactions() : transactions;
   for (let currentDate = new Date(startDateObj); currentDate <= endDateObj; currentDate.setDate(currentDate.getDate() + 1)) {
     const iso = currentDate.toISOString().slice(0, 10);
     // If we have an explicit anchor, ensure days before anchor are zero (and don't start runningBalance until anchor)
@@ -4824,7 +5134,7 @@ function buildRunningBalanceMap() {
       runningBalance = (state.startBalance != null) ? state.startBalance : 0;
     }
     // Calcula o impacto do dia usando a lógica existente
-  const dayTx = txByDate(iso);
+  const dayTx = txByDate(iso, txsLocal);
     
     // 1) Dinheiro impacta no opDate
     const cashImpact = dayTx
@@ -4838,8 +5148,8 @@ function buildRunningBalanceMap() {
       invoicesByCard[cardName].push(tx);
     };
 
-  // Não-recorrentes de cartão: vencem hoje
-  txs.forEach(t => {
+    // Não-recorrentes de cartão: vencem hoje
+    txsLocal.forEach(t => {
       if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
         const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
         if (!validCard) return;
@@ -4850,7 +5160,7 @@ function buildRunningBalanceMap() {
     // Recorrentes de cartão: varre 60 dias p/ trás por ocorrências cujo postDate == hoje
     const _scanStart = new Date(iso);
     _scanStart.setDate(_scanStart.getDate() - 60);
-  for (const master of txs.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+  for (const master of txsLocal.filter(t => t.recurrence && t.method !== 'Dinheiro')) {
       const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
       if (!validCard) continue;
       for (let d2 = new Date(_scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
@@ -4875,7 +5185,7 @@ function buildRunningBalanceMap() {
     });
 
     // Soma ajustes positivos que deslocam parte da fatura deste dueISO
-    const sumAdjustFor = (cardName, dueISO) => txs
+    const sumAdjustFor = (cardName, dueISO) => txsLocal
       .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
       .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
     
@@ -4901,7 +5211,7 @@ function buildRunningBalanceMap() {
 // Shows every month (Jan–Dec) and every day (01–31),
 // past months collapsed by default, current & future months open.
 // -----------------------------------------------------------------------------
-function renderAccordion() {
+function renderAccordion(groups, txs) {
   const acc = document.getElementById('accordion');
   if (!acc) return;
   
@@ -4913,9 +5223,18 @@ function renderAccordion() {
   const noDataYet = false;
   const keepSkeleton = hydrating && noDataYet; // keep shimmer only during hydrating
 
-  // Constrói o mapa de saldos contínuos uma única vez
-  const balanceMap = buildRunningBalanceMap();
-  const txs = getTransactions ? getTransactions() : transactions;
+  // Constrói o mapa de saldos contínuos uma única vez (passando snapshot)
+  let _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions);
+  
+  // DEFENSIVE: If _txs is empty but we have realtime data, force sync
+  if ((!_txs || _txs.length === 0) && transactions && transactions.length > 0) {
+    console.debug('🔄 renderAccordion: forcing sync from module transactions, length=', transactions.length);
+    _txs = getTransactions ? getTransactions() : transactions;
+  }
+  
+  // DEBUG: show snapshot size for troubleshooting imports
+  try { console.debug('renderAccordion: _txs length=', Array.isArray(_txs) ? _txs.length : 'no-txs', 'VIEW_YEAR=', VIEW_YEAR); } catch(_) {}
+  const balanceMap = buildRunningBalanceMap(_txs);
   
   // Salva quais <details> estão abertos
   const openKeys = Array.from(acc.querySelectorAll('details[open]'))
@@ -4941,10 +5260,10 @@ function renderAccordion() {
     });
 
     // Metadados: pagamentos (dinheiro), ajustes e parcelamento
-    const paidAbs = (txs || [])
+    const paidAbs = (_txs || [])
       .filter(t => t.invoicePayment && t.invoicePayment.card === cardName && t.invoicePayment.dueISO === dueISO)
       .reduce((s, t) => s + Math.abs(Number(t.val) || 0), 0);
-    const parcel = (txs || []).find(t => t.invoiceParcelOf && t.invoiceParcelOf.card === cardName && t.invoiceParcelOf.dueISO === dueISO);
+    const parcel = (_txs || []).find(t => t.invoiceParcelOf && t.invoiceParcelOf.card === cardName && t.invoiceParcelOf.dueISO === dueISO);
     const totalAbs = Math.abs(cardTotalAmount);
 
     // Regras de exibição: só marcar como pago/strike após uma ação do usuário (pagamento ou parcelamento)
@@ -4980,8 +5299,10 @@ function renderAccordion() {
   }
 
   // Helper para obter todas as transações de um cartão para o mês/ano da data
-  function getAllTransactionsOnCard(cardName, year, month) {
-    const txs = [];
+  function getAllTransactionsOnCard(cardName, year, month, txs) {
+    // txs: optional snapshot of transactions. If not provided, fall back to global getter for compatibility.
+    const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
+    const txsOut = [];
     const targetMonth = month;           // 0‑based
     const targetYear  = year;
 
@@ -4992,8 +5313,8 @@ function renderAccordion() {
     const windowStart = new Date(targetYear, targetMonth - 1, 1); // 1.º dia do mês anterior
     const windowEnd   = new Date(targetYear, targetMonth + 1, 0); // último dia do mês seguinte
 
-    // Percorre todas as transações já persistidas
-    (getTransactions ? getTransactions() : transactions).forEach(tx => {
+    // Percorre todas as transações já persistidas (ou o snapshot fornecido)
+    _txs.forEach(tx => {
       if (tx.method !== cardName) return;
 
       // 1. Operações únicas --------------------------------------------
@@ -5014,7 +5335,7 @@ function renderAccordion() {
         const pd  = post(iso, cardName);
         const pdDate = new Date(pd);
         if (pdDate.getFullYear() === targetYear && pdDate.getMonth() === targetMonth) {
-          txs.push({
+          txsOut.push({
             ...tx,
             opDate: iso,           // dia real da compra
             postDate: pd,          // dia de vencimento da fatura
@@ -5025,7 +5346,7 @@ function renderAccordion() {
     });
 
     // Exibe na fatura apenas transações que já foram executadas
-    return txs.filter(t => !t.planned);
+    return txsOut.filter(t => !t.planned);
   }
 
   // Remove variável runningBalance local - agora usa o mapa precalculado
@@ -5080,21 +5401,21 @@ function renderAccordion() {
       mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
     }
     // Month total = sum of all tx in that month
-    const monthTotal = (txs || [])
+    const monthTotal = (_txs || [])
       .filter(t => new Date(t.postDate).getMonth() === mIdx)
       .reduce((s,t) => s + t.val, 0);
     // Cabeçalho flutuante dos meses
     let mSum = mDet.querySelector('summary.month-divider');
     if (!mSum) { mSum = document.createElement('summary'); mSum.className = 'month-divider'; }
 
-    const monthActual = (txs || [])
+    const monthActual = (_txs || [])
       .filter(t => {
         const pd = new Date(t.postDate);
         return pd.getMonth() === mIdx && !t.planned;
       })
       .reduce((s, t) => s + t.val, 0);
 
-    const monthPlanned = (txs || [])
+    const monthPlanned = (_txs || [])
       .filter(t => {
         const pd = new Date(t.postDate);
         return pd.getMonth() === mIdx && t.planned;
@@ -5134,7 +5455,7 @@ function renderAccordion() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(VIEW_YEAR, mIdx, d);
       const iso = formatToISO(dateObj);
-      const dayTx = txByDate(iso);
+  const dayTx = txByDate(iso, _txs);
 
       // === DAILY IMPACT (novas regras) — TABELA: só cálculo, sem UI ===
 const invoicesByCard = {};
@@ -5144,7 +5465,7 @@ const addToGroup = (cardName, tx) => {
 };
 
 // Não-recorrentes de cartão: vencem hoje
-(txs || []).forEach(t => {
+(_txs || []).forEach(t => {
   if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
     // Garantir que o método refere-se a um cartão existente (evita fatura fantasma)
     const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
@@ -5156,7 +5477,7 @@ const addToGroup = (cardName, tx) => {
 // Recorrentes de cartão: varre 60 dias p/ trás por ocorrências cujo postDate == hoje
 const _scanStart = new Date(iso);
 _scanStart.setDate(_scanStart.getDate() - 60);
-for (const master of (txs || []).filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+for (const master of (_txs || []).filter(t => t.recurrence && t.method !== 'Dinheiro')) {
   // Pula séries que apontam para um cartão inexistente
   const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
   if (!validCard) continue;
@@ -5178,13 +5499,13 @@ for (const master of (txs || []).filter(t => t.recurrence && t.method !== 'Dinhe
 
 // 1) Dinheiro impacta o saldo no dia da operação (inclui invoicePayment; exclui invoiceAdjust)
 //    Agora considera também as ocorrências de recorrências em Dinheiro no dia
-const cashNonRecurring = (txs || [])
+const cashNonRecurring = (_txs || [])
   .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso)
   .filter(t => !t.invoiceAdjust) // ajustes da fatura têm val=0 e não devem afetar caixa
   .reduce((s, t) => s + (Number(t.val) || 0), 0);
 
 // Soma das recorrências de Dinheiro que ocorrem neste dia
-const cashRecurring = (txs || [])
+const cashRecurring = (_txs || [])
   .filter(t => t.method === 'Dinheiro' && t.recurrence)
   .filter(t => occursOn(t, iso))
   .reduce((s, t) => s + (Number(t.val) || 0), 0);
@@ -5197,7 +5518,7 @@ Object.keys(invoicesByCard).forEach(card => {
   invoiceTotals[card] = invoicesByCard[card].reduce((s, t) => s + t.val, 0);
 });
 // Soma ajustes positivos que deslocam parte da fatura deste dueISO
-const sumAdjustFor = (cardName, dueISO) => (txs || [])
+const sumAdjustFor = (cardName, dueISO) => (_txs || [])
   .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
   .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
 let cardImpact = 0;
@@ -5397,7 +5718,7 @@ const dayTotal = cashImpact + cardImpact;
           }
           // Linha da operação (mantém swipe)
           const li = document.createElement('li');
-          li.appendChild(makeLine(t, false, true));
+          li.appendChild(makeLine(t, false, true, _txs));
           execList.appendChild(li);
           // Sem divisores entre itens (visual minimalista)
         }
@@ -5417,7 +5738,7 @@ const dayTotal = cashImpact + cardImpact;
 
         plannedOps.forEach(t => {
           const li = document.createElement('li');
-          li.appendChild(makeLine(t));
+          li.appendChild(makeLine(t, false, false, _txs));
           plannedList.appendChild(li);
         });
 
@@ -5439,7 +5760,7 @@ const dayTotal = cashImpact + cardImpact;
 
         allExec.forEach(t => {
           const li = document.createElement('li');
-          li.appendChild(makeLine(t));
+          li.appendChild(makeLine(t, false, false, _txs));
           execList.appendChild(li);
         });
 
@@ -5513,10 +5834,19 @@ const headerPreviewLabel = (mIdx < curMonth) ? 'Saldo final' : 'Saldo planejado'
 function initStart() {
   // Avoid showing start UI until we have loaded cached state to prevent flashes
   if (!state.bootHydrated) return;
-  // Show start balance input whenever there's no anchored start date.
-  // If the persisted startSet flag exists, user already completed the start flow.
-  // Otherwise, fall back to presence of startDate/startBalance.
-  const showStart = !(state.startSet === true || (state.startDate != null && state.startBalance != null));
+  
+  // For profiles with existing transactions, don't show start balance box 
+  // if no start balance configuration exists (all values null/false)
+  const hasTransactions = transactions && transactions.length > 0;
+  const hasStartConfig = state.startSet === true || 
+                        (state.startDate != null && state.startBalance != null);
+  
+  // Show start balance input only if:
+  // 1. No transactions exist yet, OR
+  // 2. Start configuration is partially set (user was in the middle of setup)
+  const showStart = !hasTransactions && !hasStartConfig;
+  
+  console.log(`📋 initStart -> startSet=${state.startSet} startDate=${state.startDate} startBalance=${state.startBalance} hasTransactions=${hasTransactions} showStart=${showStart}`);
   // exibe ou oculta todo o container de saldo inicial
   startContainer.style.display = showStart ? 'block' : 'none';
   dividerSaldo.style.display = showStart ? 'block' : 'none';
@@ -5763,7 +6093,7 @@ function updatePlannedModalHeader() {
   if (closeBtn) closeBtn.style.display = '';
 }
 
-function preparePlannedList() {
+function preparePlannedList(txs) {
   plannedList.innerHTML = '';
 
   // Agrupa por data
@@ -5776,17 +6106,17 @@ function preparePlannedList() {
   };
 
   const today = todayISO();
-  const txs = getTransactions ? getTransactions() : transactions;
+  const _txs = Array.isArray(txs) ? txs : (getTransactions ? getTransactions() : transactions) || [];
 
   // 1) Planejados já salvos (a partir de hoje)
-  for (const tx of txs) {
+  for (const tx of _txs) {
     if (!tx) continue;
     if (tx.planned && tx.opDate && tx.opDate >= today) add(tx);
   }
 
   // 2) Filhas de recorrência projetadas para os próximos 90 dias
   const DAYS_AHEAD = 90;
-  for (const master of txs) {
+  for (const master of _txs) {
     if (!master || !master.recurrence) continue;
 
     for (let i = 1; i <= DAYS_AHEAD; i++) {           // começa em amanhã; hoje nasce executada
@@ -5809,7 +6139,7 @@ function preparePlannedList() {
 
       // If there is already a recorded transaction (planned or executed) for this date
       // that matches this master (by parentId or desc/method/val), skip projection.
-      const exists = txs.some(t =>
+      const exists = _txs.some(t =>
         t && t.opDate === iso && (
           (t.parentId && sameId(t.parentId, master.id)) ||
           ((t.desc||'')===(master.desc||'') && (t.method||'')===(master.method||'') &&
@@ -5841,7 +6171,7 @@ function preparePlannedList() {
   groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
   plannedList.appendChild(groupHeader);
 
-    for (const tx of group) plannedList.appendChild(makeLine(tx, true));
+  for (const tx of group) plannedList.appendChild(makeLine(tx, true, false, _txs));
   }
 }
 
@@ -5854,7 +6184,9 @@ function bindPlannedActions() {
 
 function renderPlannedModal() {
   updatePlannedModalHeader();
-  preparePlannedList();
+  // Provide a snapshot to the prepared list to avoid repeated global reads
+  const _txs = getTransactions ? getTransactions() : transactions;
+  preparePlannedList(_txs);
   bindPlannedActions();
 }
 

@@ -82,4 +82,27 @@
 
 Esta atualização documenta o que foi feito até a pausa solicitada. Quando quiser que eu continue a varredura, diga se prefere batches pequenos com smoke-tests entre eles (mais seguro) ou um sweep maior seguido por testes manuais (mais rápido). Também posso começar aplicando as funções pendentes listadas na seção "Áreas pendentes" — diga qual abordagem prefere.
 
+---
+
+## Atualização (2025-10-06)
+
+- Status: pausa durante a varredura reads-second. Avançamos no escopo de edição/exclusão e no pipeline de renderização.
+- Principais mudanças desde o último checkpoint:
+  - `renderAccordion()` — completado: todos os helpers internos agora usam o snapshot `_txs` calculado no início da função (substituímos chamadas internas a `txs` por `_txs` e passamos `_txs` para `makeLine`, `txByDate`, `createCardInvoiceHeader` onde necessário).
+  - `makeLine()` — já estava snapshot-aware; ajustamos chamadas para garantir o mesmo snapshot é passado pela render pipeline.
+  - `addTx()` / `finalizeTransaction()` — `finalizeTransaction(tx, txs)` agora aceita `txs` e usa um fallback consistente; em `addTx()` calculamos `txs` uma vez e passamos para `finalizeTransaction`.
+  - `delTx()` — agora aceita `txs` e principais handlers (botões de delete) foram atualizados para passar um snapshot.
+  - `buildRunningBalanceMap()` — corrigido um ReferenceError de inicialização (variável usada antes de declarar); agora inicializa local `_txs` antes de chamar `calculateDateRange`.
+  - Vários pontos de cache/save/hydration foram atualizados para usar uma única leitura snapshot dentro do mesmo fluxo (por exemplo: handler de hydration, `performResetAllData`, `finalizeTransaction`).
+
+### Observações
+
+- Todas as mudanças mantêm compatibilidade retroativa: funções aceitam um `txs` opcional e os fallbacks continuam chamando `getTransactions()` quando omitido.
+- As alterações foram aplicadas em minibatches pequenos e verificadas com checagens estáticas (nenhum erro de sintaxe encontrado após os patches).
+
+### Próximo passo recomendado
+
+- Continuar a varredura em `main.js` para converter as leituras restantes (`getTransactions()`/`transactions`) em snapshots locais por função. Priorizar funções que fazem múltiplas iterações/filtragens (por exemplo, áreas ao redor de cache/save, handlers legacy, e utilitários ainda não adaptados).
+
+
 ```
