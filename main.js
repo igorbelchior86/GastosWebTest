@@ -2171,6 +2171,27 @@ function updateModalOpenState() {
   const txModalEl = document.getElementById('txModal');
   const txOpen = !!(txModalEl && !txModalEl.classList.contains('hidden'));
   if (txOpen) root.classList.add('kb-lock-shift'); else root.classList.remove('kb-lock-shift');
+  
+  // CRITICAL iOS 26+ PWA Fix: Force fixed elements stability when modal opens
+  if (open) {
+    // Modal opened - stabilize all fixed elements immediately
+    const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+    fixedElements.forEach(el => {
+      el.style.transform = 'translate3d(0, 0, 0)';
+      el.style.webkitTransform = 'translate3d(0, 0, 0)';
+      el.style.willChange = 'auto';
+      el.style.position = 'fixed';
+    });
+  } else {
+    // Modal closed - clean up forced styles
+    const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+    fixedElements.forEach(el => {
+      el.style.removeProperty('transform');
+      el.style.removeProperty('-webkit-transform');
+      el.style.removeProperty('will-change');
+      // Don't remove position as it should stay fixed
+    });
+  }
 
   if (wrapperEl) {
     try {
@@ -2504,10 +2525,20 @@ document.addEventListener('wheel', (e) => {
         root.style.setProperty('--kb-offset-top', shift + 'px');
         console.log('🔧 Applied keyboard transforms - bottom:', effective, 'top:', shift);
       } else {
-        // Modal aberto - força transformações zeradas
+        // Modal aberto - força transformações zeradas E estabilidade de elementos fixed
         root.style.setProperty('--kb-offset-bottom', '0px');
         root.style.setProperty('--kb-offset-top', '0px');
-        console.log('🚫 Modal open - keyboard transforms disabled');
+        
+        // CRITICAL iOS PWA Fix: Force fixed elements stability when modal + keyboard
+        const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+        fixedElements.forEach(el => {
+          el.style.transform = 'translate3d(0, 0, 0)';
+          el.style.webkitTransform = 'translate3d(0, 0, 0)';
+          el.style.willChange = 'auto';
+          el.style.webkitWillChange = 'auto';
+        });
+        
+        console.log('🚫 Modal open - keyboard transforms disabled + fixed elements stabilized');
       }
     }
   };
@@ -2534,8 +2565,17 @@ document.addEventListener('wheel', (e) => {
         delete root.dataset.kbLock;
         delete root.dataset.kbLockTop;
         delete root.dataset.kbLockPage;
-
       }
+      
+      // iOS PWA Fix: Clean up forced transforms from fixed elements
+      const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+      fixedElements.forEach(el => {
+        el.style.removeProperty('transform');
+        el.style.removeProperty('-webkit-transform');
+        el.style.removeProperty('will-change');
+        el.style.removeProperty('-webkit-will-change');
+      });
+      
       flushKeyboardDeferredTasks();
     }, 200);
   };
@@ -2616,6 +2656,31 @@ document.addEventListener('wheel', (e) => {
   window.addEventListener('orientationchange', () => scheduleUpdate(160));
   window.addEventListener('focusin', () => scheduleUpdate());
   window.addEventListener('focusout', () => scheduleUpdate(220));
+  
+  // iOS PWA Ultimate Fix: Monitor and enforce fixed element stability
+  const enforceFixedStability = () => {
+    const hasModal = !!document.querySelector('.bottom-modal:not(.hidden)');
+    const hasKeyboard = keyboardOpen || root?.dataset?.vvKb === '1';
+    
+    if (hasModal || hasKeyboard) {
+      const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
+      fixedElements.forEach(el => {
+        // Force stability if transform is not already neutral
+        const currentTransform = window.getComputedStyle(el).transform;
+        if (currentTransform && currentTransform !== 'none' && currentTransform !== 'matrix(1, 0, 0, 1, 0, 0)') {
+          el.style.transform = 'translate3d(0, 0, 0)';
+          el.style.webkitTransform = 'translate3d(0, 0, 0)';
+        }
+      });
+    }
+  };
+  
+  // Run stability check periodically when keyboard or modal is active
+  setInterval(() => {
+    if (keyboardOpen || document.querySelector('.bottom-modal:not(.hidden)')) {
+      enforceFixedStability();
+    }
+  }, 16); // ~60fps check rate
 })();
 
 
