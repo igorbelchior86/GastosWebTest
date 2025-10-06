@@ -718,20 +718,7 @@ html.modal-open.keyboard-open.kb-lock-shift {
   will-change: auto !important;
 }
 
-/* iOS PWA Triple Fix: Modal + Keyboard - lock all fixed elements */
-html.modal-open.keyboard-open .app-header,
-html.modal-open.keyboard-open .floating-pill,
-html.modal-open.keyboard-open .floating-add-button, 
-html.modal-open.keyboard-open .floating-home-button,
-html.modal-open.kb-lock-shift .app-header,
-html.modal-open.kb-lock-shift .floating-pill,
-html.modal-open.kb-lock-shift .floating-add-button, 
-html.modal-open.kb-lock-shift .floating-home-button {
-  transform: translate3d(0, 0, 0) !important;
-  -webkit-transform: translate3d(0, 0, 0) !important;
-  will-change: auto !important;
-  position: fixed !important;
-}
+/* iOS PWA: DO NOT manipulate .app-header with transforms! */
 
 /* Força wrapper fixo quando modal aberto */
 html.modal-open .wrapper {
@@ -748,57 +735,7 @@ html.modal-open.keyboard-open .wrapper {
 
 /* ===================== CRITICAL iOS PWA KEYBOARD STABILITY ===================== */
 
-/* When keyboard appears in iOS PWA, prevent ALL fixed elements from moving */
-@media (display-mode: standalone) {
-  html.keyboard-open .app-header,
-  html.keyboard-open .floating-pill, 
-  html.keyboard-open .floating-add-button,
-  html.keyboard-open .floating-home-button,
-  html[data-vv-kb="1"] .app-header,
-  html[data-vv-kb="1"] .floating-pill,
-  html[data-vv-kb="1"] .floating-add-button,
-  html[data-vv-kb="1"] .floating-home-button {
-    /* FORCE absolute stability - no transforms allowed */
-    transform: translate3d(0, 0, 0) !important;
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    
-    /* Ensure they stay in compositor layer but don't move */
-    will-change: auto !important;
-    -webkit-will-change: auto !important;
-    
-    /* Force re-anchor to layout viewport, not visual viewport */
-    position: fixed !important;
-  }
-  
-  /* Additional enforcement for header */
-  html.keyboard-open .app-header,
-  html[data-vv-kb="1"] .app-header {
-    top: 0 !important;
-    inset-block-start: 0 !important;
-  }
-  
-  /* Additional enforcement for bottom elements */
-  html.keyboard-open .floating-pill,
-  html.keyboard-open .floating-add-button, 
-  html.keyboard-open .floating-home-button,
-  html[data-vv-kb="1"] .floating-pill,
-  html[data-vv-kb="1"] .floating-add-button,
-  html[data-vv-kb="1"] .floating-home-button {
-    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
-    inset-block-end: calc(12px + env(safe-area-inset-bottom)) !important;
-  }
-  
-  /* Ultimate iOS PWA enforcement - override ANY potential transforms */
-  html.modal-open .app-header,
-  html.modal-open .floating-pill,
-  html.modal-open .floating-add-button,
-  html.modal-open .floating-home-button {
-    transform: translate3d(0, 0, 0) !important;
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    will-change: auto !important;
-    position: fixed !important;
-  }
-}
+/* iOS PWA keyboard handling: DON'T manipulate header - it should stay fixed naturally! */
 
 
 

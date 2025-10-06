@@ -2424,30 +2424,6 @@ document.addEventListener('wheel', (e) => {
   window.addEventListener('focusout', () => setTimeout(update, 50));
 })();
 
-// Simple keyboard detection for iOS (like working backup)
-(function setupSimpleKeyboard(){
-  const vv = window.visualViewport;
-  if (!vv) return;
-  const root = document.documentElement;
-  const THRESH = 140; // px
-  const update = () => {
-    const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
-    const isKb = gap > THRESH && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isKb) {
-      root.dataset.vvKb = '1';
-      root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
-    } else {
-      delete root.dataset.vvKb;
-      root.style.removeProperty('--kb-offset-bottom');
-    }
-  };
-  update();
-  vv.addEventListener('resize', update);
-  window.addEventListener('orientationchange', () => setTimeout(update, 50));
-  window.addEventListener('focusin', () => setTimeout(update, 0));
-  window.addEventListener('focusout', () => setTimeout(update, 50));
-})();
-
 const currency = (v) => safeFmtCurrency(v);
 const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 // Palavras que caracterizam “salário”
