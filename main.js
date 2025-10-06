@@ -2424,264 +2424,29 @@ document.addEventListener('wheel', (e) => {
   window.addEventListener('focusout', () => setTimeout(update, 50));
 })();
 
-
-
-// Original keyboard system (non-iOS PWA)
-(function setupKbOffsetsLegacy(){
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  const root = document.documentElement;
-  if (!root) return;
-
-  // Only run if iOS PWA fix didn't activate
-  const IS_IOS_PWA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const IS_PWA = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
-  
-  if (IS_IOS_PWA && IS_PWA) return; // iOS PWA uses new system above
-
-  const noop = () => {};
-  if (typeof window.__lockKeyboardGap !== 'function') window.__lockKeyboardGap = noop;
-  if (typeof window.__unlockKeyboardGap !== 'function') window.__unlockKeyboardGap = noop;
-
+// Simple keyboard detection for iOS (like working backup)
+(function setupSimpleKeyboard(){
   const vv = window.visualViewport;
   if (!vv) return;
-  const THRESH = 140; // px
-  const IS_IOS_LEGACY = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    // Non-iOS PWA: use noop functions
-    window.__lockKeyboardGap = () => {};
-    window.__unlockKeyboardGap = () => {};
-    return;
-  }
-
-
-// Original keyboard system (non-iOS PWA)
-(function setupKbOffsetsLegacy(){
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const root = document.documentElement;
-  if (!root) return;
-
-  // Only run if iOS PWA fix didn't activate
-  const IS_IOS_PWA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const IS_PWA = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
-  
-  if (IS_IOS_PWA && IS_PWA) return; // iOS PWA uses new system above
-
-  const noop = () => {};
-  if (typeof window.__lockKeyboardGap !== 'function') window.__lockKeyboardGap = noop;
-  if (typeof window.__unlockKeyboardGap !== 'function') window.__unlockKeyboardGap = noop;
-
-  const vv = window.visualViewport;
-  if (!vv) return;
   const THRESH = 140; // px
-  const IS_IOS_LEGACY = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  let keyboardOpen = false;
-  let closeTimer = null;
-  let lastGap = 0;
-  let lastTopOffset = 0;
-  let lastPageTop = 0;
-  let lockedGap = null;
-  let lockedTopOffset = null;
-  let lockedPageTop = null;
-
-  const applyKeyboardOpen = (gap) => {
-    keyboardOpen = true;
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-      closeTimer = null;
-    }
-    const measured = Math.max(0, Math.round(gap || 0));
-    const rawOffsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
-    const rawPageTop = Math.max(0, Math.round(
-      typeof vv?.pageTop === 'number'
-        ? vv.pageTop
-        : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
-    ));
-    lastGap = measured;
-    lastTopOffset = rawOffsetTop;
-    lastPageTop = rawPageTop;
-
-    // CORREÇÃO: Se há modal aberto, não aplicar transformações do teclado
-    const hasModalOpen = !!document.querySelector('.bottom-modal:not(.hidden)');
-    console.log('📱 Keyboard detected - Modal open:', hasModalOpen);
-
-    if (root) {
-      root.dataset.vvKb = '1';
-      root.classList.add('keyboard-open');
-      root.dataset.kbGap = String(measured);
-      root.dataset.kbTop = String(rawOffsetTop);
-      root.dataset.kbPage = String(rawPageTop);
-      
-      // Só aplicar transformações se NÃO há modal aberto
-      if (!hasModalOpen) {
-        const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
-        const baselineOffset = lockedTopOffset != null ? lockedTopOffset : rawOffsetTop;
-        const baselinePage = lockedPageTop != null ? lockedPageTop : rawPageTop;
-        const diffOffset = Math.max(0, rawOffsetTop - baselineOffset);
-        const diffPage = Math.max(0, rawPageTop - baselinePage);
-        const shift = Math.max(diffOffset, diffPage);
-        root.style.setProperty('--kb-offset-bottom', effective + 'px');
-        root.style.setProperty('--kb-offset-top', shift + 'px');
-        console.log('🔧 Applied keyboard transforms - bottom:', effective, 'top:', shift);
-      } else {
-        // Modal aberto - força transformações zeradas E estabilidade de elementos fixed
-        root.style.setProperty('--kb-offset-bottom', '0px');
-        root.style.setProperty('--kb-offset-top', '0px');
-        
-        // CRITICAL iOS PWA Fix: Force fixed elements stability when modal + keyboard
-        const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-        fixedElements.forEach(el => {
-          el.style.transform = 'translate3d(0, 0, 0)';
-          el.style.webkitTransform = 'translate3d(0, 0, 0)';
-          el.style.willChange = 'auto';
-          el.style.webkitWillChange = 'auto';
-        });
-        
-        console.log('🚫 Modal open - keyboard transforms disabled + fixed elements stabilized');
-      }
-    }
-  };
-
-  const applyKeyboardClosed = () => {
-    if (closeTimer) clearTimeout(closeTimer);
-    closeTimer = setTimeout(() => {
-      keyboardOpen = false;
-      lockedGap = null;
-      lockedTopOffset = null;
-      lockedPageTop = null;
-      lastGap = 0;
-      lastTopOffset = 0;
-      lastPageTop = 0;
-
-      if (root) {
-        delete root.dataset.vvKb;
-        root.classList.remove('keyboard-open');
-        root.style.removeProperty('--kb-offset-bottom');
-        root.style.removeProperty('--kb-offset-top');
-        delete root.dataset.kbGap;
-        delete root.dataset.kbTop;
-        delete root.dataset.kbPage;
-        delete root.dataset.kbLock;
-        delete root.dataset.kbLockTop;
-        delete root.dataset.kbLockPage;
-      }
-      
-      // iOS PWA Fix: Clean up forced transforms from fixed elements
-      const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-      fixedElements.forEach(el => {
-        el.style.removeProperty('transform');
-        el.style.removeProperty('-webkit-transform');
-        el.style.removeProperty('will-change');
-        el.style.removeProperty('-webkit-will-change');
-      });
-      
-      flushKeyboardDeferredTasks();
-    }, 200);
-  };
-
-  const parseGap = (value) => {
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) return null;
-      return Math.max(0, Math.round(value));
-    }
-    if (typeof value === 'string' && value) {
-      const parsed = Number(value);
-      if (Number.isFinite(parsed)) return Math.max(0, Math.round(parsed));
-    }
-    return null;
-  };
-
-  const lockGap = (value) => {
-    const candidate = parseGap(value ?? lastGap ?? root.dataset.kbGap);
-    if (candidate == null) return;
-    lockedGap = candidate;
-    lockedTopOffset = lastTopOffset;
-    lockedPageTop = lastPageTop;
-    if (root) {
-      root.dataset.kbLock = String(candidate);
-      if (lockedTopOffset != null) root.dataset.kbLockTop = String(lockedTopOffset);
-      if (lockedPageTop != null) root.dataset.kbLockPage = String(lockedPageTop);
-    }
-
-    if (keyboardOpen) applyKeyboardOpen(lastGap);
-  };
-
-  const unlockGap = () => {
-    lockedGap = null;
-    lockedTopOffset = null;
-    lockedPageTop = null;
-    if (root) delete root.dataset.kbLock;
-    if (root) {
-      delete root.dataset.kbLockTop;
-      delete root.dataset.kbLockPage;
-    }
-
-    if (keyboardOpen) applyKeyboardOpen(lastGap);
-  };
-
-  window.__lockKeyboardGap = lockGap;
-  window.__unlockKeyboardGap = unlockGap;
-
   const update = () => {
-    // When txModal is open we mark the root with kb-lock-shift. In this state
-    // we must NOT translate the root (header/footer must remain fixed).
-    if (root && root.classList && root.classList.contains('kb-lock-shift')) {
-      // Ensure any previous keyboard-open state is cleared promptly
-      if (root.classList.contains('keyboard-open')) {
-        try { applyKeyboardClosed(); } catch(_) { root.classList.remove('keyboard-open'); }
-      }
-      return; // Skip all keyboard shift logic while locked
-    }
-
     const gap = (window.innerHeight || 0) - ((vv.height || 0) + (vv.offsetTop || 0));
-    const isKb = IS_IOS_LEGACY && gap > THRESH;
+    const isKb = gap > THRESH && /iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isKb) {
-      applyKeyboardOpen(gap);
-    } else if (keyboardOpen || root?.dataset?.vvKb === '1') {
-      applyKeyboardClosed();
-    }
-  };
-
-  const scheduleUpdate = (delay = 0) => {
-    if (delay <= 0) {
-      scheduleAfterKeyboard(update);
+      root.dataset.vvKb = '1';
+      root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
     } else {
-      setTimeout(() => scheduleAfterKeyboard(update), delay);
+      delete root.dataset.vvKb;
+      root.style.removeProperty('--kb-offset-bottom');
     }
   };
-
   update();
   vv.addEventListener('resize', update);
-  window.addEventListener('orientationchange', () => scheduleUpdate(160));
-  window.addEventListener('focusin', () => scheduleUpdate());
-  window.addEventListener('focusout', () => scheduleUpdate(220));
-  
-  // iOS PWA Ultimate Fix: Monitor and enforce fixed element stability
-  const enforceFixedStability = () => {
-    const hasModal = !!document.querySelector('.bottom-modal:not(.hidden)');
-    const hasKeyboard = keyboardOpen || root?.dataset?.vvKb === '1';
-    
-    if (hasModal || hasKeyboard) {
-      const fixedElements = document.querySelectorAll('.app-header, .floating-pill, .floating-add-button, .floating-home-button');
-      fixedElements.forEach(el => {
-        // Force stability if transform is not already neutral
-        const currentTransform = window.getComputedStyle(el).transform;
-        if (currentTransform && currentTransform !== 'none' && currentTransform !== 'matrix(1, 0, 0, 1, 0, 0)') {
-          el.style.transform = 'translate3d(0, 0, 0)';
-          el.style.webkitTransform = 'translate3d(0, 0, 0)';
-        }
-      });
-    }
-  };
-  
-  // Run stability check periodically when keyboard or modal is active
-  setInterval(() => {
-    if (keyboardOpen || document.querySelector('.bottom-modal:not(.hidden)')) {
-      enforceFixedStability();
-    }
-  }, 16); // ~60fps check rate
+  window.addEventListener('orientationchange', () => setTimeout(update, 50));
+  window.addEventListener('focusin', () => setTimeout(update, 0));
+  window.addEventListener('focusout', () => setTimeout(update, 50));
 })();
-
-
-
 
 const currency = (v) => safeFmtCurrency(v);
 const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
