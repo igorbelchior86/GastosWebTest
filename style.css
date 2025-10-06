@@ -3591,214 +3591,48 @@ Opcional: atualizar o header da fatura para mostrar “total líquido” (total 
 #offlineIndicator{ position: static !important; right: auto; top: auto; width:40px; height:40px; display:flex; align-items:center; justify-content:center; }
 /* keep the segmented control from pushing over icons */
 .header-seg{ margin-left: 0; margin-right: 0; }
-/* ===================== NOVO HEADER/FOOTER LIMPO E ESTÁVEL ===================== */
+/* ===================== TESTE SCROLL STABILITY ===================== */
 
-/* RESET COMPLETO: Ocultar header antigo problemático */
-.app-header {
-  display: none !important;
-}
-
-/* NOVO HEADER: Ancoragem absoluta ao layout viewport */
-.new-header {
-  /* Posicionamento imutável */
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 1000;
+/* FORÇA: Container wrapper sempre estável independente do visual viewport */
+.wrapper {
+  /* Força dimensões consistentes */
+  position: relative !important;
+  width: 100% !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
   
-  /* Dimensões */
-  width: 100vw;
-  height: calc(80px + env(safe-area-inset-top));
+  /* Força overflow consistente */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   
-  /* Visual igual ao original */
-  background: rgba(42, 42, 44, 0.95);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  
-  /* Força estabilidade no iOS */
-  transform: translate3d(0, 0, 0) !important;
-  -webkit-transform: translate3d(0, 0, 0) !important;
+  /* Previne reflow durante mudanças de viewport */
   will-change: auto !important;
-  -webkit-will-change: auto !important;
+  transform: translateZ(0) !important;
   
-  /* Padding para safe areas */
-  padding-left: calc(20px + env(safe-area-inset-left));
-  padding-right: calc(20px + env(safe-area-inset-right));
-  padding-top: env(safe-area-inset-top);
+  /* Força containment */
+  contain: layout style !important;
+  overscroll-behavior: contain !important;
 }
 
-.new-header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 80px;
-  width: 100%;
-}
-
-/* Logo Section */
-.new-logo-section {
-  display: flex;
-  align-items: center;
-}
-
-.new-logo-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  font-family: inherit;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: background-color 0.2s ease;
-}
-
-.new-logo-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.new-logo-text {
-  font-weight: 700;
-  font-size: 32pt;
-  letter-spacing: 0.5pt;
-  color: #fff;
-  text-shadow: 0 0 6px #00FF0040;
-}
-
-.new-year-indicator {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-left: 4px;
-}
-
-/* Header Controls (Segmented Control) */
-.new-header-controls {
-  display: flex;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 4px;
-  gap: 2px;
-  position: relative;
-}
-
-.new-control-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  width: 44px;
-  height: 36px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.new-control-btn[aria-selected="true"] {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-/* Ícones do segmented control */
-.new-icon-calendar::before {
-  content: "📅";
-  font-size: 18px;
-}
-
-.new-icon-creditcard::before {
-  content: "💳"; 
-  font-size: 18px;
-}
-
-/* Botões invisíveis para compatibilidade */
-.legacy-compat-btn {
-  position: absolute !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  width: 1px !important;
-  height: 1px !important;
+/* FORÇA: Body/HTML nunca mudam de overflow durante viewport changes */
+html, body {
   overflow: hidden !important;
+  height: 100% !important;
+  width: 100% !important;
+  position: relative !important;
 }
 
-/* NOVOS BOTÕES FLUTUANTES ESTÁVEIS */
-.new-floating-add, .new-floating-home {
-  /* Posicionamento imutável */
+/* FORÇA: Elementos fixed sempre ancorados ao layout viewport */
+.app-header, 
+.floating-add-button, 
+.floating-home-button {
+  /* Força posicionamento absoluto no layout viewport */
   position: fixed !important;
-  z-index: 1201;
-  
-  /* Força estabilidade no iOS */
   transform: translate3d(0, 0, 0) !important;
   -webkit-transform: translate3d(0, 0, 0) !important;
   will-change: auto !important;
   -webkit-will-change: auto !important;
-  
-  /* Visual */
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border: none;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-  
-  /* Layout */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 32px;
-  font-weight: 600;
-  cursor: pointer;
-  
-  /* Animações */
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-  clip-path: circle(50% at 50% 50%);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.new-floating-add {
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  right: calc(24px + env(safe-area-inset-right));
-  animation: pulse 4s ease-in-out infinite;
-}
-
-.new-floating-home {
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  left: calc(24px + env(safe-area-inset-left));
-}
-
-.new-floating-add:hover, .new-floating-home:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
-}
-
-.new-floating-add:active, .new-floating-home:active {
-  transform: translateY(0) scale(0.95) !important;
-}
-
-/* Ícone Home */
-.new-icon-home::before {
-  content: "🏠";
-  font-size: 24px;
-}
-
-/* Ocultar botões quando modal aberto */
-html.modal-open .new-floating-add,
-html.modal-open .new-floating-home {
-  display: none !important;
-}
-
-/* Animação pulse para botão add */
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
 }
 
 /* ===================== SKELETON (light shimmer) ===================== */

@@ -18,7 +18,7 @@
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=1.6.0">
+  <link rel="stylesheet" href="style.css?v=1.6.1">
   <link rel="stylesheet" href="login.css?v=1.5.2">
 
 
@@ -31,31 +31,24 @@
   <template id="add-button-template">
     <button class="add-button">Adicionar</button>
   </template>
-  <!-- NOVO HEADER LIMPO E ESTÁVEL -->
-  <header class="new-header" id="new-header">
-    <div class="new-header-content">
-      <!-- Logo/Title área -->
-      <div class="new-logo-section">
-        <button id="yearSelector" class="new-logo-btn">
-          <span class="new-logo-text">Gastos+</span>
-          <span class="new-year-indicator">▼</span>
-        </button>
-      </div>
-      
-      <!-- Segmented Control -->
-      <div class="new-header-controls" role="tablist" aria-label="Atalhos do topo" data-selected="planned">
-        <button type="button" class="new-control-btn new-btn-calendar" data-action="planned" role="tab" aria-selected="true" title="Planejados">
-          <span class="new-icon-calendar"></span>
-        </button>
-        <button type="button" class="new-control-btn new-btn-cards" data-action="cards" role="tab" aria-selected="false" title="Orçamentos">
-          <span class="new-icon-creditcard"></span>
-        </button>
-      </div>
+  <header class="app-header" style="display: none;">
+    <div class="logo-title">
+      <button id="yearSelector" class="logo-text-btn">
+        <span class="logo-text">Gastos+</span>
+        <span class="year-indicator">▼</span>
+      </button>
+    </div>
+    <!-- Offline indicator removed -->
+
+    <!-- Header segmented control (icons only) -->
+    <div class="header-seg" role="tablist" aria-label="Atalhos do topo" data-selected="planned">
+      <button type="button" class="seg-option icon-calendar" data-action="planned" role="tab" aria-selected="true" aria-controls="plannedModal" title="Planejados"></button>
+  <button type="button" class="seg-option icon-creditcard" data-action="cards" role="tab" aria-selected="false" aria-controls="cardModal" title="Orçamentos"></button>
     </div>
 
-    <!-- Botões invisíveis para compatibilidade com JS existente -->
-    <button id="openPlannedBtn" class="legacy-compat-btn" title="Planejados">📅</button>
-    <button id="openCardModal" class="legacy-compat-btn" title="Gerenciar cartões">💳</button>
+    <!-- Mantidos para compatibilidade com o JS existente (ficam invisíveis) -->
+    <button id="openPlannedBtn" class="floating-planned-button legacy-hidden" title="Planejados">📅</button>
+    <button id="openCardModal" class="floating-card-button legacy-hidden" title="Gerenciar cartões">💳</button>
   </header>
 
   <div class="wrapper app-hidden main-panel" style="display: none;">
@@ -316,11 +309,7 @@
       <span class="pill-icon icon-gear"></span>
     </button>
   </div>
-  <!-- NOVOS BOTÕES FLUTUANTES LIMPOS E ESTÁVEIS -->
-  <button id="openTxModal" class="new-floating-add" title="Nova operação">＋</button>
-  <button id="scrollTodayBtn" class="new-floating-home" title="Hoje">
-    <span class="new-icon-home"></span>
-  </button>
+  <button id="openTxModal" class="floating-add-button" title="Nova operação" style="display: none;">＋</button>
 
   <!-- Early skeleton and unhide: runs before main.js to ensure immediate UI -->
   <script>
@@ -380,7 +369,7 @@
   
   <script type="module" src="auth.js?v=1.5.2"></script>
   <script type="module" src="login.view.js?v=1.5.2"></script>
-  <script type="module" src="main.js?v=1.6.0"></script>
+  <script type="module" src="main.js?v=1.6.1"></script>
 
   <!-- Styles moved to style.css -->
 

@@ -584,35 +584,18 @@ const plannedModal   = document.getElementById('plannedModal');
 const closePlannedModal = document.getElementById('closePlannedModal');
 const plannedList    = document.getElementById('plannedList');
 
-// NOVO Header segmented control → delega para os botões originais
-const newHeaderControls = document.querySelector('.new-header-controls');
-if (newHeaderControls) {
-  newHeaderControls.addEventListener('click', (e) => {
-    const btn = e.target.closest('.new-control-btn');
+// Header segmented control → delega para os botões originais
+const headerSeg = document.querySelector('.header-seg');
+if (headerSeg) {
+  headerSeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('.seg-option');
     if (!btn) return;
-    
-    console.log('🎯 [NEW HEADER] Botão clicado:', btn.dataset.action);
-    
     const action = btn.dataset.action;
-    
-    // Remove seleção de todos os botões
-    newHeaderControls.querySelectorAll('.new-control-btn').forEach(b => {
-      b.setAttribute('aria-selected', 'false');
-    });
-    
-    // Marca o botão atual como selecionado
-    btn.setAttribute('aria-selected', 'true');
-    newHeaderControls.dataset.selected = action;
-    
     if (action === 'planned' && openPlannedBtn) {
-      console.log('🎯 [NEW HEADER] Abrindo modal planejados');
+      headerSeg.dataset.selected = 'planned';
       openPlannedBtn.click();
     } else if (action === 'cards') {
-      console.log('🎯 [NEW HEADER] Abrindo modal cartões');
-      const openCardBtn = document.getElementById('openCardModal');
-      if (openCardBtn) {
-        openCardBtn.click();
-      }
+      headerSeg.dataset.selected = 'cards';
     }
   });
 }
@@ -2099,7 +2082,7 @@ function toggleTxModal() {
   
   // Verificar posição ANTES da mudança
   const modalRect = txModal.getBoundingClientRect();
-  const header = document.querySelector('.new-header');
+  const header = document.querySelector('.app-header');
   const headerRect = header ? header.getBoundingClientRect() : null;
   
   console.log('🔲 [MODAL DEBUG] Posições ANTES:', {
@@ -2131,7 +2114,7 @@ function toggleTxModal() {
   } else {
     console.log('🔲 [MODAL DEBUG] Preparando fechamento...');
     // CORREÇÃO: Forçar reset do header quando modal fecha
-    const header = document.querySelector('.new-header');
+    const header = document.querySelector('.app-header');
     if (header) {
       header.style.transform = '';
       header.style.top = '';
@@ -2303,7 +2286,7 @@ function scrollTodayIntoView() {
 
     requestAnimationFrame(() => {
       try {
-        const header = document.querySelector('.new-header');
+        const header = document.querySelector('.app-header');
         const headerHeight = header ? header.offsetHeight || 0 : 0;
         const sticky = document.querySelector('.sticky-month');
         if (sticky) {
@@ -2537,7 +2520,7 @@ document.addEventListener('wheel', (e) => {
     });
     
     // Verificar posição atual do header ANTES da mudança
-    const header = document.querySelector('.new-header');
+    const header = document.querySelector('.app-header');
     if (header) {
       const headerRect = header.getBoundingClientRect();
       console.log('📋 [HEADER DEBUG] Posição ANTES:', {
@@ -2611,7 +2594,136 @@ document.addEventListener('wheel', (e) => {
   console.log('✅ [KEYBOARD DEBUG] Setup completo!');
 })();
 
-// Debug removido para teste limpo
+// Debug visual na tela
+(function createDebugPanel() {
+  const debugPanel = document.createElement('div');
+  debugPanel.id = 'debug-panel';
+  debugPanel.style.cssText = `
+    position: fixed;
+    top: 70px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ff00;
+    padding: 10px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 11px;
+    z-index: 10000;
+    max-width: 300px;
+    border: 1px solid #00ff00;
+  `;
+  document.body.appendChild(debugPanel);
+  
+  function updateDebugInfo() {
+    const vv = window.visualViewport;
+    const header = document.querySelector('.app-header');
+    const modal = document.querySelector('.bottom-modal:not(.hidden)');
+    const root = document.documentElement;
+    
+    const headerRect = header ? header.getBoundingClientRect() : null;
+    const modalRect = modal ? modal.getBoundingClientRect() : null;
+    
+    debugPanel.innerHTML = `
+      <strong>📱 VIEWPORT:</strong><br>
+      Window: ${window.innerHeight}px<br>
+      Visual: ${vv ? vv.height : 'N/A'}px<br>
+      VV Top: ${vv ? vv.offsetTop : 'N/A'}px<br>
+      Gap: ${vv ? (window.innerHeight - (vv.height + vv.offsetTop)) : 'N/A'}px<br>
+      <br>
+      <strong>📋 HEADER:</strong><br>
+      Top: ${headerRect ? headerRect.top : 'N/A'}px<br>
+      Position: ${header ? getComputedStyle(header).position : 'N/A'}<br>
+      Transform: ${header ? getComputedStyle(header).transform : 'N/A'}<br>
+      <br>
+      <strong>🔲 MODAL:</strong><br>
+      Estado: ${modal ? 'ABERTO' : 'FECHADO'}<br>
+      Top: ${modalRect ? modalRect.top : 'N/A'}px<br>
+      Bottom: ${modalRect ? modalRect.bottom : 'N/A'}px<br>
+      <br>
+      <strong>🎯 CSS:</strong><br>
+      vv-kb: ${root.dataset.vvKb || 'não'}<br>
+      modal-open: ${root.classList.contains('modal-open') ? 'sim' : 'não'}<br>
+      kb-offset: ${root.style.getPropertyValue('--kb-offset-bottom') || '0px'}<br>
+    `;
+  }
+  
+  // Atualizar a cada 100ms
+  setInterval(updateDebugInfo, 100);
+  
+  // Também atualizar em eventos importantes
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateDebugInfo);
+  }
+  window.addEventListener('focus', updateDebugInfo);
+  window.addEventListener('blur', updateDebugInfo);
+  
+  console.log('📊 [DEBUG PANEL] Painel visual criado');
+})();
+
+// TESTE: Força estabilidade do container durante mudanças de viewport
+(function forceScrollStability() {
+  console.log('🧪 [SCROLL TEST] Inicializando força estabilidade...');
+  
+  const wrapper = document.querySelector('.wrapper');
+  if (!wrapper) {
+    console.log('❌ [SCROLL TEST] Wrapper não encontrado');
+    return;
+  }
+  
+  const vv = window.visualViewport;
+  if (!vv) {
+    console.log('❌ [SCROLL TEST] VisualViewport não disponível');
+    return;
+  }
+  
+  const stabilizeContainer = () => {
+    console.log('🧪 [SCROLL TEST] Forçando container estável...');
+    
+    // FORÇA: Container dimensions fixas
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100vh';
+    wrapper.style.minHeight = '100vh';
+    wrapper.style.maxHeight = '100vh';
+    
+    // FORÇA: Overflow sempre igual
+    wrapper.style.overflowY = 'auto';
+    wrapper.style.overflowX = 'hidden';
+    
+    // FORÇA: Prevent reflow
+    wrapper.style.willChange = 'auto';
+    wrapper.style.transform = 'translateZ(0)';
+    
+    console.log('🧪 [SCROLL TEST] Container estabilizado:', {
+      height: wrapper.style.height,
+      overflow: wrapper.style.overflowY,
+      position: wrapper.style.position
+    });
+  };
+  
+  // Aplicar em mudanças de viewport
+  vv.addEventListener('resize', () => {
+    console.log('🧪 [SCROLL TEST] VV resize event - estabilizando');
+    stabilizeContainer();
+  });
+  
+  window.addEventListener('orientationchange', () => {
+    console.log('🧪 [SCROLL TEST] Orientation change - estabilizando');
+    setTimeout(stabilizeContainer, 50);
+  });
+  
+  // Modal events
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'openTxModal') {
+      console.log('🧪 [SCROLL TEST] Modal opening - pré-estabilizando');
+      setTimeout(stabilizeContainer, 0);
+    }
+  });
+  
+  // Aplicar inicial
+  stabilizeContainer();
+  console.log('✅ [SCROLL TEST] Sistema de estabilidade ativado');
+})();
 
 const currency = (v) => safeFmtCurrency(v);
 const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -2629,7 +2741,7 @@ const fmt = (d) => {
 // ---------------------------------------------------------------------------
 // Sticky month header  (Safari/iOS não suporta <summary> sticky)
 // ---------------------------------------------------------------------------
-const headerEl      = document.querySelector('.new-header');
+const headerEl      = document.querySelector('.app-header');
 let HEADER_OFFSET = headerEl ? headerEl.getBoundingClientRect().height : 58;
 const STICKY_VISIBLE = 18;
 let stickyMonth = null; // Não cria imediatamente
