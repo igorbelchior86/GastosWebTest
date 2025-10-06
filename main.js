@@ -2486,112 +2486,44 @@ document.addEventListener('wheel', (e) => {
   e.preventDefault();
 }, { passive: false });
 
-// iOS: detectar teclado via VisualViewport (COM DEBUG EXTENSIVO)
-(function setupKbOffsetsWithDebug(){
-  console.log('🔧 [KEYBOARD DEBUG] Inicializando detecção de teclado...');
-  
-  const vv = window.visualViewport;
-  if (!vv) {
-    console.log('❌ [KEYBOARD DEBUG] VisualViewport não disponível');
-    return;
-  }
-  console.log('✅ [KEYBOARD DEBUG] VisualViewport disponível');
+// Minimal keyboard detection + anti-bounce clamp (iOS 16+/17/18 large vs visual viewport)
+(function setupKeyboardMinimal(){
+  const vv = window.visualViewport; if(!vv) return;
+  const root = document.documentElement; const THRESH = 140;
+  const wrapper = document.querySelector('.wrapper');
+  let lastOffsetTop = 0; let baselineScroll = 0; let clamping = false;
 
-  const root = document.documentElement;
-  const THRESH = 140; // px
-  
-  const update = () => {
-    const windowHeight = window.innerHeight || 0;
-    const vvHeight = vv.height || 0;
-    const vvOffsetTop = vv.offsetTop || 0;
-    // CORREÇÃO: Usar apenas diferença de altura, ignorar offsetTop
-    const gap = windowHeight - vvHeight;
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isKb = gap > THRESH && isIOS;
-    
-    console.log('📱 [KEYBOARD DEBUG] Atualização:', {
-      windowHeight,
-      vvHeight,
-      vvOffsetTop,
-      gap,
-      isIOS,
-      isKb,
-      THRESH
-    });
-    
-    // Verificar posição atual do header ANTES da mudança
-    const header = document.querySelector('.app-header');
-    if (header) {
-      const headerRect = header.getBoundingClientRect();
-      console.log('📋 [HEADER DEBUG] Posição ANTES:', {
-        top: headerRect.top,
-        position: getComputedStyle(header).position,
-        transform: getComputedStyle(header).transform,
-        zIndex: getComputedStyle(header).zIndex
-      });
-    }
-
-    if (isKb) {
-      console.log('⌨️ [KEYBOARD DEBUG] TECLADO DETECTADO! Aplicando offset:', Math.max(0, Math.round(gap)) + 'px');
-      root.dataset.vvKb = '1';
-      root.style.setProperty('--kb-offset-bottom', Math.max(0, Math.round(gap)) + 'px');
+  function applyGap(){
+    const gap = (window.innerHeight - vv.height);
+    const isKb = gap > THRESH;
+    if(isKb){
+      root.dataset.vvKb='1';
+      root.style.setProperty('--kb-offset-bottom', Math.round(gap)+'px');
     } else {
-      console.log('📱 [KEYBOARD DEBUG] Teclado fechado, removendo offset');
       delete root.dataset.vvKb;
       root.style.removeProperty('--kb-offset-bottom');
     }
-    
-    // Verificar posição do header DEPOIS da mudança
-    if (header) {
-      setTimeout(() => {
-        const headerRect = header.getBoundingClientRect();
-        console.log('📋 [HEADER DEBUG] Posição DEPOIS:', {
-          top: headerRect.top,
-          position: getComputedStyle(header).position,
-          transform: getComputedStyle(header).transform,
-          zIndex: getComputedStyle(header).zIndex
-        });
-      }, 10);
+  }
+
+  function clampBounce(){
+    if(!wrapper) return;
+    // When visual viewport shifts (vv.offsetTop increases) capture baseline scroll
+    if(vv.offsetTop > 0 && lastOffsetTop === 0){ baselineScroll = wrapper.scrollTop; clamping = true; }
+    // When returning to 0 release clamping restoring baseline
+    if(vv.offsetTop === 0 && lastOffsetTop > 0){ clamping = false; wrapper.scrollTop = baselineScroll; }
+    lastOffsetTop = vv.offsetTop;
+    if(clamping){
+      // Keep wrapper anchored even if Safari tries to offset layout
+      wrapper.scrollTop = baselineScroll;
     }
-    
-    // Verificar se modal está aberto e sua posição
-    const modal = document.querySelector('.bottom-modal:not(.hidden)');
-    if (modal) {
-      const modalRect = modal.getBoundingClientRect();
-      console.log('🔲 [MODAL DEBUG] Posição do modal:', {
-        top: modalRect.top,
-        bottom: modalRect.bottom,
-        height: modalRect.height,
-        windowHeight: window.innerHeight
-      });
-    }
-  };
-  
-  console.log('🎯 [KEYBOARD DEBUG] Primeira execução...');
+  }
+
+  const update=()=>{applyGap();clampBounce();};
+  vv.addEventListener('resize', update);
+  window.addEventListener('orientationchange', ()=>setTimeout(update,50));
+  window.addEventListener('focusin', ()=>setTimeout(update,0));
+  window.addEventListener('focusout', ()=>setTimeout(update,80));
   update();
-  
-  console.log('📡 [KEYBOARD DEBUG] Registrando event listeners...');
-  vv.addEventListener('resize', () => {
-    console.log('🔄 [KEYBOARD DEBUG] VisualViewport resize event');
-    update();
-  });
-  
-  window.addEventListener('orientationchange', () => {
-    console.log('🔄 [KEYBOARD DEBUG] Orientation change event');
-    setTimeout(update, 50);
-  });
-  
-  window.addEventListener('focusin', () => {
-    console.log('🔄 [KEYBOARD DEBUG] Focus in event');
-    setTimeout(update, 0);
-  });
-  
-  window.addEventListener('focusout', () => {
-    console.log('🔄 [KEYBOARD DEBUG] Focus out event');  
-    setTimeout(update, 50);
-  });
-  
-  console.log('✅ [KEYBOARD DEBUG] Setup completo!');
 })();
 
 // Debug visual na tela
@@ -2660,70 +2592,7 @@ document.addEventListener('wheel', (e) => {
   console.log('📊 [DEBUG PANEL] Painel visual criado');
 })();
 
-// TESTE: Força estabilidade do container durante mudanças de viewport
-(function forceScrollStability() {
-  console.log('🧪 [SCROLL TEST] Inicializando força estabilidade...');
-  
-  const wrapper = document.querySelector('.wrapper');
-  if (!wrapper) {
-    console.log('❌ [SCROLL TEST] Wrapper não encontrado');
-    return;
-  }
-  
-  const vv = window.visualViewport;
-  if (!vv) {
-    console.log('❌ [SCROLL TEST] VisualViewport não disponível');
-    return;
-  }
-  
-  const stabilizeContainer = () => {
-    console.log('🧪 [SCROLL TEST] Forçando container estável...');
-    
-    // FORÇA: Container dimensions fixas
-    wrapper.style.position = 'relative';
-    wrapper.style.width = '100%';
-    wrapper.style.height = '100vh';
-    wrapper.style.minHeight = '100vh';
-    wrapper.style.maxHeight = '100vh';
-    
-    // FORÇA: Overflow sempre igual
-    wrapper.style.overflowY = 'auto';
-    wrapper.style.overflowX = 'hidden';
-    
-    // FORÇA: Prevent reflow
-    wrapper.style.willChange = 'auto';
-    wrapper.style.transform = 'translateZ(0)';
-    
-    console.log('🧪 [SCROLL TEST] Container estabilizado:', {
-      height: wrapper.style.height,
-      overflow: wrapper.style.overflowY,
-      position: wrapper.style.position
-    });
-  };
-  
-  // Aplicar em mudanças de viewport
-  vv.addEventListener('resize', () => {
-    console.log('🧪 [SCROLL TEST] VV resize event - estabilizando');
-    stabilizeContainer();
-  });
-  
-  window.addEventListener('orientationchange', () => {
-    console.log('🧪 [SCROLL TEST] Orientation change - estabilizando');
-    setTimeout(stabilizeContainer, 50);
-  });
-  
-  // Modal events
-  document.addEventListener('click', (e) => {
-    if (e.target.id === 'openTxModal') {
-      console.log('🧪 [SCROLL TEST] Modal opening - pré-estabilizando');
-      setTimeout(stabilizeContainer, 0);
-    }
-  });
-  
-  // Aplicar inicial
-  stabilizeContainer();
-  console.log('✅ [SCROLL TEST] Sistema de estabilidade ativado');
-})();
+// (removido: bloco experimental forceScrollStability)
 
 const currency = (v) => safeFmtCurrency(v);
 const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];

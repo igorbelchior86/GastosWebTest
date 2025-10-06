@@ -797,7 +797,8 @@ html,body {
   overflow-x:hidden;
   font-family:'SF Pro Display',system-ui,sans-serif;
   margin:0;
-  padding:20px 10px 0;
+  /* Remove horizontal padding to avoid expanding layout width */
+  padding:20px 0 0;
 }
 .main-panel{
 background: transparent !important;
@@ -819,7 +820,8 @@ border-radius: 0 !important;
   z-index: -1;
   
   /* iOS 26 fix: Ensure backdrop extends fully behind browser chrome */
-  width: 100vw;
+  /* Use 100% instead of 100vw to prevent horizontal overflow caused by scrollbars */
+  width: 100%;
   height: 100vh; /* Will be overridden by @supports rules above */
 }
 .app-hidden{visibility:hidden;}
@@ -836,10 +838,11 @@ body{display:block;}
   overscroll-behavior: contain; /* evita bounce do body */
   
   /* iOS 26 fix: Ensure content respects safe areas on all sides */
-  padding-left: constant(safe-area-inset-left);
-  padding-left: env(safe-area-inset-left);
-  padding-right: constant(safe-area-inset-right);
-  padding-right: env(safe-area-inset-right);
+  /* Provide horizontal breathing room inside wrapper instead of on body */
+  padding-left: calc(12px + constant(safe-area-inset-left));
+  padding-left: calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + constant(safe-area-inset-right));
+  padding-right: calc(12px + env(safe-area-inset-right));
   
   /* espaço do header fixo */
   padding-top: calc(80px + constant(safe-area-inset-top));
