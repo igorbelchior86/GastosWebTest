@@ -1,102 +1,230 @@
-/* ===================== HEADER MODO CLARO ===================== */
-html[data-theme="light"] .app-header {
-  background: #fff !important;
-  color: #222;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  border: 1px solid #e0e0e0;
-}
-html[data-theme="light"] .app-header::after {
-  /* Higher-contrast green on white and restore sliding animation */
-  background: linear-gradient(90deg, transparent, #16A34A 35%, transparent 65%) !important;
-  background-repeat: no-repeat !important;          /* avoid tiling that can look static */
-  background-size: 200% 100% !important;   /* was reset by background shorthand */
-  animation: headerBar 8s linear infinite !important; /* ensure it slides in light too */
-  will-change: background-position;                 /* hint smoother animation */
-}
-html[data-theme="light"] .logo-text {
-  color: #000 !important;
-  text-shadow: 0 0 8px #00FF8080, 0 0 2px #00FF8040 !important;
+/* ===================== THEME TOKENS ===================== */
+/* Define base (dark mode) variables. These tokens centralize
+   common colors, spacing and shadows used throughout the app. */
+:root {
+  /* backgrounds */
+  --bg-main: #1e1e1e;
+  --bg-card: #2a2a2a;
+  --bg-header: rgba(42,42,44,0.8);
+  /* text colors */
+  --txt-main: #f5f5f5;
+  --txt-muted: #9e9e9e;
+  --txt-header: #ffffff;
+  /* logo text styles */
+  --logo-txt-color: #ffffff;
+  --logo-txt-shadow: 0 0 6px #00FF0040;
+  /* accent and dividers */
+  --accent: #00cfff;
+  --divider: rgba(255,255,255,0.08);
+  /* header specific styles */
+  --header-shadow: inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.3);
+  --header-bar-gradient: linear-gradient(90deg, transparent, #00FF00 30%, transparent 60%);
+
+  /* Variables for the segmented control in the header (dark mode defaults) */
+  --seg-highlight-bg: rgba(255,255,255,0.22);
+  --seg-option-bg: rgba(255,255,255,0.05);
+  --seg-option-border: rgba(255,255,255,0.18);
+  --seg-option-shadow: 0 2px 6px rgba(0,0,0,0.45);
+  --seg-option-focus-shadow: 0 0 0 2px #00FF00;
+  --seg-option-icon-color: #fff;
+  --seg-option-icon-filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  --seg-option-active-shadow: 0 6px 18px rgba(0,255,0,0.22);
+  --seg-option-active-icon-color: #fff;
+  --seg-option-active-icon-filter: drop-shadow(0 1px 3px rgba(0,0,0,.5));
+
+  /* Year item variables (dark mode defaults) */
+  --year-item-bg: rgba(255,255,255,0.06);
+  --year-item-border: rgba(255,255,255,0.12);
+  --year-item-hover-bg: rgba(255,255,255,0.12);
+  --year-item-active-bg: rgba(255,255,255,0.18);
+  --year-item-color: var(--txt-main);
+  --year-item-current-bg: var(--green);
+  --year-item-current-color: #000000;
+  --year-item-current-opacity-hover: 0.9;
+
+  /* Operation list tokens (dark mode defaults).
+     These centralize styles for executed and planned transaction blocks.
+     Background and text colors are defined here and can be overridden in light theme. */
+  --ops-bg: var(--glass-bg);
+  --ops-op-line-bg: var(--card-bg);
+  --ops-desc-color: #fff;
+  --ops-time-color: #bbbbbb;
+  --ops-value-color: #fff;
+
+  /* Month divider and meta tokens (dark mode defaults).
+     These variables control the colors of month headers, including the border,
+     divider line and meta label/value. They are overridden in light mode. */
+  --month-divider-border-color: #5a5a5a;
+  --month-divider-line-color: #3e3e40;
+  --month-meta-label-color: rgba(255,255,255,0.7);
+  --month-meta-value-color: #ffffff;
+
+  /* Card list line tokens (dark mode defaults).  The defaults reflect the
+     existing dark theme styling for card list items: a semi-opaque dark
+     background, modest corner rounding and no border or shadow.  Colors
+     for the card name and dates are also defined here. */
+  --card-line-bg: rgba(255,255,255,0.1);
+  --card-line-border: none;
+  --card-line-radius: 12px;
+  --card-line-padding: 8px 16px;
+  --card-line-shadow: none;
+  --card-line-color: #fff;
+  --card-name-color: #fff;
+  --card-dates-color: #444;
+
+  /* Modal card line tokens (dark mode defaults).  These control the
+     appearance of card rows within the card modal, which have a more
+     pronounced glass effect, border and drop shadow. */
+  --modal-card-line-bg: var(--glass-bg-light);
+  --modal-card-line-border: 1px solid rgba(255,255,255,0.12);
+  --modal-card-line-radius: 12px;
+  --modal-card-line-padding: 16px;
+  --modal-card-line-margin-top: 12px;
+  --modal-card-line-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  --modal-card-line-color: #fff;
+  --modal-card-name-color: #fff;
+  --modal-card-dates-color: #fff;
+
+  /* Bottom sheet modal tokens (dark mode defaults).  These control
+     the appearance of the generic bottom modal boxes used for
+     transactions, cards, planned items and recurrence confirmation.
+     The base values match the existing dark theme styling. */
+  --sheet-bg: rgba(255,255,255,0.1);
+  --sheet-border: 1px solid rgba(255,255,255,0.2);
+  --sheet-shadow: inset 0 8px 16px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.6), 0 12px 36px rgba(0,0,0,0.7);
+  --sheet-radius: 20px;
+  --sheet-padding: 18px;
+
+  /* Swipe operation line tokens (dark mode defaults).  These variables
+     unify the styling for swipeable operation rows across accordion
+     contexts.  Light mode will override them below. */
+  --swipe-op-bg: var(--card-bg);
+  --swipe-op-color: #fff;
+  --swipe-op-border: none;
+  --swipe-op-shadow: none;
+  --swipe-op-radius: 12px;
+  --swipe-op-padding: 12px;
+  --swipe-op-margin-top: 8px;
+
+  /* Additional operation line tokens for border and shadow.
+     These are used by executed/planned operation rows so that
+     borders and shadows can be customized per theme. */
+  --ops-op-line-border: none;
+  --ops-op-line-shadow: 0 2px 6px rgba(0,0,0,.30);
 }
 
+/* Light theme overrides for bottom sheet modal tokens.  These values
+   adjust the background, border and shadow to suit the light palette
+   without changing the common `.bottom-modal-box` styling.  Keeping
+   these in one place avoids duplicating modal rules later. */
+html[data-theme="light"] {
+  --sheet-bg: var(--bg-card);
+  --sheet-border: 1px solid var(--divider);
+  --sheet-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  /* Preserve existing radius/padding values from dark theme */
+  --sheet-radius: 20px;
+  --sheet-padding: 18px;
+}
+
+/* Override variables for light mode only.  Only the values change –
+   the rules elsewhere reference the same CSS variables so styles
+   update automatically when the theme changes. */
+html[data-theme="light"] {
+  --bg-main: #f7f7f7;
+  --bg-card: #ffffff;
+  --bg-header: #ffffff;
+  --txt-main: #222222;
+  --txt-muted: #888888;
+  --txt-header: #222222;
+  --logo-txt-color: #000000;
+  --logo-txt-shadow: 0 0 8px #00FF8080, 0 0 2px #00FF8040;
+  --accent: #00cfff;
+  --divider: #e0e0e0;
+  --header-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --header-bar-gradient: linear-gradient(90deg, transparent, #16A34A 35%, transparent 65%);
+
+  /* Override segmented control variables for light mode */
+  --seg-highlight-bg: rgba(0,0,0,0.04);
+  --seg-option-bg: #fff;
+  --seg-option-border: rgba(0,0,0,0.08);
+  --seg-option-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  --seg-option-focus-shadow: 0 0 0 2px rgba(0,207,255,0.12);
+  --seg-option-icon-color: #111;
+  --seg-option-icon-filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
+  --seg-option-active-shadow: 0 6px 18px rgba(0,207,255,0.12);
+  --seg-option-active-icon-color: #fff;
+  --seg-option-active-icon-filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
+
+  /* Year item overrides for light mode */
+  --year-item-bg: rgba(0,0,0,0.06);
+  --year-item-border: rgba(0,0,0,0.08);
+  --year-item-hover-bg: rgba(0,0,0,0.12);
+  --year-item-active-bg: rgba(0,0,0,0.18);
+  --year-item-color: #111111;
+  --year-item-current-bg: #e6ffe6;
+  --year-item-current-color: #003300;
+  --year-item-current-opacity-hover: 0.9;
+
+  /* Operation list tokens for light mode.
+     These override the dark defaults to match the light theme palette. */
+  --ops-bg: var(--bg-card);
+  --ops-op-line-bg: #fff;
+  --ops-desc-color: var(--txt-main);
+  --ops-time-color: var(--txt-muted);
+  --ops-value-color: var(--txt-main);
+
+  /* Override month divider tokens for light mode. */
+  --month-divider-border-color: rgba(0,0,0,0.14);
+  --month-divider-line-color: var(--divider);
+  --month-meta-label-color: var(--txt-muted);
+  --month-meta-value-color: var(--txt-main);
+
+  /* Card list line tokens for light mode.  These override the dark
+     defaults with a light background, subtle border, larger radius
+     and shadow, and darker text colors. */
+  --card-line-bg: #ffffffec;
+  --card-line-border: 1px solid rgba(0,0,0,0.10);
+  --card-line-radius: 14px;
+  --card-line-padding: 16px;
+  --card-line-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  --card-line-color: #111;
+  --card-name-color: #111;
+  --card-dates-color: #374151;
+
+  /* Modal card line tokens for light mode.  These adjust the glass
+     effect within the card modal to a light translucent white with
+     matching border and shadow, and appropriate text colors. */
+  --modal-card-line-bg: #ffffffec;
+  --modal-card-line-border: 1px solid rgba(0,0,0,0.10);
+  --modal-card-line-radius: 14px;
+  --modal-card-line-padding: 16px;
+  --modal-card-line-margin-top: 12px;
+  --modal-card-line-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  --modal-card-line-color: #111;
+  --modal-card-name-color: #111;
+  --modal-card-dates-color: #374151;
+
+  /* Swipe operation line tokens for light mode.  These values are used
+     for swipe rows outside of the modal. */
+  --swipe-op-bg: #fff;
+  --swipe-op-color: var(--txt-main);
+  --swipe-op-border: 1px solid rgba(0,0,0,0.06);
+  --swipe-op-shadow: 0 1px 4px rgba(0,0,0,0.10);
+
+  /* Operation line border/shadow overrides for light mode.
+     Provide a thin border and smaller shadow for executed/planned
+     operation rows in the light theme. */
+  --ops-op-line-border: 1px solid rgba(0,0,0,0.06);
+  --ops-op-line-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+/* Year selector overrides remain scoped to light mode.  These
+   declarations were originally hard-coded and are now
+   reintroduced using CSS variables where possible. */
 html[data-theme="light"] .year-indicator {
-  color: #000;
+  color: var(--txt-main);
 }
 
-/* Year selector light theme */
-html[data-theme="light"] .year-item {
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #111;
-}
-
-html[data-theme="light"] .year-item:hover {
-  background: rgba(0, 0, 0, 0.12);
-}
-
-html[data-theme="light"] .year-item:active {
-  background: rgba(0, 0, 0, 0.18);
-}
-
-html[data-theme="light"] .header-seg{
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0;
-  height: 44px;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  margin-left: auto;
-  margin-right: 8px;
-}
-html[data-theme="light"] .header-seg .seg-highlight{
-  display: none;
-  position: absolute;
-  top: 2px; bottom: 2px; left: 2px;
-  width: calc(50% - 2px);
-  background: rgba(0,0,0,0.04);
-  border-radius: 20px;
-  will-change: transform;
-  transition: transform .28s cubic-bezier(.5,1.5,.5,1);
-  pointer-events: none;
-}
-html[data-theme="light"] .header-seg[data-selected="cards"] .seg-highlight{ transform: translateX(100%); }
-html[data-theme="light"] .header-seg .seg-option{
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  z-index: 1;
-}
-html[data-theme="light"] .header-seg .seg-option:focus-visible{ outline: none; box-shadow: 0 0 0 2px rgba(0,207,255,0.12); border-radius: 18px; }
-html[data-theme="light"] .header-seg .seg-option::before{
-  content: '';
-  width: 22px; height: 22px;
-  background-color: #111; /* dark icons on light buttons */
-  mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
-  mask-position: center;  -webkit-mask-position: center;
-  mask-size: 100% 100%;   -webkit-mask-size: 100% 100%;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
-}
-html[data-theme="light"] .header-seg .seg-option.active{
-  background: var(--accent);
-  color: #fff;
-  border: 1px solid var(--accent);
-  box-shadow: 0 6px 18px rgba(0,207,255,0.12);
-}
-html[data-theme="light"] .header-seg .seg-option.active::before{
-  background-color: #fff; /* white icon on accent */
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
-}
 
 /* ===================== MODO CLARO ===================== */
 html[data-theme="light"] {
@@ -185,12 +313,12 @@ html[data-theme="light"] summary.month-divider .meta-value {
 }
 
 html[data-theme="light"] summary.month-divider .meta-label {
-  color: var(--txt-muted) !important;
+  color: var(--month-meta-label-color) !important;
   font-weight: 500;
 }
 
 html[data-theme="light"] summary.month-divider .meta-value {
-  color: var(--txt-main) !important;
+  color: var(--month-meta-value-color) !important;
   font-weight: 700; /* slightly heavier for clear contrast */
   font-size: 12pt;
 }
@@ -213,6 +341,11 @@ html[data-theme="light"] .month-meta .meta-value * {
 /* Keep the balance aligned to the right as in original layout */
 html[data-theme="light"] summary.month-divider .meta-value {
   margin-left: auto !important; /* preserve flex alignment */
+}
+
+/* Ensure month meta values use the configured token in light theme */
+html[data-theme="light"] .month-meta .meta-value {
+  color: var(--month-meta-value-color) !important;
 }
 
 html[data-theme="light"] .meta-label {
@@ -277,12 +410,12 @@ html[data-theme="light"] summary.month-divider{
   border: 1px solid rgba(0,0,0,0.08) !important;
 }
 html[data-theme="light"] summary.month-divider::before{
-  border-color: rgba(0,0,0,0.14) !important;
+  border-color: var(--month-divider-border-color) !important;
   opacity: 1 !important; /* ensure the border is visible on white */
 }
 html[data-theme="light"] summary.month-divider .month-row::after,
 html[data-theme="light"] .month-header-title::after{
-  background-color: var(--divider) !important;
+  background-color: var(--month-divider-line-color) !important;
 }
 
 /* Executed block container and lines */
@@ -397,18 +530,18 @@ html[data-theme="light"] summary.month-divider .month-meta::before{
 
 /* Generic swipe rows inside accordion (outside invoice), readable on light bg */
 html[data-theme="light"] .swipe-wrapper .op-line{
-  background: #fff !important;
-  color: var(--txt-main) !important;
-  border: 1px solid rgba(0,0,0,0.06) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+  background: var(--swipe-op-bg) !important;
+  color: var(--swipe-op-color) !important;
+  border: var(--swipe-op-border) !important;
+  box-shadow: var(--swipe-op-shadow) !important;
 }
 
 /* Planned rows inside accordion: align visuals with executed */
 html[data-theme="light"] .planned-list li .op-line{
-  background: #fff !important;
-  color: var(--txt-main) !important;
-  border: 1px solid rgba(0,0,0,0.06) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.10) !important;
+  background: var(--ops-op-line-bg) !important;
+  color: var(--ops-value-color) !important;
+  border: var(--ops-op-line-border) !important;
+  box-shadow: var(--ops-op-line-shadow) !important;
 }
 html[data-theme="light"] #accordion .plan-check{ border-color: var(--txt-muted) !important; }
 html[data-theme="light"] #accordion .plan-check:checked{ background: var(--blue) !important; border-color: var(--blue) !important; }
@@ -481,11 +614,23 @@ html[data-theme="light"] .planned-list .op-right .value.positive {
   opacity: 0.9;
 }
 
+/* Define sheet overrides for the currency profile modal in dark mode.  Use
+   the same variables as the general bottom sheet to avoid duplicating
+   structural rules. */
+#currencyProfileModal .bottom-modal-box {
+  --sheet-bg: var(--glass-bg);
+  --sheet-border: 1px solid rgba(255,255,255,0.08);
+  --sheet-shadow: 0 6px 20px rgba(0,0,0,0.45);
+}
+
 /* Light theme: País / Moeda modal styles */
 html[data-theme="light"] #currencyProfileModal .bottom-modal-box {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--divider) !important;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.08) !important;
+  /* Use variables to control appearance of the currency profile modal in
+     light mode.  This overrides the default sheet tokens without
+     duplicating styles. */
+  --sheet-bg: var(--bg-card);
+  --sheet-border: 1px solid var(--divider);
+  --sheet-shadow: 0 8px 22px rgba(0,0,0,0.08);
 }
 html[data-theme="light"] #currencyProfileModal .modal-content {
   background: transparent !important;
@@ -522,7 +667,7 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   color: #666 !important;
 }
 
-/* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
+/* Additional components for light theme should be prefixed with html[data-theme="light"] */
 /* Planned modal layout (grid without DOM changes)
    Row 1: [Descrição] .......... [Valor]
    Row 2: [Método de pagamento] (left, under descrição)
@@ -1069,6 +1214,33 @@ input,select,textarea{font-size:16px!important;box-sizing:border-box;}
 }
 
 /* ===================== ICONS ===================== */
+.icon-card,
+.icon-transporte,
+.icon-moradia,
+.icon-saude,
+.icon-alimentacao,
+.icon-mercado,
+.icon-doacao,
+.icon-renda,
+.icon-transfer,
+.icon-fatura,
+.icon-outros,
+.icon-money {
+  /* Consolidated base styles for all category icons.  Define display,
+     sizing and mask alignment once instead of repeating in every
+     class.  Individual icons still specify their own SVG via
+     `mask-image` (or `mask` for .icon-renda/.icon-money) and can
+     override width/height or colors as needed. */
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: 100%;
+}
 .icon-action{
   display:inline-block;
   width:24px;
@@ -1219,9 +1391,10 @@ summary.day-summary .icon-invoice::before{
   overflow:hidden;
   backdrop-filter:saturate(180%) blur(30px);
   -webkit-backdrop-filter:saturate(180%) blur(30px);
-  box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 4px 12px rgba(0,0,0,.3);
-  background: rgba(42,42,44,0.8) !important;
-  border:1px solid rgba(255,255,255,.08);
+  box-shadow: var(--header-shadow);
+  background: var(--bg-header) !important;
+  border:1px solid var(--divider);
+  color: var(--txt-header);
   border-bottom-left-radius:12px;
   border-bottom-right-radius:12px;
   /* fallback antigo + padrão atual */
@@ -1236,8 +1409,11 @@ summary.day-summary .icon-invoice::before{
   width:100%;
   height:2px;
   pointer-events:none;
-  background:linear-gradient(90deg, transparent, #00FF00 30%, transparent 60%);
-  background-size:200% 100%;
+  background: var(--header-bar-gradient) !important;
+  background-repeat: no-repeat !important;
+  background-size: 200% 100% !important;
+  animation: headerBar 8s linear infinite;
+  will-change: background-position;
   animation:headerBar 8s linear infinite;
 }
 /* ===== Header segmented control (2 segmentos) ===== */
@@ -1259,7 +1435,7 @@ summary.day-summary .icon-invoice::before{
   position: absolute;
   top: 2px; bottom: 2px; left: 2px;
   width: calc(50% - 2px);
-  background: rgba(255,255,255,0.22);
+  background: var(--seg-highlight-bg);
   border-radius: 20px;
   will-change: transform;
   transition: transform .28s cubic-bezier(.5,1.5,.5,1);
@@ -1270,10 +1446,10 @@ summary.day-summary .icon-invoice::before{
   position: relative;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--seg-option-border);
+  background: var(--seg-option-bg);
   border-radius: 14px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+  box-shadow: var(--seg-option-shadow);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1281,15 +1457,31 @@ summary.day-summary .icon-invoice::before{
   -webkit-tap-highlight-color: transparent;
   z-index: 1; /* acima do highlight */
 }
-.header-seg .seg-option:focus-visible{ outline: none; box-shadow: 0 0 0 2px #00FF00; border-radius: 18px; }
+.header-seg .seg-option:focus-visible{
+  outline: none;
+  box-shadow: var(--seg-option-focus-shadow);
+  border-radius: 18px;
+}
 .header-seg .seg-option::before{
   content: '';
   width: 22px; height: 22px;
-  background-color: #fff; /* ícones monocromáticos (consistentes com o app) */
+  background-color: var(--seg-option-icon-color); /* ícones monocromáticos (consistentes com o app) */
   mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
   mask-position: center;  -webkit-mask-position: center;
   mask-size: 100% 100%;   -webkit-mask-size: 100% 100%;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  filter: var(--seg-option-icon-filter);
+}
+
+/* Active state for segmented control options. Uses variables so themes control colors. */
+.header-seg .seg-option.active{
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  box-shadow: var(--seg-option-active-shadow);
+}
+.header-seg .seg-option.active::before{
+  background-color: var(--seg-option-active-icon-color);
+  filter: var(--seg-option-active-icon-filter);
 }
 .header-seg .seg-option.icon-calendar::before{
   mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm12 8H5v10h14V10zM7 8h10V6H7v2z"/></svg>') no-repeat center / 100%;
@@ -1307,7 +1499,7 @@ summary.day-summary .icon-invoice::before{
   100% {background-position:-200% 0;}
 }
 .logo-title{display:flex;align-items:center;gap:8px;margin-right:auto;}
-.logo-text{font-weight:700;font-size:32pt;letter-spacing:.5pt;color:#fff;text-shadow:0 0 6px #00FF0040;margin-right:auto;}
+.logo-text{font-weight:700;font-size:32pt;letter-spacing:.5pt;color:var(--logo-txt-color);text-shadow:var(--logo-txt-shadow);margin-right:auto;}
 
 /* Year selector button */
 .logo-text-btn {
@@ -1353,35 +1545,35 @@ summary.day-summary .icon-invoice::before{
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--year-item-bg);
+  border: 1px solid var(--year-item-border);
   border-radius: 12px;
   cursor: pointer;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--txt-main);
+  color: var(--year-item-color);
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .year-item:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--year-item-hover-bg);
 }
 
 .year-item:active {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--year-item-active-bg);
   transform: scale(0.98);
 }
 
 .year-item.current {
-  background: var(--green);
-  color: #000;
+  background: var(--year-item-current-bg);
+  color: var(--year-item-current-color);
   font-weight: 700;
 }
 
 .year-item.current:hover {
-  background: var(--green);
-  opacity: 0.9;
+  background: var(--year-item-current-bg);
+  opacity: var(--year-item-current-opacity-hover);
 }
 
 .app-footer{
@@ -1474,14 +1666,19 @@ summary.day-summary .icon-invoice::before{
 }
 
 /* Caixa do modal: vidro escuro com leve textura/gradiente */
+/* For the primary bottom sheet modals (transactions, cards, planned items
+   and recurrence confirmation), override the sheet variables instead of
+   directly styling the box.  This keeps the structural styles in one
+   place while allowing each modal type to customize its appearance. */
 #plannedModal .bottom-modal-box,
 #cardModal .bottom-modal-box,
 #txModal .bottom-modal-box,
 #deleteRecurrenceModal .bottom-modal-box,
 #editRecurrenceModal .bottom-modal-box {
-  background: var(--glass-bg) !important;             /* rgba(42,42,44,.80) + radial highlight */
-  border: 1px solid rgba(255,255,255,.08);
-  box-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
+  /* Dark theme values: use the glass background and a subtle border/shadow. */
+  --sheet-bg: var(--glass-bg);
+  --sheet-border: 1px solid rgba(255,255,255,0.08);
+  --sheet-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,0.45);
 }
 .year-list {
   overflow: auto;
@@ -1758,13 +1955,13 @@ summary.month-divider{
   font-weight:700;font-size:18pt;text-transform:uppercase;letter-spacing:.5pt;color:#348461;text-shadow:0 0 6px #00FF0040;
 
 }
-summary.month-divider::before{content:'';position:absolute;inset:0;border-radius:12px;border:1px solid #5a5a5a;opacity:.35;pointer-events:none;text-shadow:0 0 6px #00FF0040;box-sizing:border-box;}
+summary.month-divider::before{content:'';position:absolute;inset:0;border-radius:12px;border:1px solid var(--month-divider-border-color);opacity:.35;pointer-events:none;text-shadow:0 0 6px #00FF0040;box-sizing:border-box;}
 /* Ensure the month divider container clips any overlay pseudo-elements to its rounded corners */
 summary.month-divider{overflow:hidden;}
 summary.month-divider .month-row{display:flex;align-items:center;width:100%;font-weight:700;font-size:18pt;text-transform:uppercase;letter-spacing:.5pt;position:relative;gap:12px;text-shadow:0 0 6px #00FF0040;}
-summary.month-divider .month-row::after{content:"";flex-grow:1;height:1px;background-color:#3e3e40;text-shadow:0 0 6px #00FF0040;}
+summary.month-divider .month-row::after{content:"";flex-grow:1;height:1px;background-color:var(--month-divider-line-color);text-shadow:0 0 6px #00FF0040;}
 .month-header-title{position:relative;display:flex;align-items:center;}
-.month-header-title::after{content:"";flex-grow:1;height:1px;background-color:#3e3e40;margin-left:12px;border-radius:999px;box-sizing:border-box;}
+.month-header-title::after{content:"";flex-grow:1;height:1px;background-color:var(--month-divider-line-color);margin-left:12px;border-radius:999px;box-sizing:border-box;}
 /* Round the thin divider in month row so its ends are not sharp */
 summary.month-divider .month-row::after{
   content:"";
@@ -1777,8 +1974,8 @@ summary.month-divider .month-row::after{
 }
 summary.month-divider .month-meta{display:flex!important;justify-content:space-between;align-items:center;width:100%;font-size:12pt;font-weight:500;text-shadow:0 0 6px #00FF0040;}
 summary.month-divider .month-meta::before{content:'|';margin-right:6px;opacity:.7;text-shadow:0 0 6px #00FF0040;}
-summary.month-divider .meta-label{text-transform:none;font-size:12pt;color:rgba(255,255,255,.7);font-weight:400;text-shadow:0 0 6px #00FF0040;}
-summary.month-divider .meta-value{margin-left:auto;font-size:12pt;color:#fff;font-weight:600;text-shadow:0 0 6px #00FF0040;}
+summary.month-divider .meta-label{text-transform:none;font-size:12pt;color:var(--month-meta-label-color);font-weight:400;text-shadow:0 0 6px #00FF0040;}
+summary.month-divider .meta-value{margin-left:auto;font-size:12pt;color:var(--month-meta-value-color);font-weight:600;text-shadow:0 0 6px #00FF0040;}
 details.month > summary:not(.month-divider),details.month > .month-meta{display:none!important;}
 .month-meta{display:none!important;}
 
@@ -1824,10 +2021,13 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   gap:2px;
   height:64px;
   padding:0 10px;
-  background:var(--card-bg);
+  /* Use tokens for operation line styles so light/dark themes share the same rule.
+     The colors and backgrounds are defined by --ops-* variables. */
+  background: var(--ops-op-line-bg);
   border-radius:8px;
-  box-shadow:0 2px 6px rgba(0,0,0,.30);
-  color:#fff;
+  border: var(--ops-op-line-border);
+  box-shadow: var(--ops-op-line-shadow);
+  color: var(--ops-value-color);
 }
 .op-main{
   display:flex;
@@ -1843,13 +2043,14 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   gap:8px;
   font-weight:500;
   font-size:12pt;
-  color:#fff;
+  /* Use shared token for operation description color */
+  color: var(--ops-desc-color);
   flex:1 1 auto;
   min-width:0;
 }
-.executed-cash .timestamp{margin:0;font-weight:400;font-size:8pt;color:#bbbbbb;align-self:flex-start;}
+.executed-cash .timestamp{margin:0;font-weight:400;font-size:8pt;color:var(--ops-time-color);align-self:flex-start;}
 /* Place timestamp under description for Planned list */
-.planned-cash .timestamp{ margin:0; font-weight:400; font-size:8pt; color: var(--timestamp); }
+.planned-cash .timestamp{ margin:0; font-weight:400; font-size:8pt; color: var(--ops-time-color); }
 /* Layout for description + recurrence icon on one row */
 .op-left .left-text{ display:flex; flex-direction:column; min-width:0; }
 .op-left .left-title{ display:flex; align-items:center; gap:6px; min-width:0; }
@@ -1875,7 +2076,12 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
   margin-left:auto;
   flex:0 0 auto;
 }
-.executed-cash .op-right .value{font-weight:600;font-size:10pt;}
+.executed-cash .op-right .value{
+  font-weight:600;
+  font-size:10pt;
+  /* Use token for default value color; specific negative/positive classes override */
+  color: var(--ops-value-color);
+}
 
 /* Checkbox (planejados) */
 #plannedModal .planned-cash input[type="checkbox"], #plannedModal .planned-cash .plan-check{
@@ -1959,6 +2165,15 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
   min-width:0;
   font-weight:500;   /* match Executados */
   font-size:12pt;    /* match Executados */
+
+  /* Use shared token for operation description color */
+  color: var(--ops-desc-color);
+}
+
+/* Default value color for planned list matches executed list via token.
+   Specific negative/positive classes override this. */
+.planned-list .op-right .value{
+  color: var(--ops-value-color);
 }
 .planned-list .op-right .value{
   font-weight:600;  /* match Executados default */
@@ -1979,21 +2194,42 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 
 /* ==== Card modal: high-contrast glass-style cards ==== */
 #cardModal .swipe-wrapper .card-line {
-  background: var(--glass-bg-light);          /* lighter glass for contrast */
-  border: 1px solid rgba(255,255,255,0.12);   /* subtle white border */
-  border-radius: 12px;                        /* larger rounding */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.6);      /* stronger shadow */
-  margin-top: 12px !important;                /* more vertical spacing */
-  padding: 16px;                              /* slightly more padding */
-  color: #fff;                                /* ensure readability */
+  /* Use modal card line tokens so the modal list appearance follows theme variables */
+  background: var(--modal-card-line-bg);
+  border: var(--modal-card-line-border);
+  border-radius: var(--modal-card-line-radius);
+  box-shadow: var(--modal-card-line-shadow);
+  margin-top: var(--modal-card-line-margin-top);
+  padding: var(--modal-card-line-padding);
+  color: var(--modal-card-line-color);
+}
+
+/* Card modal: card list line styles.
+   Use modal card line tokens so cards within the modal follow theme definitions. */
+#cardModal .card-list li .card-line {
+  background: var(--modal-card-line-bg);
+  border: var(--modal-card-line-border);
+  border-radius: var(--modal-card-line-radius);
+  box-shadow: var(--modal-card-line-shadow);
+  margin-top: var(--modal-card-line-margin-top);
+  padding: var(--modal-card-line-padding);
+  color: var(--modal-card-line-color);
+}
+#cardModal .card-list li .card-line .card-name {
+  color: var(--modal-card-name-color);
+}
+#cardModal .card-list li .card-line .card-dates {
+  color: var(--modal-card-dates-color);
 }
 
 .swipe-wrapper .op-line {
-  background: var(--card-bg); /* was: var(--panel) */
-  color: #fff;
-  border-radius: 12px;      /* match your card corners */
-  padding: 12px;            /* reduced from 16px or previous value */
-  margin-top: 8px !important;
+  background: var(--swipe-op-bg);
+  color: var(--swipe-op-color);
+  border: var(--swipe-op-border);
+  box-shadow: var(--swipe-op-shadow);
+  border-radius: var(--swipe-op-radius);
+  padding: var(--swipe-op-padding);
+  margin-top: var(--swipe-op-margin-top);
   transition: transform .2s ease;
   box-sizing: border-box;
   width: 100%;
@@ -2261,17 +2497,18 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 .bottom-modal:not(.hidden){opacity:1;pointer-events:auto;}
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
+/* Base styling for the bottom sheet container.  Use the
+   sheet variables defined above to control appearance across
+   all bottom sheet modals.  Additional layout properties
+   remain untouched. */
 .bottom-modal-box {
-  background: rgba(255,255,255,0.1);
+  background: var(--sheet-bg);
   backdrop-filter: blur(20px) saturate(200%);
   -webkit-backdrop-filter: blur(20px) saturate(200%);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 20px;
-  box-shadow:
-    inset 0 8px 16px rgba(0,0,0,0.3),
-    0 8px 24px rgba(0,0,0,0.6),
-    0 12px 36px rgba(0,0,0,0.7);
-  padding: 18px;
+  border: var(--sheet-border);
+  border-radius: var(--sheet-radius);
+  box-shadow: var(--sheet-shadow);
+  padding: var(--sheet-padding);
   box-sizing: border-box;
   width: calc(100% - 8px);
   max-width: 480px;
@@ -2835,14 +3072,20 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 
 /* Darken card-list background and white text */
 .card-list li .card-line {
-  background: rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: 12px;
-  color: #fff;
+  /* Use variables for card line backgrounds, radius, padding and colors.
+     These tokens allow dark and light themes to share the same rule. */
+  background: var(--card-line-bg);
+  border-radius: var(--card-line-radius);
+  padding: var(--card-line-padding);
+  border: var(--card-line-border);
+  box-shadow: var(--card-line-shadow);
+  color: var(--card-line-color);
 }
-.card-list li .card-line .card-name,
+.card-list li .card-line .card-name {
+  color: var(--card-name-color);
+}
 .card-list li .card-line .card-dates {
-  color: #fff;
+  color: var(--card-dates-color);
 }
 select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-color:#fff;border:none;border-radius:16px;padding:10px;font-size:1rem;width:100%;box-shadow:inset 0 1px 4px rgba(0,0,0,.1);} 
 
@@ -2929,9 +3172,9 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 .card-dates{display:flex;gap:10px;margin-bottom:10px;}
 .card-list{list-style:none;padding:0;margin-top:10px;}
 .card-list li{display:flex;flex-direction:column;gap:2px;border-radius:8px;padding:4px 0;}
-.card-list li .card-line{display:flex;justify-content:space-between;align-items:center;gap:10px;position:relative;z-index:1;background:var(--panel);padding:8px 16px;transition:transform .2s ease;}
-.card-line .card-name{font-weight:bold;font-size:1rem;}
-.card-line .card-dates{font-size:.875rem;color:#444;}
+.card-list li .card-line{display:flex;justify-content:space-between;align-items:center;gap:10px;position:relative;z-index:1;background:var(--card-line-bg);padding:var(--card-line-padding);border: var(--card-line-border);border-radius: var(--card-line-radius);box-shadow: var(--card-line-shadow);color: var(--card-line-color);transition:transform .2s ease;}
+.card-line .card-name{font-weight:bold;font-size:1rem;color: var(--card-name-color);}
+.card-line .card-dates{font-size:.875rem;color: var(--card-dates-color);} 
 .card-list li .card-actions{display:flex;justify-content:flex-end;gap:6px;margin-left:8px;}
 .card-list li .card-actions button{width:40px;height:32px;font-size:1rem;border-radius:12px;border:2px solid #000;background:#fff;cursor:pointer;flex:1;}
 .card-list li .card-info,.card-list li .card-meta{display:flex;justify-content:space-between;align-items:center;}
@@ -3273,22 +3516,22 @@ html[data-theme="light"] #cardModal small{ color:#6b7280; }
 
 /* Card list entries */
 html[data-theme="light"] #cardModal .card-list li .card-line{
-  background:#ffffffec; /* slightly translucent to keep frosted feel */
-  border:1px solid rgba(0,0,0,0.10);
-  border-radius:14px;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
-  color:#111;
+  background: var(--modal-card-line-bg);
+  border: var(--modal-card-line-border);
+  border-radius: var(--modal-card-line-radius);
+  box-shadow: var(--modal-card-line-shadow);
+  color: var(--modal-card-line-color);
 }
-html[data-theme="light"] #cardModal .card-list li .card-line .card-name{ color:#111; }
-html[data-theme="light"] #cardModal .card-list li .card-line .card-dates{ color:#374151; }
+html[data-theme="light"] #cardModal .card-list li .card-line .card-name{ color: var(--modal-card-name-color); }
+html[data-theme="light"] #cardModal .card-list li .card-line .card-dates{ color: var(--modal-card-dates-color); }
 
 /* If swipe wrapper is in use inside card modal */
 html[data-theme="light"] #cardModal .swipe-wrapper .card-line{
-  background:#ffffffec;
-  border:1px solid rgba(0,0,0,0.10);
-  border-radius:14px;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
-  color:#111;
+  background: var(--modal-card-line-bg);
+  border: var(--modal-card-line-border);
+  border-radius: var(--modal-card-line-radius);
+  box-shadow: var(--modal-card-line-shadow);
+  color: var(--modal-card-line-color);
 }
 /* Ensure detail labels/values are readable on white */
 html[data-theme="light"] #cardModal .card-detail{ color:#111; }
@@ -3848,4 +4091,40 @@ html[data-theme="dark"] {
 
 html[data-theme="dark"] .year-indicator {
   color: #ffffff;
+}
+
+/* ===================== PREFERENCES: REDUCED MOTION ===================== */
+@media (prefers-reduced-motion: reduce) {
+  /* Drastically shorten or disable animations and transitions to respect
+     users who prefer reduced motion.  All elements will complete
+     animations instantly and will no longer loop. */
+  * {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+
+  /* Remove heavy backdrop blurs for translucent surfaces to improve
+     performance and reduce distraction. */
+  .bottom-modal,
+  .bottom-modal-box,
+  .sticky-month,
+  .card,
+  summary.month-divider,
+  .month-meta,
+  .swipe-wrapper .op-line {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Disable skeleton loading shimmer */
+  .skeleton,
+  .skeleton-pill,
+  .month-divider .skeleton,
+  .month-divider .skeleton-pill,
+  .month-meta .skeleton,
+  .month-meta .skeleton-pill {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
 }
