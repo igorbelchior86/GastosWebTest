@@ -676,7 +676,9 @@ export function groupTransactionsByMonth(context) {
  */
 export function createAnimateWrapperScroll(context) {
   return function animateWrapperScroll(targetTop) {
+    console.log('animateWrapperScroll called with targetTop:', targetTop);
     const { wrapperEl } = context;
+    console.log('wrapperEl:', wrapperEl);
     if (!wrapperEl) return;
     if (context.wrapperScrollAnimation) return;
     const startTop = wrapperEl.scrollTop || 0;
@@ -686,7 +688,7 @@ export function createAnimateWrapperScroll(context) {
       context.wrapperTodayAnchor = targetTop;
       return;
     }
-    const duration = 240;
+    const duration = 600;
     const startTime = performance.now();
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
     const step = (now) => {

@@ -399,6 +399,7 @@ const groupTransactionsByMonth = () =>
 // Placeholder for animateWrapperScroll, initialised to a no‑op. It will be
 // rebound later with the proper scrolling context.
 let animateWrapperScroll = (targetTop) => {
+  console.log('PLACEHOLDER animateWrapperScroll called - NO ANIMATION!');
   if (!wrapperEl) return;
   if (wrapperScrollAnimation) return;
   wrapperEl.scrollTop = targetTop;
@@ -607,7 +608,7 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcelRow'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData};
+window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcelRow'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR};
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -808,6 +809,7 @@ try {
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
+  console.log('Rebinding animateWrapperScroll function');
   animateWrapperScroll = createAnimateWrapperScroll({
     wrapperEl,
     get wrapperScrollAnimation() { return wrapperScrollAnimation; },
@@ -815,6 +817,12 @@ try {
     get wrapperTodayAnchor() { return wrapperTodayAnchor; },
     set wrapperTodayAnchor(val) { wrapperTodayAnchor = val; },
   });
+  console.log('animateWrapperScroll rebound:', typeof animateWrapperScroll);
+  // CRITICAL: Update the global context to use the new animated function
+  if (window.__gastos) {
+    window.__gastos.animateWrapperScroll = animateWrapperScroll;
+    console.log('Updated window.__gastos.animateWrapperScroll to animated version');
+  }
 } catch (err) {
   console.error('Helper binding failed:', err);
 }
@@ -857,6 +865,7 @@ function renderTable(){
   const hydrating=isHydrating();
   console.log('renderTable: starting, isHydrating =', hydrating);
   clearTableContent();
+  const acc=document.getElementById('accordion');
   
   // Atualizar flag de skeleton antes de reconstruir o DOM para evitar inserir placeholders quando já temos dados reais.
   if(hydrating){
@@ -888,6 +897,10 @@ function renderTable(){
 function clearTableContent(){if(typeof tbody!=='undefined'&&tbody)tbody.innerHTML='';}
 
 
+function renderTransactionGroups(groups){accordionApi.renderAccordion();}
+
+
+
 const { txByDate, calculateDateRange } = initTxUtils({
   cards,
   getTransactions,
@@ -895,30 +908,24 @@ const { txByDate, calculateDateRange } = initTxUtils({
   post,
   occursOn,
   todayISO,
-  VIEW_YEAR
+  VIEW_YEAR,
+  getViewYear: () => VIEW_YEAR
 });
 
-// Define accordion element globally
-const acc = document.getElementById('accordion');
-
 const accordionApi = initAccordion({
-  acc,
+  acc: document.getElementById('accordion'),
   getTransactions,
   transactions,
   cards,
   state,
   calculateDateRange,
   VIEW_YEAR,
+  getViewYear: () => VIEW_YEAR,
   txByDate,
   safeFmtCurrency,
   SALARY_WORDS,
   makeLine,
 });
-
-// Expose ledger invalidation globally
-window.invalidateLedger = accordionApi.invalidateLedger;
-
-function renderTransactionGroups(groups){accordionApi.renderAccordion();}
 
 // Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
 renderTable();

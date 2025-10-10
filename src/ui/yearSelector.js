@@ -184,6 +184,7 @@ export function createYearSelector(options = {}) {
     closeYearModal,
     selectYear,
     updateYearTitle,
-    getAvailableYears
+    getAvailableYears,
+    getViewYear
   };
 }

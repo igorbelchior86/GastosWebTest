@@ -7,7 +7,9 @@
  * the global object (see main.js for details).
  */
 export function scrollTodayIntoView() {
+  console.log('scrollTodayIntoView called');
   const g = typeof window !== 'undefined' ? window.__gastos || {} : {};
+  console.log('window.__gastos:', g);
   const todayISO = g.todayISO || (() => {
     // fallback: ISO date for today
     const d = new Date();
@@ -20,13 +22,48 @@ export function scrollTodayIntoView() {
   const showToast = g.showToast || (() => {});
   try {
     const iso = typeof todayISO === 'function' ? todayISO() : todayISO;
+    const targetYear = Number.parseInt(String(iso).slice(0, 4), 10);
+    const getRetryCount = () => {
+      const v = g && typeof g.__scrollTodayRetry === 'number' ? g.__scrollTodayRetry : 0;
+      return Number.isFinite(v) ? v : 0;
+    };
+    const markRetry = () => {
+      if (!g) return 0;
+      const next = getRetryCount() + 1;
+      g.__scrollTodayRetry = next;
+      return next;
+    };
+    const resetRetry = () => {
+      if (g) g.__scrollTodayRetry = 0;
+    };
     const wrap = wrapperEl;
     if (!wrap) return;
     let dayEl = document.querySelector(`details.day[data-key="d-${iso}"]`);
     if (!dayEl) {
+      const selector = g.yearSelectorApi;
+      const currentYear = typeof g.getViewYear === 'function'
+        ? g.getViewYear()
+        : (selector && typeof selector.getViewYear === 'function' ? selector.getViewYear() : null);
+      const canSwitchYear = selector && typeof selector.selectYear === 'function';
+      const retryCount = getRetryCount();
+      if (
+        canSwitchYear &&
+        Number.isFinite(targetYear) &&
+        currentYear !== targetYear &&
+        retryCount < 2
+      ) {
+        markRetry();
+        selector.selectYear(targetYear);
+        requestAnimationFrame(() => {
+          scrollTodayIntoView();
+        });
+        return;
+      }
+      resetRetry();
       showToast('Dia atual não encontrado', 'error');
       return;
     }
+    resetRetry();
     const monthEl = dayEl.closest('details.month');
     if (monthEl && !monthEl.open) {
       monthEl.open = true;
@@ -73,6 +110,7 @@ export function scrollTodayIntoView() {
         ) {
           return;
         }
+        console.log('About to call animateWrapperScroll with targetTop:', targetTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
         animateWrapperScroll(targetTop);
       } catch (err) {
         console.error('scrollTodayIntoView compute failed', err);

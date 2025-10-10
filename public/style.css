@@ -527,48 +527,48 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
    Row 1: [Descrição] .......... [Valor]
    Row 2: [Método de pagamento] (left, under descrição)
 */
-#plannedModal .planned-list > li { display: block; }
-#plannedModal .planned-list > li .op-line {
-  display: grid;
-  grid-template-columns: 1fr auto;  /* left grows, right hugs content */
-  grid-template-rows: auto auto;    /* row1 main, row2 method */
-  column-gap: 12px;
-  row-gap: 2px;
-  align-items: center;
+/* =================== CARDS INDIVIDUAIS =================== */
+#plannedModal .planned-list > li { 
+  display: block;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  transition: all 0.2s ease-out;
+  margin-bottom: 8px; /* Espaçamento entre cards */
 }
+
+#plannedModal .planned-list > li:last-child {
+  margin-bottom: 0; /* Remove margem do último item */
+}
+
+/* MOVIDO PARA LINHA 625 - Grid properties consolidadas com padding */
 /* Flatten the .op-main wrapper so its children participate in the grid */
 #plannedModal .planned-list > li .op-main { display: contents; }
 /* Place left block (checkbox + descrição) on row 1, col 1 */
 /* Planned modal: left block (checkbox + descrição + método) */
 #plannedModal .planned-list > li .op-left {
   position: relative;
-  --check-space: 44px; /* espaço fixo para checkbox + gap */
+  --check-space: 28px !important; /* ESPAÇO AINDA MAIS REDUZIDO */
   grid-column: 1;
   grid-row: 1 / span 2;   /* ocupa as duas linhas do grid */
   min-width: 0;
   display: block;         /* empilha descrição + método */
 }
 
-/* Planned modal: método de pagamento (abaixo da descrição, alinha à descrição) */
+/* Método de pagamento (subtítulo) */
 #plannedModal .planned-list > li .op-left .method{
   display: block;
   margin-top: 4px;
-  font-size: 0.9rem;
-  color: var(--txt-muted);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
   padding-left: var(--check-space) !important; /* alinha com a descrição */
+  letter-spacing: 0px;
 }
 /* Make .op-right contribute its children directly to the grid */
 #plannedModal .planned-list > li .op-right {
   display: contents !important;
-}
-/* Value goes to row 1, col 2, aligned right */
-#plannedModal .planned-list > li .op-right .value {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  text-align: right;
-  font-weight: 600;   /* match Executados default */
-  font-size: 10pt;    /* match Executados */
 }
 /* Any other child inside .op-right (e.g., "Cartão Amex") becomes the method line under the description */
 #plannedModal .planned-list > li .op-right > :not(.value) {
@@ -583,25 +583,60 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   padding-left: 0 !important;
 }
 
-#plannedModal .subheader { color: #fff; }
-#plannedModal .planned-list > li .op-left span:not(.method) { color: #fff; }
-#plannedModal .planned-list .op-left input.plan-check + span { color: #fff; }
-#plannedModal h3 { color: #FFFFFF; }
-
-/* Planned modal: valor fixo à direita do cartão */
-#plannedModal .planned-list > li .op-line{
-  position: relative;              /* referência para o valor absoluto */
-  padding-right: 96px !important;  /* reserva espaço p/ o valor */
+/* =================== HIERARQUIA TIPOGRÁFICA =================== */
+#plannedModal h3 { 
+  color: #FFFFFF;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 28px 0 16px 0;
+  letter-spacing: -0.4px;
+  text-transform: capitalize;
 }
-#plannedModal .planned-list > li .op-right .value{
+
+#plannedModal .subheader { 
+  color: #fff; 
+}
+
+/* Título principal do item (descrição) */
+#plannedModal .planned-list > li .op-left span:not(.method) { 
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  line-height: 1.3;
+}
+
+#plannedModal .planned-list .op-left input.plan-check + span { 
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* =================== VALORES ALINHADOS À DIREITA (RESTAURADO) =================== */
+#plannedModal .planned-list > li .op-line {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 12px !important;
+  row-gap: 4px !important;
+  align-items: center !important;
+  padding: 16px 120px 16px 20px !important; /* Altura mais compacta */
+  min-height: 52px !important; /* Altura mínima reduzida */
+  box-sizing: border-box !important;
+}
+
+#plannedModal .planned-list > li .op-right .value {
   position: absolute !important;
-  right: 0;                     /* cola no interior do cartão */
+  right: 20px; /* Alinhado à direita dentro do card */
   top: 50%;
   transform: translateY(-50%);
   margin: 0;
-  justify-self: auto !important;   /* ignora grid */
-  text-align: right !important;
   white-space: nowrap;
+  text-align: right;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
 }
 /* Value input with expense/income toggles */
 .value-input-wrapper {
@@ -1850,26 +1885,49 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 
 /* Planned modal: render circular checkbox via the description span, keep native input clickable */
 #plannedModal .planned-list .op-left{ position: relative; }
+/* =================== CHECKBOXES MODERNOS (QUADRADOS SÓLIDOS) =================== */
 #plannedModal .planned-list .op-left input.plan-check {
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--txt-muted);
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 6px;
-  background: transparent;
+  background: rgba(28, 28, 30, 0.8);
   appearance: none;
   -webkit-appearance: none;
   display: inline-block;
-  margin: 0;
+  margin: 0 6px 0 0 !important; /* ESPAÇAMENTO AINDA MENOR FORÇADO */
   padding: 0;
   flex-shrink: 0;
   align-self: center;
   box-sizing: border-box;
   cursor: pointer;
+  transition: all 0.15s ease-out;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+#plannedModal .planned-list .op-left input.plan-check:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(44, 44, 46, 0.9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 #plannedModal .planned-list .op-left input.plan-check:checked {
-  background: var(--blue);
-  border-color: var(--blue);
+  background: #007AFF;
+  border-color: #007AFF;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 122, 255, 0.3);
+}
+
+#plannedModal .planned-list .op-left input.plan-check:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 
@@ -1960,6 +2018,14 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 .swipe-actions button:hover{transform:scale(1.1);} 
 .swipe-actions .edit{color:var(--blue);} 
 .swipe-actions .danger{color:var(--red);} 
+
+/* ================== SWIPE ACTIONS NO MODAL PLANEJADOS ================== */
+#plannedModal .swipe-actions {
+  height: 52px !important; /* Mesma altura mínima dos cards */
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important; /* Centralizar verticalmente */
+}
 
 
 .swipe-actions .icon-action{

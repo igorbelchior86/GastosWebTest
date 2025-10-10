@@ -24,8 +24,18 @@ export function initTxUtils(config) {
     post,
     occursOn,
     todayISO,
-    VIEW_YEAR
+    VIEW_YEAR,
+    getViewYear
   } = config || {};
+  const resolveViewYear = () => {
+    if (typeof getViewYear === 'function') {
+      const dynamicYear = Number(getViewYear());
+      if (Number.isFinite(dynamicYear)) return dynamicYear;
+    }
+    const fallbackYear = Number(VIEW_YEAR);
+    if (Number.isFinite(fallbackYear)) return fallbackYear;
+    return new Date().getFullYear();
+  };
 
   /**
    * Returns a list of transactions (including expanded occurrences) that
@@ -55,12 +65,11 @@ export function initTxUtils(config) {
       return null;
     };
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions;
-    // Non‑recurring entries - match exact date regardless of year for balance calculation
+    // Non‑recurring entries
     txs.forEach(t => {
       if (t.recurrence) return;
       if (t.opDate !== iso) return;
       if (t.invoiceAdjust) return;
-      
       if (t.method !== 'Dinheiro') {
         // Card transactions may appear on opDate and also on their invoice
         const em = resolveCard(t.method) || t.method;
@@ -128,7 +137,7 @@ export function initTxUtils(config) {
   function calculateDateRange() {
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions;
     if (!Array.isArray(txs) || txs.length === 0) {
-      const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
+      const year = resolveViewYear();
       return {
         minDate: `${year}-01-01`,
         maxDate: `${year}-12-31`
@@ -136,9 +145,7 @@ export function initTxUtils(config) {
     }
     let minDate = null;
     let maxDate = null;
-    // For range calculation, expand all transactions
     const allExpandedTx = [];
-    
     txs.forEach(tx => {
       if (!tx.recurrence) {
         allExpandedTx.push({
@@ -146,9 +153,8 @@ export function initTxUtils(config) {
           postDate: tx.postDate || tx.opDate
         });
       } else {
-        // For recurring transactions, scan a broad range to catch all possible occurrences
-        const startScan = new Date('2020-01-01');
-        const endScan = new Date('2030-12-31');
+        const startScan = new Date('2024-01-01');
+        const endScan = new Date('2026-12-31');
         for (let d = new Date(startScan); d <= endScan; d.setDate(d.getDate() + 1)) {
           const isoDate = d.toISOString().slice(0, 10);
           if (typeof occursOn === 'function' ? occursOn(tx, isoDate) : false) {
@@ -166,7 +172,7 @@ export function initTxUtils(config) {
       });
     });
     if (!minDate || !maxDate) {
-      const year = typeof VIEW_YEAR === 'number' ? VIEW_YEAR : new Date().getFullYear();
+      const year = resolveViewYear();
       return {
         minDate: `${year}-01-01`,
         maxDate: `${year}-12-31`
@@ -174,9 +180,10 @@ export function initTxUtils(config) {
     }
     const minDateObj = new Date(minDate);
     const maxDateObj = new Date(maxDate);
+    const viewYear = resolveViewYear();
     try {
-      const vyStart = new Date(VIEW_YEAR, 0, 1);
-      const vyEnd = new Date(VIEW_YEAR, 11, 31);
+      const vyStart = new Date(viewYear, 0, 1);
+      const vyEnd = new Date(viewYear, 11, 31);
       if (vyStart < minDateObj) minDateObj.setTime(vyStart.getTime());
       if (vyEnd > maxDateObj) maxDateObj.setTime(vyEnd.getTime());
     } catch (_) {}

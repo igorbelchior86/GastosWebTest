@@ -18,6 +18,7 @@ import { postDateForCard } from '../utils/date.js';
  * @param {Object} config.state Application state containing startDate and startBalance.
  * @param {Function} config.calculateDateRange Function that returns the min and max ISO date strings.
  * @param {number} config.VIEW_YEAR The currently selected year to render.
+ * @param {Function} [config.getViewYear] Optional getter that returns the current view year.
  * @param {Function} config.txByDate Function that returns transactions on a given ISO date.
  * @param {Function} config.safeFmtCurrency Function to format currency values.
  * @param {Array} config.SALARY_WORDS Array of words used to detect salary transactions.
@@ -33,103 +34,104 @@ export function initAccordion(config) {
     state,
     calculateDateRange,
     VIEW_YEAR,
+    getViewYear,
     txByDate,
     safeFmtCurrency,
     SALARY_WORDS,
     makeLine
   } = config;
+  const resolveViewYear = () => {
+    if (typeof getViewYear === 'function') {
+      const dynamicYear = Number(getViewYear());
+      if (Number.isFinite(dynamicYear)) return dynamicYear;
+    }
+    const fallbackYear = Number(VIEW_YEAR);
+    if (Number.isFinite(fallbackYear)) return fallbackYear;
+    return new Date().getFullYear();
+  };
 
   // Local alias for postDate calculation: compute due date for a given opDate and card.
   function post(opISO, cardName) {
     return postDateForCard(opISO, cardName, cards);
   }
 
-  // Global cache for the complete running balance ledger
-  let globalBalanceLedger = new Map();
-  let ledgerGenerated = false;
-
   /**
-   * Generate complete running balance ledger from anchor to multiple years ahead.
-   * This runs once in background and caches everything.
-   */
-  function generateCompleteLedger() {
-    if (ledgerGenerated) return globalBalanceLedger;
-    
-    console.log('[generateCompleteLedger] Building complete ledger...');
-    
-    const txs = getTransactions ? getTransactions() : transactions;
-    const hasAnchor = !!state.startDate;
-    const anchorISO = hasAnchor ? String(state.startDate) : '2025-01-01';
-    const anchorBalance = (state.startBalance != null) ? state.startBalance : 0;
-    
-    // Generate ledger from anchor year to 2030 (enough for most use cases)
-    const anchorYear = new Date(anchorISO).getFullYear();
-    const startDate = new Date(anchorYear, 0, 1);
-    const endDate = new Date(2030, 11, 31);
-    
-    console.log(`[generateCompleteLedger] Range: ${startDate.toISOString().slice(0,10)} to ${endDate.toISOString().slice(0,10)}, anchor: ${anchorISO} (${anchorBalance})`);
-    
-    let runningBalance = anchorBalance;
-    let dayCount = 0;
-    
-    for (let current = new Date(startDate); current <= endDate; current.setDate(current.getDate() + 1)) {
-      const iso = current.toISOString().slice(0, 10);
-      dayCount++;
-      
-      // Reset to anchor balance at anchor date
-      if (iso === anchorISO) {
-        runningBalance = anchorBalance;
-      }
-      
-      // Skip days before anchor
-      if (iso < anchorISO) {
-        globalBalanceLedger.set(iso, 0);
-        continue;
-      }
-      
-      // Get day transactions and calculate impact
-      const dayTx = txByDate(iso);
-      let dayImpact = 0;
-      
-      dayTx.forEach(t => {
-        dayImpact += (t.val || 0);
-      });
-      
-      runningBalance += dayImpact;
-      globalBalanceLedger.set(iso, runningBalance);
-      
-      // Log progress every year
-      if (current.getMonth() === 11 && current.getDate() === 31) {
-        console.log(`[generateCompleteLedger] End of ${current.getFullYear()}: ${runningBalance.toFixed(2)}`);
-      }
-    }
-    
-    ledgerGenerated = true;
-    console.log(`[generateCompleteLedger] Complete! ${dayCount} days, final balance: ${runningBalance.toFixed(2)}`);
-    return globalBalanceLedger;
-  }
-
-  /**
-   * Build a map of running balances for the current viewing year only.
-   * Uses the pre-generated complete ledger for instant results.
+   * Build a map of running balances day‑by‑day across the date range.
+   * Uses startDate/startBalance anchors when provided.
+   *
+   * @returns {Map<string, number>} Map keyed by ISO date to running balance.
    */
   function buildRunningBalanceMap() {
-    // Ensure complete ledger is generated
-    const completeLedger = generateCompleteLedger();
-    
-    // Extract only the viewing year from complete ledger
     const { minDate, maxDate } = calculateDateRange();
     const balanceMap = new Map();
-    
-    console.log(`[buildRunningBalanceMap] Extracting ${minDate} to ${maxDate} from complete ledger`);
-    
-    for (let current = new Date(minDate); current <= new Date(maxDate); current.setDate(current.getDate() + 1)) {
-      const iso = current.toISOString().slice(0, 10);
-      const balance = completeLedger.get(iso) || 0;
-      balanceMap.set(iso, balance);
+    let runningBalance = 0;
+    const hasAnchor = !!state.startDate;
+    const anchorISO = hasAnchor ? String(state.startDate) : null;
+    const startDateObj = new Date(minDate);
+    const endDateObj = new Date(maxDate);
+    // If the anchor occurs before the current range, seed the running balance at the anchor.
+    if (hasAnchor && anchorISO && anchorISO < minDate && anchorISO <= maxDate) {
+      runningBalance = (state.startBalance != null) ? state.startBalance : 0;
     }
-    
-    console.log(`[buildRunningBalanceMap] Extracted ${balanceMap.size} days for viewing`);
+    const txs = getTransactions ? getTransactions() : transactions;
+    for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
+      const iso = current.toISOString().slice(0, 10);
+      if (hasAnchor && iso < anchorISO) {
+        balanceMap.set(iso, 0);
+        continue;
+      }
+      if (hasAnchor && iso === anchorISO) {
+        runningBalance = (state.startBalance != null) ? state.startBalance : 0;
+      }
+      if (!hasAnchor && iso === minDate) {
+        runningBalance = (state.startBalance != null) ? state.startBalance : 0;
+      }
+      // Determine the impact on this day using existing logic
+      const dayTx = txByDate(iso);
+      // 1) Cash transactions impact the balance on opDate
+      const cashImpact = dayTx
+        .filter(t => t.method === 'Dinheiro')
+        .reduce((s, t) => s + (t.val || 0), 0);
+      // 2) Card invoices impact the balance on due dates
+      const invoicesByCard = {};
+      const addToGroup = (cardName, tx) => {
+        if (!invoicesByCard[cardName]) invoicesByCard[cardName] = [];
+        invoicesByCard[cardName].push(tx);
+      };
+      // Non‑recurring card transactions: due on their postDate
+      txs.forEach(t => {
+        if (t.method === 'Dinheiro' || t.recurrence) return;
+        if (t.postDate === iso) addToGroup(t.method, t);
+      });
+      // Recurring card transactions: search up to 60 days back for occurrences due on this date
+      const scanStart = new Date(iso);
+      scanStart.setDate(scanStart.getDate() - 60);
+      txs.filter(t => t.recurrence && t.method !== 'Dinheiro').forEach(master => {
+        for (let d2 = new Date(scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
+          const occIso = d2.toISOString().slice(0, 10);
+          if (!occursOn(master, occIso)) continue;
+          const pd = post(occIso, master.method);
+          if (pd === iso) {
+            addToGroup(master.method, { ...master, opDate: occIso, postDate: iso, planned: false, recurrence: '' });
+          }
+        }
+      });
+      const invoiceTotals = {};
+      Object.keys(invoicesByCard).forEach(cardName => {
+        invoiceTotals[cardName] = invoicesByCard[cardName].reduce((s, t) => s + t.val, 0);
+      });
+      const sumAdjustFor = (cardName, dueISO) => txs
+        .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
+        .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
+      let cardImpact = 0;
+      Object.keys(invoiceTotals).forEach(cardName => {
+        const adj = sumAdjustFor(cardName, iso);
+        cardImpact += (invoiceTotals[cardName] + adj);
+      });
+      const dayTotal = cashImpact + cardImpact;
+      runningBalance += dayTotal;
+      balanceMap.set(iso, runningBalance);
+    }
     return balanceMap;
   }
 
@@ -265,12 +267,13 @@ export function initAccordion(config) {
       return baselineBalance;
     };
     
+    const viewYear = resolveViewYear();
     for (let mIdx = 0; mIdx < 12; mIdx++) {
-      const nomeMes = new Date(VIEW_YEAR, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
+      const nomeMes = new Date(viewYear, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
       const mDet = document.createElement('details');
       mDet.className = 'month';
       mDet.dataset.key = `m-${mIdx}`;
-      const isCurrentYear = VIEW_YEAR === curYear;
+      const isCurrentYear = viewYear === curYear;
       const isOpen = isCurrentYear ? (mIdx >= curMonth) : false;
       mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
       const monthTotal = (txs || [])
@@ -279,28 +282,17 @@ export function initAccordion(config) {
       let mSum = document.createElement('summary');
       mSum.className = 'month-divider';
       // Obter o último dia do mês
-      const monthEndISO = new Date(VIEW_YEAR, mIdx + 1, 0).toISOString().slice(0, 10);
+      const monthEndISO = new Date(viewYear, mIdx + 1, 0).toISOString().slice(0, 10);
       
       // Simplesmente pegar o saldo do último dia do mês que já está calculado corretamente
-      const monthEndBalance = balanceMap.get(monthEndISO) || 0;
-      
-      // Debug logs
-      if (VIEW_YEAR === 2026 && mIdx === 0) {
-        console.log(`[accordion] Janeiro 2026 debug:`, {
-          VIEW_YEAR,
-          mIdx,
-          monthEndISO,
-          monthEndBalance,
-          balanceMapSize: balanceMap.size,
-          hasKey: balanceMap.has(monthEndISO),
-          balanceMapKeys: Array.from(balanceMap.keys()).slice(0, 10)
-        });
-      }
+      const monthEndBalance = balanceMap.has(monthEndISO)
+        ? balanceMap.get(monthEndISO)
+        : getBalanceBefore(monthEndISO);
       
       let metaLabel = '';
       let metaValue = '';
-      const isPastMonth = (VIEW_YEAR < curYear) || (VIEW_YEAR === curYear && mIdx < curMonth);
-      const isCurrentMonth = VIEW_YEAR === curYear && mIdx === curMonth;
+      const isPastMonth = (viewYear < curYear) || (viewYear === curYear && mIdx < curMonth);
+      const isCurrentMonth = viewYear === curYear && mIdx === curMonth;
       
       if (isPastMonth) {
         metaLabel = 'Saldo final:';
@@ -315,22 +307,11 @@ export function initAccordion(config) {
       mSum.innerHTML = `\n        <div class="month-row">\n          <span class="month-name">${nomeMes.toUpperCase()}</span>\n        </div>\n        <div class="month-meta">\n          <span class="meta-label">${metaLabel}</span>\n          <span class="meta-value">${metaValue}</span>\n        </div>`;
       mDet.appendChild(mSum);
       // Number of days in this month
-      const daysInMonth = new Date(VIEW_YEAR, mIdx + 1, 0).getDate();
+      const daysInMonth = new Date(viewYear, mIdx + 1, 0).getDate();
       for (let d = 1; d <= daysInMonth; d++) {
-        const dateObj = new Date(VIEW_YEAR, mIdx, d);
+        const dateObj = new Date(viewYear, mIdx, d);
         const iso = formatToISO(dateObj);
-        const allDayTx = txByDate(iso);
-        
-        // Filter transactions to only show those from the current viewing year
-        const dayTx = allDayTx.filter(t => {
-          // For non-recurring transactions, check if they belong to this year
-          if (!t.recurrence) {
-            const txYear = new Date(t.opDate).getFullYear();
-            return txYear === VIEW_YEAR;
-          }
-          // For recurring transactions, they're already materialized for the correct date
-          return true;
-        });
+        const dayTx = txByDate(iso);
         // Daily cash impact
         const cashNonRecurring = (txs || [])
           .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso && !t.invoiceAdjust)
@@ -384,7 +365,7 @@ export function initAccordion(config) {
         });
         const dayTotal = cashImpact + cardImpact;
         // Retrieve the running balance for this day
-        const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : (state.startBalance || 0);
+        const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : getBalanceBefore(iso);
         const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
         const dDet = document.createElement('details');
         dDet.className = 'day';
@@ -547,12 +528,5 @@ export function initAccordion(config) {
     const endTime = performance.now();
     try { console.debug('renderAccordion: finished, months rendered =', accEl.querySelectorAll('details.month').length, 'time =', (endTime - startTime).toFixed(2) + 'ms (optimized with DocumentFragment)'); } catch(_) {}
   }
-  // Function to invalidate ledger cache when data changes
-  function invalidateLedger() {
-    ledgerGenerated = false;
-    globalBalanceLedger.clear();
-    console.log('[invalidateLedger] Ledger cache cleared');
-  }
-
-  return { renderAccordion, invalidateLedger };
+  return { renderAccordion };
 }
