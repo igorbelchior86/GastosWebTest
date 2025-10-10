@@ -461,9 +461,13 @@ export function createHideCardModal(context) {
   return function hideCardModal() {
     const { cardModal, updateModalOpenState } = context;
     if (!cardModal) return;
+    
+    const wasFromSettings = cardModal.dataset.origin === 'settings';
+    
     cardModal.classList.add('hidden');
     cardModal.classList.remove('from-settings-visible');
     cardModal.classList.remove('card-slide-visible');
+    
     if (!cardModal.dataset.origin || cardModal.dataset.origin !== 'settings') {
       cardModal.classList.remove('from-settings');
       setTimeout(() => {
@@ -478,8 +482,20 @@ export function createHideCardModal(context) {
         }
       }, 320);
     }
+    
     delete cardModal.dataset.origin;
     if (typeof updateModalOpenState === 'function') updateModalOpenState();
+    
+    // Se veio do modal de settings, reabrir o settings após o fechamento
+    if (wasFromSettings) {
+      setTimeout(() => {
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal) {
+          settingsModal.classList.remove('hidden');
+          if (typeof updateModalOpenState === 'function') updateModalOpenState();
+        }
+      }, 100); // Pequeno delay para garantir que o card modal fechou completamente
+    }
   };
 }
 

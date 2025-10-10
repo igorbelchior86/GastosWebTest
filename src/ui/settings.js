@@ -83,9 +83,73 @@ export function setupSettings(settingsModalEl) {
   function persistProfile(profile) {
     try {
       cacheSet('profile', profile);
+      // Also cache the avatar image if it's a new URL
+      if (profile && profile.photo) {
+        cacheAvatarImage(profile.photo);
+      }
     } catch {
       /* ignore */
     }
+  }
+
+  /**
+   * Cache avatar image locally to avoid repeated downloads
+   */
+  async function cacheAvatarImage(photoURL) {
+    try {
+      const cachedAvatarURL = cacheGet('avatar_url', null);
+      if (cachedAvatarURL === photoURL) {
+        console.log('[settings] avatar already cached for URL:', photoURL);
+        return; // Already cached
+      }
+
+      console.log('[settings] caching new avatar URL:', photoURL);
+      
+      // Fetch the image and convert to blob
+      const response = await fetch(photoURL);
+      if (!response.ok) {
+        console.warn('[settings] failed to fetch avatar:', response.status);
+        return;
+      }
+      
+      const blob = await response.blob();
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        try {
+          // Store as data URL for immediate use
+          cacheSet('avatar_data', reader.result);
+          cacheSet('avatar_url', photoURL);
+          console.log('[settings] avatar cached successfully');
+        } catch (err) {
+          console.warn('[settings] failed to cache avatar data:', err);
+        }
+      };
+      
+      reader.readAsDataURL(blob);
+    } catch (err) {
+      console.warn('[settings] avatar caching failed:', err);
+    }
+  }
+
+  /**
+   * Get cached avatar data URL or original URL
+   */
+  function getAvatarURL(photoURL) {
+    try {
+      const cachedURL = cacheGet('avatar_url', null);
+      const cachedData = cacheGet('avatar_data', null);
+      
+      if (cachedURL === photoURL && cachedData) {
+        console.log('[settings] using cached avatar data');
+        return cachedData;
+      }
+    } catch (err) {
+      console.warn('[settings] failed to get cached avatar:', err);
+    }
+    
+    console.log('[settings] using original avatar URL');
+    return photoURL;
   }
 
   /**
@@ -111,9 +175,15 @@ export function setupSettings(settingsModalEl) {
     const box = settingsModalEl.querySelector('.modal-content');
     if (!box) return;
     let profile = getProfileFromAuth();
+    console.log('[settings] profile from auth:', profile);
     if (profile && profile.email) persistProfile(profile);
-    if (!profile) profile = loadCachedProfile() || { name: '', email: '', photo: '' };
-    const avatarImg = profile.photo ? `<img src="${profile.photo}" alt="Avatar"/>` : '';
+    if (!profile) {
+      profile = loadCachedProfile() || { name: '', email: '', photo: '' };
+      console.log('[settings] profile from cache:', profile);
+    }
+    console.log('[settings] final profile photo URL:', profile.photo);
+    const avatarURL = profile.photo ? getAvatarURL(profile.photo) : '';
+    const avatarImg = avatarURL ? `<img src="${avatarURL}" alt="Avatar" onload="console.log('[settings] avatar loaded successfully')" onerror="console.warn('[settings] avatar failed to load:', this.src)"/>` : '';
     const sub = profile.email || '';
     const cardHTML = `
       <div class="settings-card">
@@ -144,7 +214,7 @@ export function setupSettings(settingsModalEl) {
       
       <h3 class="settings-section-title">Financeiro</h3>
       <div class="settings-list">
-        <div class="settings-item settings-link">
+        <div class="settings-item settings-link" data-action="cards">
           <div class="left">Cartões</div>
           <div class="right">›</div>
         </div>
@@ -277,7 +347,7 @@ export function setupSettings(settingsModalEl) {
                   const left = currencyLink.querySelector('.left');
                   if (left) left.textContent = p.name || '--';
                   
-                  // Close modals
+                  // Close ALL modals when currency is selected (return to accordion)
                   modal.classList.add('hidden');
                   const settingsModal = document.getElementById('settingsModal');
                   if (settingsModal) settingsModal.classList.add('hidden');
@@ -358,7 +428,19 @@ export function setupSettings(settingsModalEl) {
           }
         }
 
-        if (closeBtn) closeBtn.onclick = () => { modal.classList.add('hidden'); try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){} };
+        if (closeBtn) closeBtn.onclick = () => { 
+          modal.classList.add('hidden'); 
+          try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+          
+          // Reabrir modal de settings após fechar modal de moedas (comportamento de sub-modal)
+          setTimeout(() => {
+            const settingsModal = document.getElementById('settingsModal');
+            if (settingsModal) {
+              settingsModal.classList.remove('hidden');
+              try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+            }
+          }, 100);
+        };
 
         console.log('[settings] showing currency modal');
         try {
@@ -371,6 +453,58 @@ export function setupSettings(settingsModalEl) {
         }
       };
     })();
+    
+    // Wire cards button to open card modal (replicating currency modal behavior)
+    const cardsBtn = box.querySelector('[data-action="cards"]');
+    if (cardsBtn) {
+      cardsBtn.onclick = () => {
+        console.log('[settings] cards button clicked');
+        try {
+          const cardModal = document.getElementById('cardModal');
+          const closeCardBtn = document.getElementById('closeCardModal');
+          
+          if (!cardModal) {
+            console.warn('[settings] cardModal element not found');
+            return;
+          }
+          
+          // Setup close button handler (same pattern as currency modal)
+          if (closeCardBtn) {
+            closeCardBtn.onclick = () => {
+              cardModal.classList.add('hidden');
+              try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+              
+              // Reabrir modal de settings após fechar modal de cartões (comportamento de sub-modal)
+              setTimeout(() => {
+                const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) {
+                  settingsModal.classList.remove('hidden');
+                  try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+                }
+              }, 100);
+            };
+          }
+          
+          // Open cards modal (same pattern as currency modal)
+          console.log('[settings] showing cards modal');
+          try {
+            // Use the same showModal helper if available
+            if (typeof showModal === 'function') {
+              showModal(cardModal);
+            } else {
+              // Fallback: toggle class directly
+              cardModal.classList.remove('hidden');
+              try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+            }
+          } catch (err) {
+            console.warn('[settings] failed to show card modal:', err);
+          }
+          
+        } catch (err) {
+          console.warn('[settings] failed to open card modal:', err);
+        }
+      };
+    }
     
     // Reset data button
     const resetBtn = box.querySelector('#resetDataBtn');

@@ -800,6 +800,12 @@ try {
   try { window.performResetAllData = performResetAllData; } catch (_) {}
   // Create a floating reset button via the helper.
   createFloatingResetButton({ performResetAllData });
+  
+  // Add card modal functions to window.__gastos after they're created
+  try { 
+    window.__gastos.showCardModal = showCardModal;
+    window.__gastos.hideCardModal = hideCardModal;
+  } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
   animateWrapperScroll = createAnimateWrapperScroll({
@@ -851,7 +857,6 @@ function renderTable(){
   const hydrating=isHydrating();
   console.log('renderTable: starting, isHydrating =', hydrating);
   clearTableContent();
-  const acc=document.getElementById('accordion');
   
   // Atualizar flag de skeleton antes de reconstruir o DOM para evitar inserir placeholders quando já temos dados reais.
   if(hydrating){
@@ -883,10 +888,6 @@ function renderTable(){
 function clearTableContent(){if(typeof tbody!=='undefined'&&tbody)tbody.innerHTML='';}
 
 
-function renderTransactionGroups(groups){accordionApi.renderAccordion();}
-
-
-
 const { txByDate, calculateDateRange } = initTxUtils({
   cards,
   getTransactions,
@@ -897,8 +898,11 @@ const { txByDate, calculateDateRange } = initTxUtils({
   VIEW_YEAR
 });
 
+// Define accordion element globally
+const acc = document.getElementById('accordion');
+
 const accordionApi = initAccordion({
-  acc: document.getElementById('accordion'),
+  acc,
   getTransactions,
   transactions,
   cards,
@@ -910,6 +914,11 @@ const accordionApi = initAccordion({
   SALARY_WORDS,
   makeLine,
 });
+
+// Expose ledger invalidation globally
+window.invalidateLedger = accordionApi.invalidateLedger;
+
+function renderTransactionGroups(groups){accordionApi.renderAccordion();}
 
 // Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
 renderTable();

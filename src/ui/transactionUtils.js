@@ -55,11 +55,12 @@ export function initTxUtils(config) {
       return null;
     };
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions;
-    // Non‑recurring entries
+    // Non‑recurring entries - match exact date regardless of year for balance calculation
     txs.forEach(t => {
       if (t.recurrence) return;
       if (t.opDate !== iso) return;
       if (t.invoiceAdjust) return;
+      
       if (t.method !== 'Dinheiro') {
         // Card transactions may appear on opDate and also on their invoice
         const em = resolveCard(t.method) || t.method;
@@ -135,7 +136,9 @@ export function initTxUtils(config) {
     }
     let minDate = null;
     let maxDate = null;
+    // For range calculation, expand all transactions
     const allExpandedTx = [];
+    
     txs.forEach(tx => {
       if (!tx.recurrence) {
         allExpandedTx.push({
@@ -143,8 +146,9 @@ export function initTxUtils(config) {
           postDate: tx.postDate || tx.opDate
         });
       } else {
-        const startScan = new Date('2024-01-01');
-        const endScan = new Date('2026-12-31');
+        // For recurring transactions, scan a broad range to catch all possible occurrences
+        const startScan = new Date('2020-01-01');
+        const endScan = new Date('2030-12-31');
         for (let d = new Date(startScan); d <= endScan; d.setDate(d.getDate() + 1)) {
           const isoDate = d.toISOString().slice(0, 10);
           if (typeof occursOn === 'function' ? occursOn(tx, isoDate) : false) {
