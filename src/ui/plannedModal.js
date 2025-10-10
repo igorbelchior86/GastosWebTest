@@ -30,8 +30,12 @@ export function setupPlannedModal() {
     todayISO,
     getTransactions,
     transactions,
-    makeLine,
   } = g;
+
+  const getLineFactory = () => {
+    const latest = (window.__gastos && window.__gastos.makeLine) || g.makeLine;
+    return typeof latest === 'function' ? latest : null;
+  };
 
   /**
    * Updates the header of the planned modal. Ensures the title and
@@ -63,11 +67,26 @@ export function setupPlannedModal() {
       plannedByDate[key].push(tx);
     };
     const today = typeof todayISO === 'function' ? todayISO() : new Date().toISOString().slice(0, 10);
+    const todayDate = new Date(today + 'T00:00');
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
-    // Add saved planned transactions (on or after today)
+    const matchesActual = (candidate) => {
+      return txs.some((other) => {
+        if (!other || other === candidate) return false;
+        if (other.planned) return false;
+        if (other.opDate !== candidate.opDate) return false;
+        const sameDesc = (other.desc || '').trim() === (candidate.desc || '').trim();
+        const sameVal = Math.abs(Number(other.val || 0)) === Math.abs(Number(candidate.val || 0));
+        const sameMethod = (other.method || '') === (candidate.method || '');
+        return sameDesc && sameVal && sameMethod;
+      });
+    };
     for (const tx of txs) {
-      if (!tx) continue;
-      if (tx.planned && tx.opDate && tx.opDate >= today) add(tx);
+      if (!tx || !tx.planned || !tx.opDate) continue;
+      const txDate = new Date(tx.opDate + 'T00:00');
+      const isFuture = tx.opDate >= today;
+      const isToday = tx.opDate === today;
+      const pendingPast = txDate < todayDate && !matchesActual(tx);
+      if (isFuture || isToday || pendingPast) add(tx);
     }
     // Project recurring master transactions for the next 90 days
     const DAYS_AHEAD = 90;
@@ -112,6 +131,14 @@ export function setupPlannedModal() {
     }
     // Render grouped planned transactions
     const sortedDates = Object.keys(plannedByDate).sort();
+    if (!sortedDates.length) {
+      const empty = document.createElement('p');
+      empty.className = 'planned-empty';
+      empty.textContent = 'Nenhuma operação planejada.';
+      plannedList.appendChild(empty);
+      return;
+    }
+    const lineFactory = getLineFactory();
     for (const date of sortedDates) {
       const group = plannedByDate[date].sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
       const dateObj = new Date(date + 'T00:00');
@@ -119,11 +146,23 @@ export function setupPlannedModal() {
       const groupHeader = document.createElement('h3');
       groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
       plannedList.appendChild(groupHeader);
+      const list = document.createElement('ul');
+      list.className = 'planned-list';
       for (const tx of group) {
-        if (typeof makeLine === 'function') {
-          plannedList.appendChild(makeLine(tx, true));
+        const li = document.createElement('li');
+        li.className = 'planned-cash';
+        if (lineFactory) {
+          const line = lineFactory(tx, true);
+          if (line) li.appendChild(line);
+        } else {
+          const fallback = document.createElement('div');
+          fallback.className = 'op-line';
+          fallback.textContent = tx.desc || 'Operação planejada';
+          li.appendChild(fallback);
         }
+        list.appendChild(li);
       }
+      plannedList.appendChild(list);
     }
   }
 

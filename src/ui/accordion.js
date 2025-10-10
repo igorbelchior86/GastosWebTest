@@ -21,6 +21,7 @@ import { postDateForCard } from '../utils/date.js';
  * @param {Function} config.txByDate Function that returns transactions on a given ISO date.
  * @param {Function} config.safeFmtCurrency Function to format currency values.
  * @param {Array} config.SALARY_WORDS Array of words used to detect salary transactions.
+ * @param {Function} config.makeLine Helper that renders a transaction row (swipe-enabled).
  * @returns {{renderAccordion: Function}} Object exposing the renderAccordion function.
  */
 export function initAccordion(config) {
@@ -34,7 +35,8 @@ export function initAccordion(config) {
     VIEW_YEAR,
     txByDate,
     safeFmtCurrency,
-    SALARY_WORDS
+    SALARY_WORDS,
+    makeLine
   } = config;
 
   // Local alias for postDate calculation: compute due date for a given opDate and card.
@@ -133,10 +135,10 @@ export function initAccordion(config) {
   /**
    * Helper to create the invoice header for a card. Returns a <summary> element.
    */
-  function createCardInvoiceHeader(cardName, cardTotalAmount, dueISO, txs) {
+  function createCardInvoiceHeader(cardName, cardTotalAmount, dueISO, txs, isSkeletonMode) {
     const invSum = document.createElement('summary');
     invSum.classList.add('invoice-header-line');
-    const formattedTotal = safeFmtCurrency(cardTotalAmount, {
+    const formattedTotal = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 70px; height: 14px;"></span>' : safeFmtCurrency(cardTotalAmount, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
@@ -212,8 +214,10 @@ export function initAccordion(config) {
     }
     const startTime = performance.now();
     try { console.debug('renderAccordion: accEl found, transactions length =', (getTransactions ? (getTransactions() || []).length : (transactions || []).length)); } catch(_) {}
-    // Always perform a full refresh; hydrating is always false here.
-    const hydrating = false;
+    
+    // Verificar se o accordion está em modo skeleton (durante hidratação)
+    const isSkeletonMode = accEl.dataset.state === 'skeleton';
+    
     const { minDate, maxDate } = calculateDateRange();
     // Build the running balance map once per render
     const balanceMap = buildRunningBalanceMap();
@@ -225,16 +229,39 @@ export function initAccordion(config) {
     // Performance optimization: use DocumentFragment to batch DOM operations
     const fragment = document.createDocumentFragment();
     const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const currency = v => safeFmtCurrency(v);
-    const curMonth = new Date().getMonth();
+    
+    // Função auxiliar para aplicar shimmer nos valores quando em modo skeleton
+    const currency = v => isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 60px; height: 14px;"></span>' : safeFmtCurrency(v);
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    const baselineBalance = Number.isFinite(state?.startBalance) ? Number(state.startBalance) : 0;
+    const minDateObj = new Date(minDate);
+
+    const getBalanceBefore = (iso) => {
+      if (!iso) return baselineBalance;
+      const target = new Date(iso);
+      target.setDate(target.getDate() - 1);
+      for (let d = new Date(target); d >= minDateObj; d.setDate(d.getDate() - 1)) {
+        const key = d.toISOString().slice(0, 10);
+        if (balanceMap.has(key)) return balanceMap.get(key);
+      }
+      const firstDayKey = iso;
+      if (balanceMap.has(firstDayKey)) {
+        // Derive the pre-day balance by subtracting the day's net movement
+        const dayTx = txByDate(firstDayKey);
+        const dayTotal = (dayTx || []).reduce((sum, t) => sum + (Number(t.val) || 0), 0);
+        return balanceMap.get(firstDayKey) - dayTotal;
+      }
+      return baselineBalance;
+    };
     
     for (let mIdx = 0; mIdx < 12; mIdx++) {
       const nomeMes = new Date(VIEW_YEAR, mIdx).toLocaleDateString('pt-BR', { month: 'long' });
       const mDet = document.createElement('details');
       mDet.className = 'month';
       mDet.dataset.key = `m-${mIdx}`;
-      const currentYear = new Date().getFullYear();
-      const isCurrentYear = VIEW_YEAR === currentYear;
+      const isCurrentYear = VIEW_YEAR === curYear;
       const isOpen = isCurrentYear ? (mIdx >= curMonth) : false;
       mDet.open = openKeys.includes(mDet.dataset.key) || isOpen;
       const monthTotal = (txs || [])
@@ -242,6 +269,8 @@ export function initAccordion(config) {
         .reduce((s,t) => s + t.val, 0);
       let mSum = document.createElement('summary');
       mSum.className = 'month-divider';
+      const monthStartISO = new Date(VIEW_YEAR, mIdx, 1).toISOString().slice(0, 10);
+      const monthBaseBalance = getBalanceBefore(monthStartISO);
       const monthActual = (txs || [])
         .filter(t => {
           const pd = new Date(t.postDate);
@@ -254,17 +283,21 @@ export function initAccordion(config) {
           return pd.getMonth() === mIdx && t.planned;
         })
         .reduce((s, t) => s + t.val, 0);
+      const monthActualBalance = monthBaseBalance + monthActual;
+      const monthProjectedBalance = monthActualBalance + monthPlanned;
       let metaLabel = '';
       let metaValue = '';
-      if (mIdx < curMonth) {
+      const isPastMonth = (VIEW_YEAR < curYear) || (VIEW_YEAR === curYear && mIdx < curMonth);
+      const isCurrentMonth = VIEW_YEAR === curYear && mIdx === curMonth;
+      if (isPastMonth) {
         metaLabel = 'Saldo final:';
-        metaValue = currency(monthActual);
-      } else if (mIdx === curMonth) {
+        metaValue = currency(monthActualBalance);
+      } else if (isCurrentMonth) {
         metaLabel = 'Saldo atual:';
-        metaValue = currency(monthActual);
+        metaValue = currency(monthActualBalance);
       } else {
         metaLabel = 'Saldo projetado:';
-        metaValue = currency(monthActual + monthPlanned);
+        metaValue = currency(monthProjectedBalance);
       }
       mSum.innerHTML = `\n        <div class="month-row">\n          <span class="month-name">${nomeMes.toUpperCase()}</span>\n        </div>\n        <div class="month-meta">\n          <span class="meta-label">${metaLabel}</span>\n          <span class="meta-value">${metaValue}</span>\n        </div>`;
       mDet.appendChild(mSum);
@@ -337,7 +370,7 @@ export function initAccordion(config) {
         if (iso === todayISO()) dDet.classList.add('today');
         const dSum = document.createElement('summary');
         dSum.className = 'day-summary';
-        const saldoFormatado = safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const saldoFormatado = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 70px; height: 14px;"></span>' : safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
         const hasCardDue = cards.some(card => card.due === d);
         const hasSalary = dayTx.some(t => SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w)));
@@ -358,7 +391,7 @@ export function initAccordion(config) {
           det.className = 'invoice swipe-wrapper';
           det.dataset.pd = iso;
           det.dataset.swipeId = `inv_${cardName.replace(/[^a-z0-9]/gi,'')}_${iso.replace(/-/g,'')}_${Math.random().toString(36).slice(2,7)}`;
-          const invHeader = createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0, iso, txs);
+          const invHeader = createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0, iso, txs, isSkeletonMode);
           det.appendChild(invHeader);
           // Swipe actions
           const headerActions = document.createElement('div');
@@ -385,16 +418,29 @@ export function initAccordion(config) {
           });
           dDet.appendChild(headerActions);
           // Build details for each invoice item
-          const invDetails = document.createElement('div');
-          invDetails.className = 'invoice-items';
-          (invoicesByCard[cardName] || []).forEach(tx => {
-            const p = document.createElement('p');
-            p.className = 'invoice-item';
-            const amountFormatted = safeFmtCurrency(tx.val, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            p.innerHTML = `${tx.desc} <span class="amount">${amountFormatted}</span>`;
-            invDetails.appendChild(p);
-          });
-          det.appendChild(invDetails);
+          if (isSkeletonMode || typeof makeLine !== 'function') {
+            const invDetails = document.createElement('div');
+            invDetails.className = 'invoice-items';
+            (invoicesByCard[cardName] || []).forEach(() => {
+              const placeholder = document.createElement('div');
+              placeholder.className = 'skeleton skeleton-line';
+              placeholder.style.width = '100%';
+              placeholder.style.height = '20px';
+              placeholder.style.margin = '6px 0';
+              invDetails.appendChild(placeholder);
+            });
+            det.appendChild(invDetails);
+          } else {
+            const invList = document.createElement('ul');
+            invList.className = 'executed-list';
+            (invoicesByCard[cardName] || []).forEach(tx => {
+              const li = document.createElement('li');
+              const line = makeLine(tx, false, true);
+              if (line) li.appendChild(line);
+              invList.appendChild(li);
+            });
+            det.appendChild(invList);
+          }
           dDet.appendChild(det);
         });
         // Planned operations section
@@ -408,13 +454,25 @@ export function initAccordion(config) {
         if (plannedOps.length > 0) {
           const plannedContainer = document.createElement('div');
           plannedContainer.className = 'planned-cash';
-          plannedOps.forEach(tx => {
-            const div = document.createElement('div');
-            div.className = 'planned-item';
-            const amount = safeFmtCurrency(tx.val, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            div.innerHTML = `${tx.desc} <span class="amount">${amount}</span>`;
-            plannedContainer.appendChild(div);
-          });
+          if (isSkeletonMode || typeof makeLine !== 'function') {
+            plannedOps.forEach(tx => {
+              const div = document.createElement('div');
+              div.className = 'planned-item';
+              const amount = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 60px; height: 12px;"></span>' : safeFmtCurrency(tx.val, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              div.innerHTML = `${tx.desc} <span class="amount">${amount}</span>`;
+              plannedContainer.appendChild(div);
+            });
+          } else {
+            const list = document.createElement('ul');
+            list.className = 'planned-list';
+            plannedOps.forEach(tx => {
+              const li = document.createElement('li');
+              const line = makeLine(tx);
+              if (line) li.appendChild(line);
+              list.appendChild(li);
+            });
+            plannedContainer.appendChild(list);
+          }
           dDet.appendChild(plannedContainer);
         }
         // Executed operations section
@@ -428,13 +486,25 @@ export function initAccordion(config) {
         if (executedOps.length > 0) {
           const executedContainer = document.createElement('div');
           executedContainer.className = 'executed-cash';
-          executedOps.forEach(tx => {
-            const div = document.createElement('div');
-            div.className = 'executed-item';
-            const amount = safeFmtCurrency(tx.val, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            div.innerHTML = `${tx.desc} <span class="amount">${amount}</span>`;
-            executedContainer.appendChild(div);
-          });
+          if (isSkeletonMode || typeof makeLine !== 'function') {
+            executedOps.forEach(tx => {
+              const div = document.createElement('div');
+              div.className = 'executed-item';
+              const amount = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 60px; height: 12px;"></span>' : safeFmtCurrency(tx.val, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              div.innerHTML = `${tx.desc} <span class="amount">${amount}</span>`;
+              executedContainer.appendChild(div);
+            });
+          } else {
+            const list = document.createElement('ul');
+            list.className = 'executed-list';
+            executedOps.forEach(tx => {
+              const li = document.createElement('li');
+              const line = makeLine(tx);
+              if (line) li.appendChild(line);
+              list.appendChild(li);
+            });
+            executedContainer.appendChild(list);
+          }
           dDet.appendChild(executedContainer);
         }
         mDet.appendChild(dDet);

@@ -9,6 +9,9 @@
  */
 
 import { cacheGet, cacheSet } from '../utils/cache.js';
+import { applyCurrencyProfile, getAvailableProfiles, getCurrentProfile } from '../utils/currencyProfile.js';
+import { getRuntimeProfile } from '../utils/profile.js';
+import { showModal } from '../utils/dom.js';
 
 /**
  * Apply theme preference to the document
@@ -133,8 +136,8 @@ export function setupSettings(settingsModalEl) {
           <button class="theme-btn" data-theme="dark" aria-pressed="${savedTheme === 'dark' ? 'true' : 'false'}">Escuro</button>
           <button class="theme-btn" data-theme="system" aria-pressed="${savedTheme === 'system' ? 'true' : 'false'}">Sistema</button>
         </div>
-        <div class="settings-item settings-link">
-          <div class="left">Portugal (EUR)</div>
+        <div class="settings-item settings-link" data-action="currency">
+          <div class="left">--</div>
           <div class="right">›</div>
         </div>
       </div>
@@ -185,6 +188,189 @@ export function setupSettings(settingsModalEl) {
         btn.setAttribute('aria-pressed', 'true');
       });
     });
+
+      // Wire currency selector: open existing currencyProfileModal and populate list
+    (function wireCurrencySelector(){
+      const currencyLink = box.querySelector('[data-action="currency"]');
+      if (!currencyLink) return;
+
+        console.log('[settings] renderSettings: wiring currency selector', currencyLink);
+
+      // Set initial label from runtime profile
+      try {
+        const runtime = getRuntimeProfile();
+        const left = currencyLink.querySelector('.left');
+        if (left && runtime) left.textContent = runtime.name || '--';
+      } catch (_) {}
+
+      currencyLink.onclick = () => {
+        console.log('[settings] currency selector clicked');
+        let modal = document.getElementById('currencyProfileModal');
+        let list = document.getElementById('currencyProfileList');
+        let closeBtn = document.getElementById('closeCurrencyProfileModal');
+        console.log('[settings] modal/list refs:', { modal, list, closeBtn });
+        if (!modal || !list) {
+          // Try fallbacks and log helpful info
+          modal = document.querySelector('#currencyProfileModal') || modal;
+          list = document.querySelector('#currencyProfileList') || list;
+          closeBtn = document.querySelector('#closeCurrencyProfileModal') || closeBtn;
+          console.warn('[settings] modal or list not found by id, tried querySelector:', { modal, list, closeBtn });
+        }
+        if (!modal) {
+          console.warn('[settings] currency modal element not found — creating dynamic modal');
+          try {
+            modal = document.createElement('div');
+            modal.id = 'currencyProfileModal';
+            modal.className = 'bottom-modal backdrop-blur hidden sheet-modal';
+            modal.setAttribute('role','dialog');
+            modal.setAttribute('aria-modal','true');
+            modal.innerHTML = `
+              <div class="bottom-modal-box">
+                <div class="modal-drag"></div>
+                <button id="closeCurrencyProfileModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+                <header class="sheet-header">
+                  <h2 id="currencyProfileTitle">País / Moeda</h2>
+                </header>
+                <div class="modal-content">
+                  <ul id="currencyProfileList" style="list-style:none;padding:6px 0;margin:0;display:block;"></ul>
+                </div>
+              </div>`;
+            document.body.appendChild(modal);
+            // re-query list and closeBtn
+            list = modal.querySelector('#currencyProfileList');
+            closeBtn = modal.querySelector('#closeCurrencyProfileModal');
+          } catch (err) {
+            console.error('[settings] failed to create currency modal dynamically', err);
+            return;
+          }
+        }
+
+        // populate list only if available
+        if (!list) {
+          console.warn('[settings] currency list element not found — showing modal without items');
+        } else {
+          try {
+            const profiles = getAvailableProfiles();
+            console.log('[settings] currency profiles:', profiles);
+            const currentId = (getCurrentProfile() && getCurrentProfile().id) || localStorage.getItem('ui:profile') || Object.keys(profiles)[0];
+            list.innerHTML = '';
+            Object.keys(profiles || {}).forEach(pid => {
+              const p = profiles[pid];
+              const li = document.createElement('li');
+              li.className = 'currency-profile-item';
+              
+              const isSelected = pid === currentId;
+              li.innerHTML = `
+                <div class="currency-profile-info">
+                  <div class="currency-profile-name">${p.name}</div>
+                  <div class="currency-profile-details">${p.locale} · ${p.currency}</div>
+                </div>
+                <div class="currency-profile-icon">${isSelected ? '✓' : '›'}</div>
+              `;
+              
+              li.onclick = () => {
+                try {
+                  console.log('[settings] applying currency profile:', pid);
+                  applyCurrencyProfile(pid);
+                  
+                  // Update the selector label
+                  const left = currencyLink.querySelector('.left');
+                  if (left) left.textContent = p.name || '--';
+                  
+                  // Close modals
+                  modal.classList.add('hidden');
+                  const settingsModal = document.getElementById('settingsModal');
+                  if (settingsModal) settingsModal.classList.add('hidden');
+                  try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch (_) {}
+                  
+                  // Show toast
+                  try {
+                    const showToast = window.__gastos?.showToast;
+                    if (typeof showToast === 'function') {
+                      showToast(`Moeda alterada para ${p.name}`, 'success', 3000);
+                    }
+                  } catch (err) { console.warn('[settings] toast failed', err); }
+                  
+                  // Reload data from new profile
+                  setTimeout(async () => {
+                    try {
+                      console.log('[settings] loading data for new profile:', pid);
+                      
+                      // Clear profile-scoped cache first
+                      if (typeof window.cacheClearProfile === 'function') {
+                        console.log('[settings] clearing profile cache');
+                        window.cacheClearProfile();
+                      }
+                      
+                      // Load fresh data from Firebase with new profile scoping
+                      const load = window.__gastos?.load;
+                      if (typeof load === 'function') {
+                        console.log('[settings] loading fresh data from Firebase');
+                        
+                        const [newTx, newCards, newStartBal] = await Promise.all([
+                          load('tx', []),
+                          load('cards', [{name:'Dinheiro',close:0,due:0}]),
+                          load('startBal', null)
+                        ]);
+                        
+                        console.log('[settings] loaded profile data:', { 
+                          txCount: newTx?.length || 0, 
+                          cardCount: newCards?.length || 0,
+                          startBal: newStartBal 
+                        });
+                        
+                        // Update app state with new profile data
+                        if (window.setTransactions) window.setTransactions(newTx);
+                        if (window.setCards) window.setCards(newCards);  
+                        if (window.setStartBalance) window.setStartBalance(newStartBal);
+                        
+                        // Update cache
+                        if (window.cacheSet) {
+                          window.cacheSet('tx', newTx);
+                          window.cacheSet('cards', newCards);
+                          window.cacheSet('startBal', newStartBal);
+                        }
+                        
+                        // Re-render everything
+                        if (window.refreshMethods) window.refreshMethods();
+                        if (window.renderCardList) window.renderCardList();
+                        
+                        const renderTable = window.__gastos?.renderTable;
+                        if (typeof renderTable === 'function') {
+                          console.log('[settings] re-rendering table with new data');
+                          renderTable();
+                        }
+                      } else {
+                        console.warn('[settings] load function not available');
+                      }
+                      
+                    } catch (err) { 
+                      console.warn('[settings] profile reload failed:', err);
+                    }
+                  }, 100);
+                  
+                } catch (err) { console.warn('applyCurrencyProfile failed', err); }
+              };
+              list.appendChild(li);
+            });
+          } catch (err) {
+            console.warn('Failed to populate currency profiles', err);
+          }
+        }
+
+        if (closeBtn) closeBtn.onclick = () => { modal.classList.add('hidden'); try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){} };
+
+        console.log('[settings] showing currency modal');
+        try {
+          // Prefer the dom helper to manage modal open state
+          showModal(modal);
+        } catch (err) {
+          // Fallback: toggle class directly
+          modal.classList.remove('hidden');
+          try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+        }
+      };
+    })();
     
     // Reset data button
     const resetBtn = box.querySelector('#resetDataBtn');

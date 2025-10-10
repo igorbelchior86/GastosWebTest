@@ -431,6 +431,56 @@ html[data-theme="light"] .planned-list .op-right .value.positive {
   -webkit-text-fill-color: initial !important;
 }
 
+/* País / Moeda modal: Currency profile list styles (dark theme default) */
+#currencyProfileModal #currencyProfileList {
+  list-style: none;
+  padding: 6px 0;
+  margin: 0;
+  display: block;
+}
+
+#currencyProfileModal .currency-profile-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#currencyProfileModal .currency-profile-item:first-child {
+  border-top: none;
+}
+
+#currencyProfileModal .currency-profile-item:hover {
+  background: rgba(255,255,255,.04);
+}
+
+#currencyProfileModal .currency-profile-item .currency-profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#currencyProfileModal .currency-profile-item .currency-profile-name {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+#currencyProfileModal .currency-profile-item .currency-profile-details {
+  color: #cfcfcf;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+#currencyProfileModal .currency-profile-item .currency-profile-icon {
+  color: var(--accent-color, #007AFF);
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
 /* Light theme: País / Moeda modal styles */
 html[data-theme="light"] #currencyProfileModal .bottom-modal-box {
   background: var(--bg-card) !important;
@@ -453,6 +503,23 @@ html[data-theme="light"] #currencyProfileModal .modal-close-btn {
 }
 html[data-theme="light"] #currencyProfileModal .modal-close-btn:hover {
   opacity: 1;
+}
+
+/* Light theme: Currency profile list items */
+html[data-theme="light"] #currencyProfileModal .currency-profile-item {
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+html[data-theme="light"] #currencyProfileModal .currency-profile-item:hover {
+  background: rgba(0,0,0,0.02);
+}
+
+html[data-theme="light"] #currencyProfileModal .currency-profile-name {
+  color: #111 !important;
+}
+
+html[data-theme="light"] #currencyProfileModal .currency-profile-details {
+  color: #666 !important;
 }
 
 /* Adicione outros componentes conforme necessário, sempre prefixando com html[data-theme="light"] */
@@ -1523,6 +1590,7 @@ html[data-theme="light"] #startGroup .start-input-row #setStartBtn{
 /* ===================== ACCORDION ===================== */
 #accordion,#accordion details,#accordion summary{border:none;margin:0;background:transparent;}
 #accordion details.month{border:none;background:transparent;padding:0;margin-bottom:20px;}
+#accordion details.month:first-of-type{margin-top:var(--sticky-month-safe-area,0);}
 #accordion details{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;padding:0 8px;}
 #accordion summary{cursor:pointer;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px;}
 #accordion summary::-webkit-details-marker{display:none;}
@@ -3525,8 +3593,8 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
   border-radius: 10px;
   /* switch from flex to grid to control placement */
   display: grid;
-  grid-template-columns: minmax(0,1fr) auto; /* descrição cresce, valor encosta à direita */
-  grid-template-rows: auto auto;            /* linha 1: desc/valor, linha 2: método */
+  grid-template-columns: auto minmax(0,1fr) auto; /* checkbox + descrição + valor */
+  grid-template-rows: auto auto;                  /* linha 1: principal, linha 2: detalhes */
   column-gap: 12px;
   row-gap: 2px;
   align-items: center;
@@ -3540,11 +3608,19 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 
 /* Grid-based layout for planned modal children */
 /* Grid-based layout for planned modal children */
+#plannedModal #plannedList .planned-cash .op-line { display: contents; }
 #plannedModal #plannedList .planned-cash .op-main { display: contents; }
-#plannedModal #plannedList .planned-cash .op-left { grid-column: 1; grid-row: 1; min-width: 0; }
+#plannedModal #plannedList .planned-cash .op-left {
+  grid-column: 1 / span 2;
+  grid-row: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 #plannedModal #plannedList .planned-cash .op-right { display: contents; }
 #plannedModal #plannedList .planned-cash .op-right .value {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   justify-self: end;
   text-align: right;
@@ -3553,15 +3629,13 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 /* Qualquer conteúdo da direita que não seja o valor vira a linha de método, abaixo da descrição */
 #plannedModal #plannedList .planned-cash .op-right > :not(.value),
 #plannedModal #plannedList .planned-cash .method {
-  grid-column: 1;
+  grid-column: 1 / span 3;
   grid-row: 2;
   justify-self: start;
   align-self: start;
   margin-top: 2px;
   font-size: 0.9rem;
   color: var(--txt-muted);
-  margin-left: 100px !important;
-  padding-left: 100px !important;
 }
 /* Guard rails: prevent horizontal overflow in bottom modals */
 .bottom-modal,

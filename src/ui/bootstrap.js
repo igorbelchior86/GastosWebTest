@@ -10,6 +10,8 @@
  * `window.__gastos`.
  */
 
+import { normalizeStartBalance } from '../utils/startBalance.js';
+
 export function runBootstrap() {
   const g = (window.__gastos = window.__gastos || {});
 
@@ -51,6 +53,17 @@ export function runBootstrap() {
 
   const addCard = g.addCard || (() => {});
   const addTx = g.addTx || (() => {});
+  const setStartBalance = g.setStartBalance || ((val) => {
+    if (state) state.startBalance = val;
+    return val;
+  });
+  const syncStartInputFromState = g.syncStartInputFromState || (() => {});
+  const ensureStartSetFromBalance = g.ensureStartSetFromBalance || (() => {});
+  const normalizeISODate = g.normalizeISODate || ((iso) => iso);
+  const todayISO = g.todayISO || (() => {
+    const now = new Date();
+    return now.toISOString().slice(0, 10);
+  });
 
   const showCardModal = g.showCardModal || (() => { if (cardModal) { cardModal.classList.remove('hidden'); } });
   const hideCardModal = g.hideCardModal || (() => { if (cardModal) { cardModal.classList.add('hidden'); } });
@@ -96,7 +109,7 @@ export function runBootstrap() {
       return;
     }
     // salva o novo saldo e renderiza novamente
-    state.startBalance = numberValue;
+    setStartBalance(numberValue);
     cacheSet('startBal', state.startBalance);
     syncStartInputFromState();
     const anchorISO = normalizeISODate(state.startDate) || todayISO();
@@ -210,11 +223,13 @@ export function runBootstrap() {
 
     if (typeof PATH === 'string') {
       try {
-        const [liveTx, liveCards, liveBal] = await Promise.all([
+        const [liveTx, liveCards, liveBalRaw] = await Promise.all([
           load('tx', []),
           load('cards', cards),
           load('startBal', state.startBalance)
         ]);
+        const liveBal = normalizeStartBalance(liveBalRaw);
+        const currentBal = normalizeStartBalance(state.startBalance);
 
         const hasLiveTx    = Array.isArray(liveTx)    ? liveTx.length    > 0 : liveTx    && Object.keys(liveTx).length    > 0;
         const hasLiveCards = Array.isArray(liveCards) ? liveCards.length > 0 : liveCards && Object.keys(liveCards).length > 0;
@@ -240,8 +255,8 @@ export function runBootstrap() {
           try { cacheSet('cards', getCards()); } catch (_) { cacheSet('cards', normalized); }
           refreshMethods(); renderCardList(); renderTable();
         }
-        if (liveBal !== state.startBalance) {
-          state.startBalance = liveBal;
+        if (liveBal !== currentBal) {
+          setStartBalance(liveBal);
           cacheSet('startBal', state.startBalance);
           syncStartInputFromState();
           ensureStartSetFromBalance();

@@ -1,3 +1,5 @@
+import { normalizeStartBalance } from './startBalance.js';
+
 /**
  * Provides a helper to hydrate the application state from cached storage. The
  * original implementation lived in main.js but has been extracted to reduce
@@ -55,7 +57,7 @@ export function hydrateCache(options = {}) {
   const cards = getCards ? getCards() : normalizedCards;
   // 3) Start values
   if (state) {
-    state.startBalance = cacheGet('startBal', null);
+    state.startBalance = normalizeStartBalance(cacheGet('startBal', null));
     state.startDate = g.normalizeISODate
       ? g.normalizeISODate(cacheGet('startDate', null))
       : cacheGet('startDate', null);

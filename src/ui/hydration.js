@@ -52,7 +52,11 @@ export function resetHydration() {
  * @param {boolean} enabled whether to track this target
  */
 export function registerHydrationTarget(key, enabled) {
-  if (!enabled || !key) return;
+  if (!enabled || !key) {
+    console.log('registerHydrationTarget: skipping', key, 'enabled:', enabled);
+    return;
+  }
+  console.log('registerHydrationTarget: registering', key);
   hydrationTargets.set(key, false);
 }
 
@@ -63,7 +67,11 @@ export function registerHydrationTarget(key, enabled) {
  * @param {string} key identifier previously passed to registerHydrationTarget
  */
 export function markHydrationTargetReady(key) {
-  if (!key || !hydrationTargets.has(key)) return;
+  if (!key || !hydrationTargets.has(key)) {
+    console.log('markHydrationTargetReady: key not found or invalid:', key, 'has key:', hydrationTargets.has(key));
+    return;
+  }
+  console.log('markHydrationTargetReady: marking', key, 'as ready');
   hydrationTargets.set(key, true);
   maybeCompleteHydration();
 }
@@ -73,10 +81,22 @@ export function markHydrationTargetReady(key) {
  * completion. Exposed only for the fallback timer.
  */
 function maybeCompleteHydration() {
-  if (!hydrationInProgress) return;
-  for (const status of hydrationTargets.values()) {
-    if (status === false) return;
+  if (!hydrationInProgress) {
+    console.log('maybeCompleteHydration: hydration not in progress');
+    return;
   }
+  
+  const targets = Array.from(hydrationTargets.entries());
+  console.log('maybeCompleteHydration: checking targets:', targets);
+  
+  for (const status of hydrationTargets.values()) {
+    if (status === false) {
+      console.log('maybeCompleteHydration: not all targets ready, continuing hydration');
+      return;
+    }
+  }
+  
+  console.log('maybeCompleteHydration: all targets ready, completing hydration');
   completeHydration();
 }
 
@@ -86,7 +106,11 @@ function maybeCompleteHydration() {
  * attach their own hooks to run after hydration completes.
  */
 export function completeHydration() {
-  if (!hydrationInProgress) return;
+  if (!hydrationInProgress) {
+    console.log('completeHydration: hydration not in progress, skipping');
+    return;
+  }
+  console.log('completeHydration: starting completion process');
   hydrationInProgress = false;
   hydrationTargets.clear();
   try {
@@ -100,37 +124,45 @@ export function completeHydration() {
   // Delegate to hooks on window if present. These mirror the original
   // calls in main.js and keep the hydration behaviour consistent.
   try {
+    console.log('completeHydration: calling ensureStartSetFromBalance');
     if (typeof window.ensureStartSetFromBalance === 'function') {
       window.ensureStartSetFromBalance({ persist: true });
     }
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.warn('completeHydration: ensureStartSetFromBalance failed:', err);
   }
   try {
+    console.log('completeHydration: calling refreshMethods');
     if (typeof window.refreshMethods === 'function') window.refreshMethods();
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.warn('completeHydration: refreshMethods failed:', err);
   }
   try {
+    console.log('completeHydration: calling renderCardList');
     if (typeof window.renderCardList === 'function') window.renderCardList();
-  } catch {
+  } catch (err) {
+    console.warn('completeHydration: renderCardList failed:', err);
     /* ignore */
   }
   try {
+    console.log('completeHydration: calling initStart');
     if (typeof window.initStart === 'function') window.initStart();
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.warn('completeHydration: initStart failed:', err);
   }
   try {
+    console.log('completeHydration: calling safeRenderTable - THIS SHOULD REMOVE SKELETON');
     if (typeof window.safeRenderTable === 'function') window.safeRenderTable();
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.warn('completeHydration: safeRenderTable failed:', err);
   }
   try {
+    console.log('completeHydration: removing skeleton-boot class');
     document.documentElement.classList.remove('skeleton-boot');
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.warn('completeHydration: skeleton-boot removal failed:', err);
   }
+  console.log('completeHydration: hydration completion process finished');
 }
 
 /**
@@ -144,4 +176,4 @@ export function isHydrating() {
 }
 
 // Expose internal map for debugging/testing if needed
-export { hydrationTargets };
+export { hydrationTargets, maybeCompleteHydration };

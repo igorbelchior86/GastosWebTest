@@ -19,6 +19,7 @@ import { FirebaseService } from '../services/firebaseService.js';
 import { AuthService } from '../services/authService.js';
 import * as cache from '../utils/cache.js';
 import * as profile from '../utils/profile.js';
+import { firebaseConfig } from '../config/firebaseConfig.js';
 
 // Attach date utilities
 if (typeof window !== 'undefined') {
@@ -138,11 +139,30 @@ if (typeof window !== 'undefined') {
   window.FirebaseSvc = FirebaseService;
 }
 
-// Attach Auth service via a backwards‑compatible wrapper named `Auth`
+// Initialize Auth service and attach via a backwards‑compatible wrapper named `Auth`
 if (typeof window !== 'undefined') {
-  // Wait until AuthService has been initialised before invoking
+  // Initialize the auth service immediately
+  AuthService.init(firebaseConfig).catch(err => {
+    console.warn('AuthService.init failed in globals:', err);
+  });
+
+  // Subscribe to auth changes and dispatch DOM events for compatibility
+  AuthService.onAuthChanged((user) => {
+    try {
+      console.log('globals: auth state changed, dispatching auth:state event', user ? user.email : 'signed out');
+      document.dispatchEvent(new CustomEvent('auth:state', { 
+        detail: { user } 
+      }));
+    } catch (err) {
+      console.warn('Failed to dispatch auth:state event:', err);
+    }
+  });
+
+  // Create auth proxy
   const authProxy = {
-    async signInWithGoogle() { return AuthService.signInWithGoogle(); },
+    async signInWithGoogle() { 
+      return AuthService.signInWithGoogle();
+    },
     async signOut() { return AuthService.signOut(); },
     onReady(cb) {
       // Immediately invoke with current user if available

@@ -2,10 +2,12 @@
  * Formatting helpers
  *
  * Utilities to format numbers, currencies and dates consistently according
- * to the user’s chosen locale and currency. These helpers accept an
+ * to the user's chosen locale and currency. These helpers accept an
  * optional profile parameter to override locale, currency and decimal
  * precision. When omitted, a basic default profile is used.
  */
+
+import { getRuntimeProfile } from './profile.js';
 
 /**
  * Default formatting profile used when no explicit profile is provided.
@@ -20,7 +22,7 @@ export const DEFAULT_PROFILE = {
 
 /**
  * Determine the current formatting profile. This implementation uses
- * localStorage to persist the user’s choice and falls back to the default
+ * localStorage to persist the user's choice and falls back to the default
  * profile if no stored value exists. Pass a map of available profiles to
  * restrict which profiles can be chosen.
  *
@@ -28,34 +30,30 @@ export const DEFAULT_PROFILE = {
  * @returns {object} active profile
  */
 export function getActiveProfile(profiles = {}) {
-  // Attempt to read a profile id from localStorage
-  if (typeof window !== 'undefined') {
-    try {
-      const savedId = window.localStorage?.getItem?.('ui:profile');
-      if (savedId && profiles[savedId]) return profiles[savedId];
-    } catch {
-      /* ignore */
-    }
+  if (typeof window === 'undefined') return DEFAULT_PROFILE;
+  try {
+    const stored = localStorage.getItem('ui:profile');
+    if (stored && profiles[stored]) return profiles[stored];
+  } catch {
+    // ignore localStorage errors
   }
-  // Fallback to the first profile in the map, or default
   const first = Object.values(profiles)[0];
   return first || DEFAULT_PROFILE;
 }
 
 /**
- * Create a number formatter for currency values according to a profile.
- * Uses the built‑in Intl API when available; falls back to a simple
- * formatter on error. The result object has a `format` method that
- * accepts a numeric value and returns a localized currency string.
+ * Create a currency formatter according to a profile. Useful for formatting
+ * currency values with the correct grouping and decimal separators. Falls
+ * back to a simple implementation when Intl is unavailable.
  *
  * @param {object} profile formatting profile
- * @param {object} [options] override locale/currency/decimal settings
+ * @param {object} [options] override minimum/maximum fraction digits
  * @returns {Intl.NumberFormat|{ format: (number) => string }} formatter
  */
 function createCurrencyFormatter(profile, options = {}) {
   const locale = options.locale || profile.locale || DEFAULT_PROFILE.locale;
   const currency = options.currency || profile.currency || DEFAULT_PROFILE.currency;
-  const decimals = options.decimals ?? profile.decimalPlaces ?? DEFAULT_PROFILE.decimalPlaces;
+  const decimals = profile.decimalPlaces ?? DEFAULT_PROFILE.decimalPlaces;
   const minimumFractionDigits = options.minimumFractionDigits ?? decimals;
   const maximumFractionDigits = options.maximumFractionDigits ?? decimals;
   try {
@@ -70,6 +68,69 @@ function createCurrencyFormatter(profile, options = {}) {
     return {
       format: (v) => `${currency} ${Number(v ?? 0).toFixed(maximumFractionDigits)}`
     };
+  }
+}
+
+/**
+ * Format a value as currency. Accepts numbers or numeric strings. The
+ * returned string will include the appropriate currency symbol and
+ * grouping based on the active profile. Optionally hide the sign or
+ * force a sign to always be shown on positive values.
+ *
+ * @param {number|string} value value to format
+ * @param {object} [options] formatting options (showSign, minimumFractionDigits, etc.)
+ * @param {object} [profileOverride] override the active profile
+ * @returns {string} formatted currency string
+ */
+export function fmtCurrency(value, options = {}, profileOverride = null) {
+  const profile = profileOverride || getRuntimeProfile();
+  const formatter = createCurrencyFormatter(profile, options);
+  const numericValue = coerceNumber(value);
+  let formatted;
+  try {
+    formatted = formatter.format(numericValue);
+  } catch {
+    const decimals = options.maximumFractionDigits ?? options.minimumFractionDigits ?? (profile.decimalPlaces || DEFAULT_PROFILE.decimalPlaces);
+    formatted = `${profile.currency || DEFAULT_PROFILE.currency} ${numericValue.toFixed(decimals)}`;
+  }
+  // Manage sign visibility
+  if (options.showSign === false) {
+    return formatted.replace(/^[-+]/, '').replace(/^-/, '');
+  }
+  if (options.showSign === 'always' && numericValue > 0 && !formatted.startsWith('+')) {
+    return `+${formatted}`;
+  }
+  return formatted;
+}
+
+/**
+ * Convenience alias for fmtCurrency when no customisation is required.
+ *
+ * @param {number|string} v value to format
+ * @returns {string}
+ */
+export function currency(v) {
+  return fmtCurrency(v);
+}
+
+/**
+ * Format a number according to locale and options. Accepts numbers or
+ * numeric strings. Returns a simple string when Intl is unavailable.
+ *
+ * @param {number|string} value number to format
+ * @param {object} [options] optional configuration
+ * @param {object} [profileOverride] override the active profile
+ * @returns {string}
+ */
+export function fmtNumber(value, options = {}, profileOverride = null) {
+  const profile = profileOverride || getRuntimeProfile();
+  const formatter = createNumberFormatter(profile, options);
+  const numericValue = coerceNumber(value);
+  try {
+    return formatter.format(numericValue);
+  } catch {
+    const max = options.maximumFractionDigits ?? options.minimumFractionDigits ?? (profile.decimalPlaces || DEFAULT_PROFILE.decimalPlaces);
+    return numericValue.toFixed(Math.max(0, max));
   }
 }
 
@@ -144,66 +205,40 @@ export function escHtml(s) {
 }
 
 /**
- * Format a value as currency. Accepts numbers or numeric strings. The
- * returned string will include the appropriate currency symbol and
- * grouping based on the active profile. Optionally hide the sign or
- * force a sign to always be shown on positive values.
+ * Parse a currency input string into a numeric value. Attempts to infer
+ * locale-specific grouping and decimal separators based on the current
+ * profile. Accepts strings containing digits, optional grouping
+ * separators, optional decimal separators, and leading sign. Returns
+ * zero on failure.
  *
- * @param {number|string} value value to format
- * @param {object} [options] formatting options (showSign, minimumFractionDigits, etc.)
+ * @param {string|number} str input
  * @param {object} [profileOverride] override the active profile
- * @returns {string} formatted currency string
+ * @returns {number} parsed value
  */
-export function fmtCurrency(value, options = {}, profileOverride = null) {
+export function parseCurrency(str, profileOverride = null) {
+  if (typeof str === 'number') {
+    return Number.isFinite(str) ? str : 0;
+  }
+  if (!str) return 0;
   const profile = profileOverride || DEFAULT_PROFILE;
-  const formatter = createCurrencyFormatter(profile, options);
-  const numericValue = coerceNumber(value);
-  let formatted;
-  try {
-    formatted = formatter.format(numericValue);
-  } catch {
-    const decimals = options.maximumFractionDigits ?? options.minimumFractionDigits ?? (profile.decimalPlaces || DEFAULT_PROFILE.decimalPlaces);
-    formatted = `${profile.currency || DEFAULT_PROFILE.currency} ${numericValue.toFixed(decimals)}`;
+  const locale = profile.locale || DEFAULT_PROFILE.locale;
+  let group = '.';
+  let decimal = ',';
+  
+  // Infer decimal and grouping separators from locale
+  if (locale.includes('en')) {
+    group = ',';
+    decimal = '.';
   }
-  // Manage sign visibility
-  if (options.showSign === false) {
-    return formatted.replace(/^[-+]/, '').replace(/^-/, '');
-  }
-  if (options.showSign === 'always' && numericValue > 0 && !formatted.startsWith('+')) {
-    return `+${formatted}`;
-  }
-  return formatted;
-}
-
-/**
- * Convenience alias for fmtCurrency when no customisation is required.
- *
- * @param {number|string} v value to format
- * @returns {string}
- */
-export function currency(v) {
-  return fmtCurrency(v);
-}
-
-/**
- * Format a number according to locale and options. Accepts numbers or
- * numeric strings. Returns a simple string when Intl is unavailable.
- *
- * @param {number|string} value number to format
- * @param {object} [options] optional configuration
- * @param {object} [profileOverride] override the active profile
- * @returns {string}
- */
-export function fmtNumber(value, options = {}, profileOverride = null) {
-  const profile = profileOverride || DEFAULT_PROFILE;
-  const formatter = createNumberFormatter(profile, options);
-  const numericValue = coerceNumber(value);
-  try {
-    return formatter.format(numericValue);
-  } catch {
-    const max = options.maximumFractionDigits ?? options.minimumFractionDigits ?? (profile.decimalPlaces || DEFAULT_PROFILE.decimalPlaces);
-    return numericValue.toFixed(Math.max(0, max));
-  }
+  
+  const cleaned = String(str)
+    .trim()
+    .replace(/[^\d+\-.,]/g, '') // Remove currency symbols and letters
+    .replace(new RegExp(`\\${group}`, 'g'), '') // Remove grouping separators
+    .replace(decimal, '.'); // Normalize decimal separator
+    
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /**
@@ -234,65 +269,4 @@ export function fmtDate(d, locale = 'pt-BR') {
 export function formatDateISO(date) {
   if (!(date instanceof Date)) return '';
   return date.toISOString().slice(0, 10);
-}
-
-/**
- * Parse a currency input string into a numeric value. Attempts to infer
- * locale-specific grouping and decimal separators based on the current
- * profile. Accepts strings containing digits, optional grouping
- * separators, optional decimal separators, and leading sign. Returns
- * zero on failure.
- *
- * @param {string|number} str input
- * @param {object} [profileOverride] override the active profile
- * @returns {number} parsed value
- */
-export function parseCurrency(str, profileOverride = null) {
-  if (typeof str === 'number') {
-    return Number.isFinite(str) ? str : 0;
-  }
-  if (!str) return 0;
-  const profile = profileOverride || DEFAULT_PROFILE;
-  const locale = profile.locale || DEFAULT_PROFILE.locale;
-  let group = '.';
-  let decimal = ',';
-  // Determine separators via Intl API if available
-  try {
-    const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
-    const groupPart = parts.find((p) => p.type === 'group');
-    const decPart = parts.find((p) => p.type === 'decimal');
-    group = groupPart?.value || group;
-    decimal = decPart?.value || decimal;
-  } catch {
-    // Provide sensible defaults for English
-    if (locale.startsWith('en')) {
-      group = ',';
-      decimal = '.';
-    }
-  }
-  // Remove whitespace and currency symbols
-  const sanitized = String(str)
-    .replace(/\s+/g, '')
-    .replace(new RegExp(`[^0-9${group}${decimal}\-+]`, 'g'), '')
-    .replace(new RegExp(`\${group}`, 'g'), '')
-    .replace(new RegExp(`\${decimal}`, 'g'), '.');
-  const cleaned = sanitized.replace(/[^0-9+\-.]/g, '');
-  const result = parseFloat(cleaned);
-  return Number.isFinite(result) ? result : 0;
-}
-
-/**
- * Abbreviated month names in Portuguese. Useful for compact date displays.
- */
-export const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-/**
- * Determine if the current viewport qualifies as “mobile” based on width.
- * This helper is used by other parts of the application to adjust UI
- * behaviour and formatting for small screens.
- *
- * @returns {boolean}
- */
-export function isMobile() {
-  return typeof window !== 'undefined' && window.innerWidth <= 480;
 }

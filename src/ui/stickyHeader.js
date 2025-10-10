@@ -16,6 +16,8 @@
  *   });
  */
 
+import { getRuntimeProfile } from '../utils/profile.js';
+
 export function initStickyHeader({
   wrapperEl,
   headerEl,
@@ -44,6 +46,7 @@ export function initStickyHeader({
   const STICKY_VISIBLE = 18;
   // Compute an initial header offset; will be recalculated on resize
   let HEADER_OFFSET = headerEl ? (headerEl.getBoundingClientRect().height || 58) : 58;
+  const SAFE_AREA_VAR = '--sticky-month-safe-area';
 
   // Create the sticky month element on demand
   function createStickyMonth() {
@@ -52,6 +55,16 @@ export function initStickyHeader({
     stickyMonth.className = 'sticky-month';
     stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
     document.body.appendChild(stickyMonth);
+    updateStickySafeArea();
+  }
+
+  function updateStickySafeArea() {
+    if (!stickyMonth) return;
+    try {
+      const height = stickyMonth.getBoundingClientRect().height || 0;
+      const extraSpace = Math.max(0, height - STICKY_VISIBLE);
+      document.documentElement.style.setProperty(SAFE_AREA_VAR, `${extraSpace}px`);
+    } catch (_) {}
   }
 
   // Recalculate header height and reposition the sticky header
@@ -71,6 +84,7 @@ export function initStickyHeader({
       if (stickyMonth) {
         stickyMonth.style.top = (HEADER_OFFSET - STICKY_VISIBLE) + 'px';
         updateStickyMonth();
+        updateStickySafeArea();
       }
     }
   }
@@ -108,6 +122,15 @@ export function initStickyHeader({
       } catch (_) {}
       // Fallback: use the first word from label if monthText is empty
       if (!monthText) monthText = label.split(/\s+/)[0];
+      
+      // Add country flag to the month text
+      try {
+        const profile = getRuntimeProfile();
+        if (profile && profile.flag) {
+          monthText = `${profile.flag} • ${monthText}`;
+        }
+      } catch (_) {}
+      
       if (!stickyMonthVisible || stickyMonthLabel !== monthText) {
         stickyMonth.textContent = monthText;
         if (!stickyMonthVisible) stickyMonth.classList.add('visible');
@@ -119,6 +142,7 @@ export function initStickyHeader({
       stickyMonthVisible = false;
       stickyMonthLabel = '';
     }
+    updateStickySafeArea();
   }
 
   // Attach event listeners for scrolling and resizing
@@ -145,6 +169,21 @@ export function initStickyHeader({
   createStickyMonth();
   recalculateHeaderOffset();
   attachListeners();
+  
+  // Listen for currency profile changes to update the flag
+  if (typeof window !== 'undefined') {
+    window.addEventListener('currencyProfileChanged', () => {
+      // Force update of sticky month with new flag
+      setTimeout(updateStickyMonth, 10);
+    });
+  }
+  
   // Perform an initial update after DOM is ready
   setTimeout(updateStickyMonth, 0);
+
+  // Return API
+  return {
+    recalculateHeaderOffset,
+    updateStickyMonth
+  };
 }

@@ -1,3 +1,5 @@
+import { normalizeStartBalance } from '../utils/startBalance.js';
+
 /*
  * Application state management
  *
@@ -127,8 +129,9 @@ export function getStartBalance() {
 }
 
 export function setStartBalance(value, options = {}) {
-  if (state.startBalance === value) return state.startBalance;
-  state.startBalance = value;
+  const normalized = normalizeStartBalance(value);
+  if (state.startBalance === normalized) return state.startBalance;
+  state.startBalance = normalized;
   if (options.emit !== false) emit(['startBalance']);
   return state.startBalance;
 }
