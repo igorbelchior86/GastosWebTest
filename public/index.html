@@ -14,13 +14,13 @@
   <meta http-equiv="Expires" content="0">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
-  <!-- Stylesheets live in the public folder now that index.html is at the root -->
-  <link rel="stylesheet" href="public/style.css?v=1.4.9(b22)">
-  <link rel="stylesheet" href="public/login.css?v=1.4.9(b22)">
+  <link rel="stylesheet" href="style.css?v=1.4.9(b22)">
+  <link rel="stylesheet" href="login.css?v=1.4.9(b22)">
 
-  <link rel="icon" type="image/png" sizes="192x192" href="public/icons/icon-192x192.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="public/icons/icon-180x180.png">
-  <link rel="manifest" href="public/site.webmanifest">
+
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180x180.png">
+  <link rel="manifest" href="site.webmanifest">
 </head>
 <body>
   <div id="backdrop-base"></div>
@@ -189,6 +189,7 @@
           <button id="addBtn" class="add-button">Adicionar</button>
         </div>
       </div>
+      </div>
     </div>
   </div>
 
@@ -200,12 +201,99 @@
       <header class="sheet-header">
         <h2>Planejados</h2>
       </header>
-      <div class="modal-content" id="plannedList"></div>
+      <div class="modal-content">
+        <ul id="plannedList" class="planned-list"></ul>
+      </div>
     </div>
   </div>
 
-  <!-- Toast de erro -->
-  <div id="toast" class="toast"></div>
+  <!-- Modal Excluir Recorrência -->
+  <div id="deleteRecurrenceModal" class="bottom-modal backdrop-blur hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Excluir recorrência</h2>
+      <button id="closeDeleteRecurrenceModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <button id="deleteSingleBtn" class="action-btn">Somente esta</button>
+        <button id="deleteFutureBtn" class="action-btn">Esta e futuras</button>
+        <button id="deleteAllBtn" class="action-btn">Todas</button>
+        <button id="cancelDeleteRecurrence" class="action-btn cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Recorrência -->
+  <div id="editRecurrenceModal" class="bottom-modal backdrop-blur hidden">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2>Editar recorrência</h2>
+      <button id="closeEditRecurrenceModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <button id="editSingleBtn" class="action-btn">Somente esta</button>
+        <button id="editFutureBtn" class="action-btn">Esta e futuras</button>
+        <button id="editAllBtn" class="action-btn">Todas</button>
+        <button id="cancelEditRecurrence" class="action-btn cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar mover para hoje -->
+  <div id="confirmMoveModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmMoveTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmMoveTitle">Confirmação</h2>
+      <button id="closeConfirmMove" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="confirmMoveText" style="margin: 6px 0 4px; color:#fff; text-align:center;">Operação concluída. Gostaria de mover para hoje?</p>
+        <button id="confirmMoveYes" class="action-btn">Sim</button>
+        <button id="confirmMoveNo" class="action-btn cancel-btn">Não</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar sair da conta -->
+  <div id="confirmLogoutModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmLogoutTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmLogoutTitle">Sair da conta</h2>
+      <button id="closeConfirmLogout" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="confirmLogoutText" style="margin: 6px 0 4px; color: var(--txt-main); text-align:center;">Deseja mesmo desconectar?</p>
+        <button id="confirmLogoutYes" class="action-btn">Sim</button>
+        <button id="confirmLogoutNo" class="action-btn cancel-btn">Não</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar apagar dados -->
+  <div id="confirmResetModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmResetTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmResetTitle">Apagar Todos os Dados</h2>
+      <button id="closeConfirmReset" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+  <p id="confirmResetText" style="margin: 6px 0 4px; color: var(--txt-main); opacity:0.95; text-align:center;">⚠️ Esta ação apagará permanentemente todas as suas transações, cartões e configurações. Não poderá ser desfeita.</p>
+        <button id="confirmResetYes" class="action-btn danger-btn">Apagar Tudo</button>
+        <button id="confirmResetNo" class="action-btn cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal País / Moeda (profiles) -->
+  <div id="currencyProfileModal" class="bottom-modal backdrop-blur hidden sheet-modal" role="dialog" aria-modal="true" aria-labelledby="currencyProfileTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <button id="closeCurrencyProfileModal" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <header class="sheet-header">
+        <h2 id="currencyProfileTitle">País / Moeda</h2>
+      </header>
+      <div class="modal-content">
+        <ul id="currencyProfileList" style="list-style:none;padding:6px 0;margin:0;display:block;">
+          <!-- items injected by JS -->
+        </ul>
+      </div>
+    </div>
+  </div>
 
   <!-- Ações inferiores: Home/Ajustes em pill e Adicionar separadamente -->
   <div class="floating-pill" role="tablist" aria-label="Atalhos inferiores" data-selected="home" style="display: none;">
@@ -219,12 +307,70 @@
   </div>
   <button id="openTxModal" class="floating-add-button" title="Nova operação" style="display: none;">＋</button>
 
-  <!-- Load the compat layer and modules from the new locations -->
-  <script type="module" src="src/compat/globals.js"></script>
+  <!-- Early skeleton and unhide: runs before main.js to ensure immediate UI -->
+  <script>
+  (function(){
+    try{
+      // Mark skeleton boot so CSS can hide the start-balance box
+      document.documentElement.classList.add('skeleton-boot');
+      var wrap = document.querySelector('.wrapper');
+      if (wrap) wrap.classList.remove('app-hidden');
+      var acc = document.getElementById('accordion');
+      if (!acc || acc.children.length) return;
+      var now = new Date();
+      // Alinhar com o render atual (usa 2025)
+      var year = 2025; // mesmo ano usado no render final
+      function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+      var curMonth = now.getMonth();
+      for (var mIdx=0; mIdx<12; mIdx++){
+        var monthName = new Date(year, mIdx).toLocaleDateString('pt-BR',{month:'long'});
+        var mDet = document.createElement('details');
+        mDet.className='month'; mDet.dataset.key = 'm-'+mIdx;
+        mDet.open = (mIdx >= curMonth);
+        var mSum = document.createElement('summary');
+        mSum.className='month-divider';
+        // Cabeçalho do mês
+        var row = document.createElement('div'); row.className='month-row';
+        var name = document.createElement('span'); name.className='month-name'; name.textContent = cap(monthName).toUpperCase();
+        row.appendChild(name);
+        var meta = document.createElement('div'); meta.className='month-meta';
+        var label = document.createElement('span'); label.className='meta-label';
+        // Label conforme passado/atual/futuro
+        if (mIdx < curMonth) label.textContent = 'Saldo final:';
+        else if (mIdx === curMonth) label.textContent = 'Saldo atual:';
+        else label.textContent = 'Saldo projetado:';
+        var value = document.createElement('span'); value.className='meta-value';
+        var pill = document.createElement('span'); pill.className='skeleton skeleton-pill'; pill.style.width='120px';
+        value.appendChild(pill);
+        meta.appendChild(label); meta.appendChild(value);
+        mSum.appendChild(row); mSum.appendChild(meta);
+        mDet.appendChild(mSum);
+        acc.appendChild(mDet);
+      }
+      acc.dataset.state = 'skeleton';
+      var sticky = document.querySelector('.sticky-month');
+      if (sticky) {
+        var stickyMonthName = new Date(year, curMonth).toLocaleDateString('pt-BR',{month:'long'});
+        sticky.textContent = cap(stickyMonthName);
+      }
+    }catch(e){}
+  })();
+  </script>
+  
+  <!-- Load the refactored modules. The globals compat layer exposes
+       functions expected by the legacy code on the window object. -->
+  <script type="module" src="../src/compat/globals.js"></script>
   <!-- Preload currency profiles into the global scope -->
-  <script src="public/js/utils/currency-profiles.js"></script>
+  <script src="./js/utils/currency-profiles.js"></script>
   <!-- Authentication and Firebase are configured within main.js. -->
-  <script type="module" src="public/login.view.js"></script>
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="./login.view.js"></script>
+  <script type="module" src="../src/main.js"></script>
+
+  <!-- Styles moved to style.css -->
+
+  <!-- Toast de erro -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Scripts moved to main.js -->
 </body>
 </html>
