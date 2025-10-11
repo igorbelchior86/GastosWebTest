@@ -184,6 +184,13 @@ export function updateModalOpenState() {
         root.dataset.kbModal = '0';
       }
       root.classList.remove('modal-keyboard-open');
+      if (typeof window !== 'undefined' && typeof window.__releaseModalTransformLock === 'function') {
+        try {
+          window.__releaseModalTransformLock();
+        } catch {
+          // ignore cleanup issues
+        }
+      }
     }
   } catch {
     // ignore dataset access issues

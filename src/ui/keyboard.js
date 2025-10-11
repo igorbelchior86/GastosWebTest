@@ -108,6 +108,37 @@ export function initKeyboardAndScrollHandlers() {
     let lockedGap = null;
     let lockedTopOffset = null;
     let lockedPageTop = null;
+    let modalTransformLocked = false;
+
+    const enforceModalTransformLock = () => {
+      if (!root || modalTransformLocked) return;
+      try {
+        root.style.setProperty('transform', 'none', 'important');
+        root.style.setProperty('will-change', 'auto', 'important');
+        modalTransformLocked = true;
+      } catch {
+        // ignore style assignment issues
+      }
+    };
+
+    const releaseModalTransformLock = () => {
+      if (!root || !modalTransformLocked) return;
+      try {
+        root.style.removeProperty('transform');
+        root.style.removeProperty('will-change');
+      } catch {
+        // ignore style cleanup issues
+      }
+      modalTransformLocked = false;
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.__releaseModalTransformLock = releaseModalTransformLock;
+      } catch {
+        // ignore assignment issues
+      }
+    }
     const applyKeyboardOpen = (gap) => {
       keyboardOpen = true;
       if (closeTimer) {
@@ -145,6 +176,11 @@ export function initKeyboardAndScrollHandlers() {
         root.classList.toggle('modal-keyboard-open', hasModalOpen);
         root.classList.toggle('kb-lock-shift', hasModalOpen);
         root.dataset.kbModal = hasModalOpen ? '1' : '0';
+        if (hasModalOpen) {
+          enforceModalTransformLock();
+        } else {
+          releaseModalTransformLock();
+        }
       }
     };
     const applyKeyboardClosed = () => {
@@ -162,6 +198,7 @@ export function initKeyboardAndScrollHandlers() {
           root.classList.remove('keyboard-open');
           root.classList.remove('kb-lock-shift');
           root.classList.remove('modal-keyboard-open');
+          releaseModalTransformLock();
           root.style.removeProperty('--kb-offset-bottom');
           root.style.removeProperty('--kb-offset-top');
           root.style.removeProperty('--vv-height');
