@@ -173,38 +173,40 @@ export function createElement(tag, attributes = {}, content = '') {
  * prevent scrolling. When no modals are visible, the lock is released.
  */
 export function updateModalOpenState() {
-  const root = document.documentElement;
+  const root = document.documentElement || document.body;
   const hasVisibleModal = !!document.querySelector('.bottom-modal:not(.hidden)');
   root.classList.toggle('modal-open', hasVisibleModal);
-  const body = document.body;
   try {
+    const wrapper = document.querySelector('.wrapper');
+    if (!wrapper) return;
     if (hasVisibleModal) {
-      // Lock body scrolling
       if (!root.classList.contains('modal-locked')) {
-        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        body.style.position = 'fixed';
-        body.style.top = `-${scrollY}px`;
-        body.style.left = '0';
-        body.style.right = '0';
-        body.style.width = '100%';
         root.classList.add('modal-locked');
-        root.dataset.modalScroll = String(scrollY);
+        wrapper.dataset.prevOverflow = wrapper.style.overflow ?? '';
+        wrapper.dataset.prevPointerEvents = wrapper.style.pointerEvents ?? '';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.pointerEvents = 'none';
       }
-    } else {
-      if (root.classList.contains('modal-locked')) {
-        root.classList.remove('modal-locked');
-        const prev = parseInt(root.dataset.modalScroll || '0', 10) || 0;
-        body.style.position = '';
-        body.style.top = '';
-        body.style.left = '';
-        body.style.right = '';
-        body.style.width = '';
-        window.scrollTo(0, prev);
-        try {
-          delete root.dataset.modalScroll;
-        } catch {
-          root.removeAttribute('data-modal-scroll');
-        }
+    } else if (root.classList.contains('modal-locked')) {
+      root.classList.remove('modal-locked');
+      const prevOverflow = wrapper.dataset.prevOverflow;
+      const prevPointer = wrapper.dataset.prevPointerEvents;
+      if (prevOverflow !== undefined) {
+        wrapper.style.overflow = prevOverflow;
+      } else {
+        wrapper.style.removeProperty('overflow');
+      }
+      if (prevPointer !== undefined) {
+        wrapper.style.pointerEvents = prevPointer;
+      } else {
+        wrapper.style.removeProperty('pointer-events');
+      }
+      try {
+        delete wrapper.dataset.prevOverflow;
+        delete wrapper.dataset.prevPointerEvents;
+      } catch {
+        wrapper.removeAttribute('data-prev-overflow');
+        wrapper.removeAttribute('data-prev-pointer-events');
       }
     }
   } catch {

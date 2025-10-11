@@ -3,6 +3,7 @@
  * This module provides helper functions for managing the transaction modal state,
  * focusing fields, and resetting modal content.
  */
+import { updateModalOpenState as syncRootModalState } from '../utils/dom.js';
 
 /**
  * Resets the transaction modal to its default state
@@ -62,22 +63,24 @@ export function resetTxModal() {
 export function updateModalOpenState() {
   try {
     const txModal = document.getElementById('txModal');
-    const openTxBtn = document.getElementById('openTxBtn');
+    const openTxBtn = document.getElementById('openTxModal') || document.getElementById('openTxBtn');
     
     if (!txModal) return;
 
     const isOpen = !txModal.classList.contains('hidden');
     
-    // Update body class for modal state
-    if (isOpen) {
-      document.body.classList.add('modal-open');
+    // Sync modal-open class with the root element so scroll locking stays consistent.
+    if (typeof syncRootModalState === 'function') {
+      syncRootModalState();
     } else {
-      document.body.classList.remove('modal-open');
+      const root = document.documentElement || document.body;
+      root?.classList.toggle('modal-open', isOpen);
     }
 
     // Update button rotation
     if (openTxBtn) {
       openTxBtn.style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
+      openTxBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     }
 
     // Dispatch custom event for other components

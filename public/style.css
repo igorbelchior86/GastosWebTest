@@ -2,6 +2,15 @@
 /* Define base (dark mode) variables. These tokens centralize
    common colors, spacing and shadows used throughout the app. */
 :root {
+  /* Safe area helpers */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --app-header-height: calc(80px + var(--safe-area-top));
+  --app-footer-gap: calc(120px + var(--safe-area-bottom));
+  --app-content-pad: 10px;
+
   /* backgrounds */
   --bg-main: #1e1e1e;
   --bg-card: #2a2a2a;
@@ -111,6 +120,15 @@
      borders and shadows can be customized per theme. */
   --ops-op-line-border: none;
   --ops-op-line-shadow: 0 2px 6px rgba(0,0,0,.30);
+}
+
+@supports (top: constant(safe-area-inset-top)) {
+  :root {
+    --safe-area-top: constant(safe-area-inset-top);
+    --safe-area-right: constant(safe-area-inset-right);
+    --safe-area-bottom: constant(safe-area-inset-bottom);
+    --safe-area-left: constant(safe-area-inset-left);
+  }
 }
 
 /* Light theme overrides for bottom sheet modal tokens.  These values
@@ -254,11 +272,11 @@ html[data-theme="light"] #backdrop-base {
 
 /* Light theme: reduce bottom padding so no visible gap remains */
 html[data-theme="light"] .wrapper {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  padding-bottom: calc(56px + var(--safe-area-bottom));
 }
 /* Align sticky divider position with the reduced padding in light theme */
 html[data-theme="light"] hr.divider {
-  bottom: calc(56px + env(safe-area-inset-bottom));
+  bottom: calc(56px + var(--safe-area-bottom));
 }
 
 html[data-theme="light"] .card,
@@ -896,7 +914,6 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   --radius:8px;
   --floating-footer-height: 96px;
   --modal-bottom-gap: calc(var(--floating-footer-height) + env(safe-area-inset-bottom));
-  --viewport-height: 100dvh;
 
   --green:#00FF00;
   --green-soft:#32FF84;
@@ -915,6 +932,79 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   --txt-main:#fff;
   --txt-muted:#B3B3B3;
   --timestamp:#6b7280;
+  /* Keyboard-aware offsets (aplicados só quando data-vv-kb=1) */
+  --kb-offset-top: 0px;
+  --kb-offset-bottom: 0px;
+}
+
+html.keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+html.keyboard-open.kb-lock-shift {
+  transform: none !important;
+  will-change: auto;
+}
+
+/* Global hard stop: if kb-lock-shift is present we never translate the root */
+html.kb-lock-shift { transform: none !important; will-change: auto !important; }
+
+/* CORREÇÃO CRÍTICA: kb-lock-shift deve funcionar independentemente de keyboard-open */
+html.kb-lock-shift {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Dupla garantia - bloquear qualquer transform quando kb-lock-shift está ativo */
+html.kb-lock-shift,
+html.kb-lock-shift.keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* FORÇA BRUTA: Modal aberto = zero transformação SEMPRE */
+html.modal-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+html.modal-open.keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Garantia tripla - qualquer combinação com modal aberto */
+html.modal-open.kb-lock-shift,
+html.modal-open.keyboard-open.kb-lock-shift {
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/*
+ * Move only the scrollable content when the keyboard appears. The helper
+ * populates --kb-offset-top/--kb-offset-bottom based on the measured gap.
+ * Adjust the wrapper bounds instead of translating the root so fixed UI
+ * (header, floating buttons) stays anchored.
+ */
+html.keyboard-open .wrapper {
+  transform: none !important;
+  top: calc(var(--app-header-height) - var(--kb-offset-top, 0px));
+  bottom: max(var(--app-footer-gap), var(--kb-offset-bottom, 0px));
+  will-change: top, bottom;
+}
+
+/* Força wrapper fixo quando modal aberto */
+html.modal-open .wrapper {
+  transform: none !important;
+  will-change: auto !important;
+  position: fixed !important;
+}
+
+html.modal-open.keyboard-open .wrapper {
+  transform: none !important;
+  will-change: auto !important;
+  position: fixed !important;
 }
 
 h1,h2,h3,h4,
@@ -937,9 +1027,10 @@ html,body {
   overflow: hidden; /* rolagem no container principal (.wrapper) */
   max-width:100%;
   overflow-x:hidden;
+  overscroll-behavior: none;
   font-family:'SF Pro Display',system-ui,sans-serif;
   margin:0;
-  padding:20px 10px 0;
+  padding:0;
 }
 .main-panel{
 background: transparent !important;
@@ -967,27 +1058,20 @@ border-radius: 0 !important;
 .app-hidden{visibility:hidden;}
 .hidden{opacity:0!important;pointer-events:none!important;}
 body{display:block;}
-/* ===================== MAIN WRAPPER ===================== */
-.wrapper {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  height: 100dvh; /* altura dinâmica visível (W3C/WebKit) */
-  min-height: 100svh; /* fallback para versões antigas */
+.wrapper{
+  position: fixed;
+  top: var(--app-header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width:100%;
+  max-width:100%;
+  box-sizing: border-box;
+  padding: 24px calc(var(--app-content-pad) + var(--safe-area-right)) var(--app-footer-gap) calc(var(--app-content-pad) + var(--safe-area-left));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-
-  /* Respeitar áreas seguras em iPhones */
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-
-  background: var(--bg-main);
-  box-sizing: border-box;
-
-  /* Espaço reservado para header e botões flutuantes */
-  padding-top: calc(env(safe-area-inset-top) + 80px);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 120px);
+  overscroll-behavior: contain; /* evita bounce do body */
+  background: transparent;
 }
 
 /* Spacer real no final do conteúdo do acordeão: mantém
@@ -996,7 +1080,7 @@ body{display:block;}
 #accordion::after{
   content: '';
   display: block;
-  height: calc(120px + env(safe-area-inset-bottom));
+  height: var(--app-footer-gap);
 }
 
 /* Divider no rodapé do conteúdo: sem grande espaçamento extra */
@@ -1005,7 +1089,7 @@ hr.divider{
   border: none;
   border-top: 1px solid rgba(255,255,255,0.15);
   position: sticky;
-  bottom: calc(70px + env(safe-area-inset-bottom)); /* segura ligeiramente acima do pseudo-footer */
+  bottom: calc(70px + var(--safe-area-bottom)); /* segura ligeiramente acima do pseudo-footer */
   z-index: 5;
   background: transparent;
 }
@@ -1019,27 +1103,20 @@ html.modal-open .app-footer { visibility: hidden; }
 html:not([data-theme="light"]) #dividerSaldo { display: none !important; }
 html[data-theme="light"] #dividerSaldo { display: block !important; }
 
-/* Floating controls */
-.floating-pill,
-.floating-add-button,
-.floating-home-button {
-  position: fixed;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  z-index: 1200;
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-          backdrop-filter: blur(12px) saturate(180%);
-}
-
 /* Floating bottom pill (Home/Ajustes) */
 .floating-pill{
-  left: calc(24px + constant(safe-area-inset-left));
-  left: calc(24px + env(safe-area-inset-left));
+  position:fixed;
+  left: calc(24px + var(--safe-area-left));
+  bottom:calc(12px + var(--safe-area-bottom));
+  z-index:1201;
   display:inline-flex; align-items:center; gap:0;
   height:50px; padding:6px; /* igual ao botão "+" */
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.15);
   box-shadow:0 10px 24px rgba(0,0,0,.35), inset 0 -2px 0 rgba(0,0,0,.18);
   border-radius:32px; /* metade de 64 para a mesma curvatura */
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
 }
 .floating-pill .pill-option{
   position:relative;
@@ -1321,17 +1398,14 @@ summary.day-summary .icon-invoice::before{
   right:0;
   z-index:1000;
   width:100%;
-  height: calc(80px + constant(safe-area-inset-top));
-  height: calc(80px + env(safe-area-inset-top));
+  height: var(--app-header-height);
   display:flex;
   align-items:center;
   justify-content:space-between;
   
   /* iOS 26 fix: Respect safe areas on left/right sides */
-  padding-left: calc(20px + constant(safe-area-inset-left));
-  padding-left: calc(20px + env(safe-area-inset-left));
-  padding-right: calc(20px + constant(safe-area-inset-right));
-  padding-right: calc(20px + env(safe-area-inset-right));
+  padding-left: calc(20px + var(--safe-area-left));
+  padding-right: calc(20px + var(--safe-area-right));
   
   box-sizing:border-box;
   overflow:hidden;
@@ -1343,9 +1417,8 @@ summary.day-summary .icon-invoice::before{
   color: var(--txt-header);
   border-bottom-left-radius:12px;
   border-bottom-right-radius:12px;
-  /* fallback antigo + padrão atual */
-  padding-top: constant(safe-area-inset-top);
-  padding-top: env(safe-area-inset-top);
+  padding-top: calc(var(--safe-area-top) + 12px);
+  padding-bottom: 12px;
 }
 .app-header::after{
   content:'';
@@ -2438,12 +2511,7 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 
 /* ===================== MODAL ===================== */
-html.modal-open,
-html.modal-open body {
-  overflow: hidden;
-  height: 100dvh;
-}
-.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px var(--modal-bottom-gap);box-sizing:border-box;}
+.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px calc(var(--modal-bottom-gap) + var(--kb-offset-bottom, 0px));box-sizing:border-box;}
 .backdrop-blur{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);} 
 .bottom-modal:not(.hidden){opacity:1;pointer-events:auto;}
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
@@ -2463,7 +2531,7 @@ html.modal-open body {
   box-sizing: border-box;
   width: calc(100% - 8px);
   max-width: 480px;
-  max-height: clamp(280px, calc(var(--viewport-height, 100dvh) - 24px), 80dvh);
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
@@ -2490,8 +2558,10 @@ html.modal-open body {
 }
 
 .sheet-modal .bottom-modal-box {
-  min-height: calc(var(--viewport-height, 100dvh) - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
-  max-height: calc(var(--viewport-height, 100dvh) - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  min-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  min-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  max-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  max-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
 }
 
 #settingsModal .modal-content {
@@ -2950,7 +3020,7 @@ html.modal-open body {
   color: rgba(255,255,255,0.7);
 }
 .modal-drag{width:40px;height:4px;background:#ccc;border-radius:2px;margin:0 auto 12px;} 
-.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;} 
 
 #txModal .modal-content {
   padding: 0;
@@ -3130,9 +3200,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 
 /* ===================== FLOATING BUTTONS ===================== */
 .floating-add-button{
-  right: calc(24px + constant(safe-area-inset-right));
-  right: calc(24px + env(safe-area-inset-right));
-  overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + var(--safe-area-bottom));
+  right: calc(24px + var(--safe-area-right));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
   /* Hard‑clip the rotated button so corners never bleed */
@@ -3141,9 +3213,11 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 }
 /* Espelho do botão flutuante de adicionar: leva ao dia atual */
 .floating-home-button{
-  left: calc(24px + constant(safe-area-inset-left));
-  left: calc(24px + env(safe-area-inset-left));
-  overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  position:fixed;
+  bottom:calc(12px + var(--safe-area-bottom));
+  left: calc(24px + var(--safe-area-left));
+  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
+  backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
   clip-path: circle(50% at 50% 50%);
@@ -3207,6 +3281,12 @@ html[data-theme="light"] .floating-pill .pill-highlight{
 /* Light theme: make masked glyphs dark */
 html[data-theme="light"] .pill-icon{ background:#111 !important; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important; }
 
+/* Ajustes quando o teclado estiver aberto (iOS 26):
+   os botões já acompanham o viewport reduzido, então mantemos a mesma âncora */
+html[data-vv-kb="1"] .floating-add-button,
+html[data-vv-kb="1"] .floating-home-button {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+}
 .floating-add-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 .floating-home-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 /* Oculta botões flutuantes quando um modal está aberto (ficariam acima do modal) */
