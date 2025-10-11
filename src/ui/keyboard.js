@@ -108,6 +108,29 @@ export function initKeyboardAndScrollHandlers() {
     let lockedGap = null;
     let lockedTopOffset = null;
     let lockedPageTop = null;
+    let baselineTopOffset = 0;
+    let baselinePageTop = 0;
+    let focusOutTimer = null;
+
+    const isEditableElement = (el) => !!el && (
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement ||
+      el.isContentEditable
+    );
+
+    const clearFocusTimer = () => {
+      if (focusOutTimer) {
+        clearTimeout(focusOutTimer);
+        focusOutTimer = null;
+      }
+    };
+
+    const refreshViewportTokens = () => {
+      if (vv?.height) {
+        root.style.setProperty('--vv-height', Math.round(vv.height) + 'px');
+      }
+    };
     const applyKeyboardOpen = (gap) => {
       keyboardOpen = true;
       if (closeTimer) {
@@ -121,6 +144,11 @@ export function initKeyboardAndScrollHandlers() {
           ? vv.pageTop
           : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
       ));
+      const offsetBaseline = lockedTopOffset != null ? lockedTopOffset : baselineTopOffset;
+      const pageBaseline = lockedPageTop != null ? lockedPageTop : baselinePageTop;
+      const offsetShift = Math.max(0, rawOffsetTop - offsetBaseline);
+      const pageShift = Math.max(0, rawPageTop - pageBaseline);
+      const shift = Math.max(offsetShift, pageShift);
       lastGap = measured;
       lastTopOffset = rawOffsetTop;
       lastPageTop = rawPageTop;
@@ -131,19 +159,13 @@ export function initKeyboardAndScrollHandlers() {
         root.dataset.kbGap = String(measured);
         root.dataset.kbTop = String(rawOffsetTop);
         root.dataset.kbPage = String(rawPageTop);
-        if (!hasModalOpen) {
-          const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
-          const baselineOffset = lockedTopOffset != null ? lockedTopOffset : rawOffsetTop;
-          const baselinePage = lockedPageTop != null ? lockedPageTop : rawPageTop;
-          const diffOffset = Math.max(0, rawOffsetTop - baselineOffset);
-          const diffPage = Math.max(0, rawPageTop - baselinePage);
-          const shift = Math.max(diffOffset, diffPage);
-          root.style.setProperty('--kb-offset-bottom', effective + 'px');
-          root.style.setProperty('--kb-offset-top', shift + 'px');
-        } else {
-          root.style.setProperty('--kb-offset-bottom', '0px');
-          root.style.setProperty('--kb-offset-top', '0px');
-        }
+        const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
+        const clampedShift = lockedGap != null ? Math.min(shift, lockedGap) : shift;
+        root.style.setProperty('--kb-offset-bottom', effective + 'px');
+        root.style.setProperty('--kb-offset-top', clampedShift + 'px');
+        refreshViewportTokens();
+        root.classList.toggle('modal-keyboard-open', hasModalOpen);
+        root.dataset.kbModal = hasModalOpen ? '1' : '0';
       }
     };
     const applyKeyboardClosed = () => {
@@ -156,17 +178,28 @@ export function initKeyboardAndScrollHandlers() {
         lastGap = 0;
         lastTopOffset = 0;
         lastPageTop = 0;
+        const closedOffsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
+        const closedPageTop = Math.max(0, Math.round(
+          typeof vv?.pageTop === 'number'
+            ? vv.pageTop
+            : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
+        ));
+        baselineTopOffset = closedOffsetTop;
+        baselinePageTop = closedPageTop;
         if (root) {
           delete root.dataset.vvKb;
           root.classList.remove('keyboard-open');
+          root.classList.remove('modal-keyboard-open');
           root.style.removeProperty('--kb-offset-bottom');
           root.style.removeProperty('--kb-offset-top');
+          root.style.removeProperty('--vv-height');
           delete root.dataset.kbGap;
           delete root.dataset.kbTop;
           delete root.dataset.kbPage;
           delete root.dataset.kbLock;
           delete root.dataset.kbLockTop;
           delete root.dataset.kbLockPage;
+          delete root.dataset.kbModal;
         }
         // flush any deferred tasks that were waiting for the keyboard to close
         if (typeof window.flushKeyboardDeferredTasks === 'function') {
@@ -178,7 +211,25 @@ export function initKeyboardAndScrollHandlers() {
       if (!IS_IOS) return;
       const vhDiff = window.innerHeight - vv.height;
       const gap = Math.max(0, vhDiff);
-      if (gap > THRESH) {
+      refreshViewportTokens();
+      const rawOffsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
+      const rawPageTop = Math.max(0, Math.round(
+        typeof vv?.pageTop === 'number'
+          ? vv.pageTop
+          : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
+      ));
+      const activeEl = document.activeElement;
+      const isEditable = !!activeEl && (
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        activeEl instanceof HTMLSelectElement ||
+        activeEl.isContentEditable
+      );
+      const modalActive = anyModalOpen();
+      const shouldOpen =
+        gap > THRESH ||
+        (rawOffsetTop > 12 || rawPageTop > 12);
+      if (shouldOpen && (keyboardOpen || isEditable || modalActive)) {
         applyKeyboardOpen(gap);
       } else {
         if (keyboardOpen) {
@@ -187,18 +238,70 @@ export function initKeyboardAndScrollHandlers() {
       }
     };
     vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
     // Provide a way to lock the keyboard gap and top offset. This is
     // used by certain flows to hold the keyboard space while performing
     // animations.
     window.__lockKeyboardGap = (lockGap, lockTop, lockPage) => {
       lockedGap = lockGap;
-      lockedTopOffset = lockTop;
-      lockedPageTop = lockPage;
+      if (lockTop === null) {
+        lockedTopOffset = null;
+      } else if (typeof lockTop === 'number') {
+        lockedTopOffset = lockTop;
+      } else {
+        lockedTopOffset = lastTopOffset;
+      }
+      if (lockPage === null) {
+        lockedPageTop = null;
+      } else if (typeof lockPage === 'number') {
+        lockedPageTop = lockPage;
+      } else {
+        lockedPageTop = lastPageTop;
+      }
+      if (typeof lockedTopOffset === 'number') baselineTopOffset = lockedTopOffset;
+      if (typeof lockedPageTop === 'number') baselinePageTop = lockedPageTop;
+      if (root) {
+        if (typeof lockGap === 'number') root.dataset.kbLock = String(lockGap);
+        if (typeof lockedTopOffset === 'number') root.dataset.kbLockTop = String(lockedTopOffset);
+        if (typeof lockedPageTop === 'number') root.dataset.kbLockPage = String(lockedPageTop);
+      }
     };
     window.__unlockKeyboardGap = () => {
       lockedGap = null;
       lockedTopOffset = null;
       lockedPageTop = null;
+      if (root) {
+        delete root.dataset.kbLock;
+        delete root.dataset.kbLockTop;
+        delete root.dataset.kbLockPage;
+      }
     };
+
+    if (IS_IOS) {
+      window.addEventListener('focusin', () => {
+        clearFocusTimer();
+        if (!keyboardOpen) {
+          baselineTopOffset = Math.max(0, Math.round(vv?.offsetTop || 0));
+          baselinePageTop = Math.max(0, Math.round(
+            typeof vv?.pageTop === 'number'
+              ? vv.pageTop
+              : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
+          ));
+        }
+        requestAnimationFrame(() => {
+          if (!keyboardOpen) {
+            onResize();
+          }
+        });
+      }, true);
+      window.addEventListener('focusout', () => {
+        clearFocusTimer();
+        focusOutTimer = setTimeout(() => {
+          const active = document.activeElement;
+          if (isEditableElement(active)) return;
+          applyKeyboardClosed();
+        }, 250);
+      }, true);
+    }
   })();
 }

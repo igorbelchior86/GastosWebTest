@@ -917,6 +917,7 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   /* Keyboard-aware offsets (aplicados só quando data-vv-kb=1) */
   --kb-offset-top: 0px;
   --kb-offset-bottom: 0px;
+  --vv-height: 100vh;
 }
 
 html.keyboard-open {
@@ -932,12 +933,6 @@ html.keyboard-open.kb-lock-shift {
 /* Global hard stop: if kb-lock-shift is present we never translate the root */
 html.kb-lock-shift { transform: none !important; will-change: auto !important; }
 
-/* CORREÇÃO CRÍTICA: kb-lock-shift deve funcionar independentemente de keyboard-open */
-html.kb-lock-shift {
-  transform: none !important;
-  will-change: auto !important;
-}
-
 /* Dupla garantia - bloquear qualquer transform quando kb-lock-shift está ativo */
 html.kb-lock-shift,
 html.kb-lock-shift.keyboard-open {
@@ -945,28 +940,21 @@ html.kb-lock-shift.keyboard-open {
   will-change: auto !important;
 }
 
-/* FORÇA BRUTA: Modal aberto = zero transformação SEMPRE */
+/* Estado de modal aberto mantém wrapper estático mas permite compensação do teclado */
 html.modal-open {
-  transform: none !important;
-  will-change: auto !important;
+  will-change: transform;
 }
 
 html.modal-open.keyboard-open {
-  transform: none !important;
-  will-change: auto !important;
-}
-
-/* Garantia tripla - qualquer combinação com modal aberto */
-html.modal-open.kb-lock-shift,
-html.modal-open.keyboard-open.kb-lock-shift {
-  transform: none !important;
-  will-change: auto !important;
+  will-change: transform;
 }
 
 /* Força wrapper fixo quando modal aberto */
 html.modal-open .wrapper {
-  transform: none !important;
-  will-change: auto !important;
+  position: relative !important;
+}
+
+html.modal-open.keyboard-open .wrapper {
   position: relative !important;
 }
 
@@ -1018,10 +1006,11 @@ border-radius: 0 !important;
   bottom: 0;
   background-color: #1e1e1e;
   z-index: -1;
-  
+
   /* iOS 26 fix: Ensure backdrop extends fully behind browser chrome */
   width: 100vw;
   height: 100vh; /* Will be overridden by @supports rules above */
+  height: 100dvh;
 }
 .app-hidden{visibility:hidden;}
 .hidden{opacity:0!important;pointer-events:none!important;}
@@ -1032,6 +1021,9 @@ body{display:block;}
   max-width:100%;
   /* Use small viewport to avoid initial iOS toolbar shrink clipping */
   height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* evita bounce do body */
@@ -1048,6 +1040,15 @@ body{display:block;}
   /* espaço para os botões flutuantes na base (permite o divider passar) */
   padding-bottom: calc(120px + env(safe-area-inset-bottom));
   /* scroll-padding-bottom removido para não alterar scrollIntoView/Home */
+}
+
+html.keyboard-open .wrapper {
+  height: calc(var(--vv-height, 100vh) + var(--kb-offset-top, 0px));
+  min-height: calc(var(--vv-height, 100vh) + var(--kb-offset-top, 0px));
+}
+
+html.keyboard-open #backdrop-base {
+  height: calc(var(--vv-height, 100vh) + var(--kb-offset-top, 0px));
 }
 
 /* Spacer real no final do conteúdo do acordeão: mantém
@@ -2525,6 +2526,10 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
     opacity   .16s ease;
 }
 
+html.modal-open.keyboard-open .bottom-modal-box {
+  max-height: clamp(280px, calc(var(--vv-height, 100vh) - var(--kb-offset-bottom, 0px) - 24px), 80vh);
+}
+
 .bottom-modal:not(.hidden) .bottom-modal-box {
   transform: translateY(0) scale(1);
   opacity: 1;
@@ -3001,7 +3006,15 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   color: rgba(255,255,255,0.7);
 }
 .modal-drag{width:40px;height:4px;background:#ccc;border-radius:2px;margin:0 auto 12px;} 
-.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;} 
+.modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+
+html.modal-open.keyboard-open .bottom-modal .modal-content {
+  padding-bottom: calc(24px + var(--kb-offset-bottom, 0px));
+}
+
+html.modal-open.keyboard-open #txModal .modal-content {
+  padding-bottom: calc(16px + var(--kb-offset-bottom, 0px));
+}
 
 #txModal .modal-content {
   padding: 0;
