@@ -143,6 +143,7 @@ export function initKeyboardAndScrollHandlers() {
           root.style.setProperty('--vv-height', Math.round(vv.height) + 'px');
         }
         root.classList.toggle('modal-keyboard-open', hasModalOpen);
+        root.classList.toggle('kb-lock-shift', hasModalOpen);
         root.dataset.kbModal = hasModalOpen ? '1' : '0';
       }
     };
@@ -159,6 +160,7 @@ export function initKeyboardAndScrollHandlers() {
         if (root) {
           delete root.dataset.vvKb;
           root.classList.remove('keyboard-open');
+          root.classList.remove('kb-lock-shift');
           root.classList.remove('modal-keyboard-open');
           root.style.removeProperty('--kb-offset-bottom');
           root.style.removeProperty('--kb-offset-top');

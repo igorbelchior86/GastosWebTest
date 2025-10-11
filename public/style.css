@@ -940,6 +940,12 @@ html.kb-lock-shift.keyboard-open {
   will-change: auto !important;
 }
 
+/* Modais com teclado aberto não podem aplicar transform no html, senão o header/footer “desancoram” */
+html.modal-keyboard-open {
+  transform: none !important;
+  will-change: auto !important;
+}
+
 /* Estado de modal aberto mantém wrapper estático mas permite compensação do teclado */
 html.modal-open {
   will-change: transform;
