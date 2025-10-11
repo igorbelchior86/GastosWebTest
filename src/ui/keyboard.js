@@ -84,181 +84,21 @@ export function initKeyboardAndScrollHandlers() {
     e.preventDefault();
   }, { passive: false });
 
-  // iOS 16/17 keyboard offset fix. When the virtual keyboard
-  // appears, the viewport shrinks and can leave large blank areas
-  // beneath the page content. This routine tracks keyboard height
-  // changes and applies CSS custom properties that can be used to
-  // adjust UI positioning. It also disables keyboard transforms
-  // entirely when a modal is open so that modals remain centered.
-  (function setupKbOffsets() {
+  // Atualiza a variável CSS `--viewport-height` com a altura visível
+  // atual. Essa medida acompanha o `visualViewport` sempre que o
+  // teclado aparece ou desaparece, sem aplicar transforms no `html`.
+  const updateViewportHeight = () => {
+    const height = window.visualViewport?.height || window.innerHeight;
+    if (!height) return;
     const root = document.documentElement;
     if (!root) return;
-    // Provide no‑ops for lock/unlock functions if not defined
-    if (typeof window.__lockKeyboardGap !== 'function') window.__lockKeyboardGap = () => {};
-    if (typeof window.__unlockKeyboardGap !== 'function') window.__unlockKeyboardGap = () => {};
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const THRESH = 140; // px
-    const IS_IOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    let keyboardOpen = false;
-    let closeTimer = null;
-    let lastGap = 0;
-    let lastTopOffset = 0;
-    let lastPageTop = 0;
-    let lockedGap = null;
-    let lockedTopOffset = null;
-    let lockedPageTop = null;
-    let modalTransformLocked = false;
+    root.style.setProperty('--viewport-height', `${Math.round(height)}px`);
+  };
 
-    const enforceModalTransformLock = () => {
-      if (!root || modalTransformLocked) return;
-      try {
-        root.style.setProperty('transform', 'none', 'important');
-        root.style.setProperty('will-change', 'auto', 'important');
-        modalTransformLocked = true;
-      } catch {
-        // ignore style assignment issues
-      }
-    };
-
-    const releaseModalTransformLock = () => {
-      if (!root || !modalTransformLocked) return;
-      try {
-        root.style.removeProperty('transform');
-        root.style.removeProperty('will-change');
-      } catch {
-        // ignore style cleanup issues
-      }
-      modalTransformLocked = false;
-    };
-
-    if (typeof window !== 'undefined') {
-      try {
-        window.__releaseModalTransformLock = releaseModalTransformLock;
-      } catch {
-        // ignore assignment issues
-      }
-    }
-    const applyKeyboardOpen = (gap) => {
-      keyboardOpen = true;
-      if (closeTimer) {
-        clearTimeout(closeTimer);
-        closeTimer = null;
-      }
-      const measured = Math.max(0, Math.round(gap || 0));
-      const rawOffsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
-      const rawPageTop = Math.max(0, Math.round(
-        typeof vv?.pageTop === 'number'
-          ? vv.pageTop
-          : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
-      ));
-      lastGap = measured;
-      lastTopOffset = rawOffsetTop;
-      lastPageTop = rawPageTop;
-      const hasModalOpen = anyModalOpen();
-      if (root) {
-        root.dataset.vvKb = '1';
-        root.classList.add('keyboard-open');
-        root.dataset.kbGap = String(measured);
-        root.dataset.kbTop = String(rawOffsetTop);
-        root.dataset.kbPage = String(rawPageTop);
-        const effective = lockedGap != null ? Math.min(lockedGap, measured) : measured;
-        const baselineOffset = lockedTopOffset != null ? lockedTopOffset : rawOffsetTop;
-        const baselinePage = lockedPageTop != null ? lockedPageTop : rawPageTop;
-        const diffOffset = Math.max(0, rawOffsetTop - baselineOffset);
-        const diffPage = Math.max(0, rawPageTop - baselinePage);
-        const shift = Math.max(diffOffset, diffPage);
-        root.style.setProperty('--kb-offset-bottom', effective + 'px');
-        root.style.setProperty('--kb-offset-top', shift + 'px');
-        if (vv?.height) {
-          root.style.setProperty('--vv-height', Math.round(vv.height) + 'px');
-        }
-        root.classList.toggle('modal-keyboard-open', hasModalOpen);
-        root.classList.toggle('kb-lock-shift', hasModalOpen);
-        root.dataset.kbModal = hasModalOpen ? '1' : '0';
-        if (hasModalOpen) {
-          enforceModalTransformLock();
-        } else {
-          releaseModalTransformLock();
-        }
-      }
-    };
-    const applyKeyboardClosed = () => {
-      if (closeTimer) clearTimeout(closeTimer);
-      closeTimer = setTimeout(() => {
-        keyboardOpen = false;
-        lockedGap = null;
-        lockedTopOffset = null;
-        lockedPageTop = null;
-        lastGap = 0;
-        lastTopOffset = 0;
-        lastPageTop = 0;
-        if (root) {
-          delete root.dataset.vvKb;
-          root.classList.remove('keyboard-open');
-          root.classList.remove('kb-lock-shift');
-          root.classList.remove('modal-keyboard-open');
-          releaseModalTransformLock();
-          root.style.removeProperty('--kb-offset-bottom');
-          root.style.removeProperty('--kb-offset-top');
-          root.style.removeProperty('--vv-height');
-          delete root.dataset.kbGap;
-          delete root.dataset.kbTop;
-          delete root.dataset.kbPage;
-          delete root.dataset.kbLock;
-          delete root.dataset.kbLockTop;
-          delete root.dataset.kbLockPage;
-          delete root.dataset.kbModal;
-        }
-        // flush any deferred tasks that were waiting for the keyboard to close
-        if (typeof window.flushKeyboardDeferredTasks === 'function') {
-          window.flushKeyboardDeferredTasks();
-        }
-      }, 200);
-    };
-    const onResize = () => {
-      if (!IS_IOS) return;
-      const vhDiff = window.innerHeight - vv.height;
-      const gap = Math.max(0, vhDiff);
-      const rawOffsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
-      const rawPageTop = Math.max(0, Math.round(
-        typeof vv?.pageTop === 'number'
-          ? vv.pageTop
-          : (window.scrollY ?? window.pageYOffset ?? document.documentElement?.scrollTop ?? 0)
-      ));
-      const activeEl = document.activeElement;
-      const isEditable = !!activeEl && (
-        activeEl instanceof HTMLInputElement ||
-        activeEl instanceof HTMLTextAreaElement ||
-        activeEl instanceof HTMLSelectElement ||
-        activeEl.isContentEditable
-      );
-      const modalActive = anyModalOpen();
-      const shouldOpen =
-        gap > THRESH ||
-        (rawOffsetTop > 12 || rawPageTop > 12);
-      if (shouldOpen && (keyboardOpen || isEditable || modalActive)) {
-        applyKeyboardOpen(gap);
-      } else {
-        if (keyboardOpen) {
-          applyKeyboardClosed();
-        }
-      }
-    };
-    vv.addEventListener('resize', onResize);
-    vv.addEventListener('scroll', onResize);
-    // Provide a way to lock the keyboard gap and top offset. This is
-    // used by certain flows to hold the keyboard space while performing
-    // animations.
-    window.__lockKeyboardGap = (lockGap, lockTop, lockPage) => {
-      lockedGap = lockGap;
-      lockedTopOffset = lockTop;
-      lockedPageTop = lockPage;
-    };
-    window.__unlockKeyboardGap = () => {
-      lockedGap = null;
-      lockedTopOffset = null;
-      lockedPageTop = null;
-    };
-  })();
+  updateViewportHeight();
+  window.addEventListener('resize', updateViewportHeight);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateViewportHeight);
+    window.visualViewport.addEventListener('scroll', updateViewportHeight);
+  }
 }
