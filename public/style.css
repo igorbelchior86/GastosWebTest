@@ -254,7 +254,7 @@ html[data-theme="light"] #backdrop-base {
 
 /* Light theme: reduce bottom padding so no visible gap remains */
 html[data-theme="light"] .wrapper {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom) + var(--kb-offset-bottom));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom));
 }
 /* Align sticky divider position with the reduced padding in light theme */
 html[data-theme="light"] hr.divider {
@@ -896,6 +896,7 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   --radius:8px;
   --floating-footer-height: 96px;
   --modal-bottom-gap: calc(var(--floating-footer-height) + env(safe-area-inset-bottom));
+  --viewport-height: 100dvh;
 
   --green:#00FF00;
   --green-soft:#32FF84;
@@ -914,60 +915,6 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   --txt-main:#fff;
   --txt-muted:#B3B3B3;
   --timestamp:#6b7280;
-  /* Keyboard-aware offsets (aplicados só quando data-vv-kb=1) */
-  --kb-offset-top: 0px;
-  --kb-offset-bottom: 0px;
-  --vv-height: 100vh;
-}
-
-html.keyboard-open {
-  transform: translate3d(0, var(--kb-offset-top, 0px), 0);
-  will-change: transform;
-}
-
-html.keyboard-open.kb-lock-shift {
-  transform: none !important;
-  will-change: auto;
-}
-
-/* Global hard stop: if kb-lock-shift is present we never translate the root */
-html.kb-lock-shift { transform: none !important; will-change: auto !important; }
-
-/* Dupla garantia - bloquear qualquer transform quando kb-lock-shift está ativo */
-html.kb-lock-shift,
-html.kb-lock-shift.keyboard-open {
-  transform: none !important;
-  will-change: auto !important;
-}
-
-/* Modais com teclado aberto não podem aplicar transform no html, senão o header/footer “desancoram” */
-html.modal-keyboard-open {
-  transform: none !important;
-  will-change: auto !important;
-}
-
-/* Estado de modal aberto mantém wrapper estático mas permite compensação do teclado */
-html.modal-open {
-  will-change: transform;
-}
-
-html.modal-open.keyboard-open {
-  will-change: transform;
-}
-
-/* Força wrapper fixo quando modal aberto */
-html.modal-open .wrapper {
-  position: relative !important;
-}
-
-html.modal-open.keyboard-open .wrapper {
-  position: relative !important;
-}
-
-html.modal-open.keyboard-open .wrapper {
-  transform: none !important;
-  will-change: auto !important;
-  position: relative !important;
 }
 
 h1,h2,h3,h4,
@@ -1020,28 +967,27 @@ border-radius: 0 !important;
 .app-hidden{visibility:hidden;}
 .hidden{opacity:0!important;pointer-events:none!important;}
 body{display:block;}
-.wrapper{
+/* ===================== MAIN WRAPPER ===================== */
+.wrapper {
   position: relative;
-  width:100%;
-  max-width:100%;
-  /* Use small viewport to avoid initial iOS toolbar shrink clipping */
-  height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh; /* altura dinâmica visível (W3C/WebKit) */
+  min-height: 100svh; /* fallback para versões antigas */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain; /* evita bounce do body */
-  
-  /* iOS 26 fix: Ensure content respects safe areas on all sides */
-  padding-left: constant(safe-area-inset-left);
+  overscroll-behavior: contain;
+
+  /* Respeitar áreas seguras em iPhones */
   padding-left: env(safe-area-inset-left);
-  padding-right: constant(safe-area-inset-right);
   padding-right: env(safe-area-inset-right);
-  
-  /* espaço do header fixo */
-  padding-top: calc(80px + constant(safe-area-inset-top));
-  padding-top: calc(80px + env(safe-area-inset-top));
-  /* espaço para os botões flutuantes na base (permite o divider passar) */
-  padding-bottom: calc(120px + env(safe-area-inset-bottom));
-  /* scroll-padding-bottom removido para não alterar scrollIntoView/Home */
+
+  background: var(--bg-main);
+  box-sizing: border-box;
+
+  /* Espaço reservado para header e botões flutuantes */
+  padding-top: calc(env(safe-area-inset-top) + 80px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120px);
 }
 
 /* Spacer real no final do conteúdo do acordeão: mantém
@@ -1073,21 +1019,27 @@ html.modal-open .app-footer { visibility: hidden; }
 html:not([data-theme="light"]) #dividerSaldo { display: none !important; }
 html[data-theme="light"] #dividerSaldo { display: block !important; }
 
+/* Floating controls */
+.floating-pill,
+.floating-add-button,
+.floating-home-button {
+  position: fixed;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 1200;
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+          backdrop-filter: blur(12px) saturate(180%);
+}
+
 /* Floating bottom pill (Home/Ajustes) */
 .floating-pill{
-  position:fixed;
   left: calc(24px + constant(safe-area-inset-left));
   left: calc(24px + env(safe-area-inset-left));
-  bottom:calc(12px + env(safe-area-inset-bottom));
-  z-index:1201;
   display:inline-flex; align-items:center; gap:0;
   height:50px; padding:6px; /* igual ao botão "+" */
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.15);
   box-shadow:0 10px 24px rgba(0,0,0,.35), inset 0 -2px 0 rgba(0,0,0,.18);
   border-radius:32px; /* metade de 64 para a mesma curvatura */
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
-  backdrop-filter: blur(10px) saturate(160%);
 }
 .floating-pill .pill-option{
   position:relative;
@@ -2486,7 +2438,12 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
 }
 
 /* ===================== MODAL ===================== */
-.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px calc(var(--modal-bottom-gap) + var(--kb-offset-bottom, 0px));box-sizing:border-box;}
+html.modal-open,
+html.modal-open body {
+  overflow: hidden;
+  height: 100dvh;
+}
+.bottom-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;justify-content:center;align-items:flex-end;z-index:1100;transition:opacity .3s ease;pointer-events:none;opacity:0;padding:0 16px var(--modal-bottom-gap);box-sizing:border-box;}
 .backdrop-blur{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);} 
 .bottom-modal:not(.hidden){opacity:1;pointer-events:auto;}
 /* ===================== MODAL BOX (Bottom Sheet) ===================== */
@@ -2506,7 +2463,7 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   box-sizing: border-box;
   width: calc(100% - 8px);
   max-width: 480px;
-  max-height: 80vh;
+  max-height: clamp(280px, calc(var(--viewport-height, 100dvh) - 24px), 80dvh);
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
@@ -2517,10 +2474,6 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   transition:
     transform .16s cubic-bezier(.22,1,.36,1),
     opacity   .16s ease;
-}
-
-html.modal-open.keyboard-open .bottom-modal-box {
-  max-height: clamp(280px, calc(var(--vv-height, 100vh) - var(--kb-offset-bottom, 0px) - 24px), 80vh);
 }
 
 .bottom-modal:not(.hidden) .bottom-modal-box {
@@ -2537,10 +2490,8 @@ html.modal-open.keyboard-open .bottom-modal-box {
 }
 
 .sheet-modal .bottom-modal-box {
-  min-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
-  min-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
-  max-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
-  max-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  min-height: calc(var(--viewport-height, 100dvh) - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  max-height: calc(var(--viewport-height, 100dvh) - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
 }
 
 #settingsModal .modal-content {
@@ -3001,14 +2952,6 @@ html.modal-open.keyboard-open .bottom-modal-box {
 .modal-drag{width:40px;height:4px;background:#ccc;border-radius:2px;margin:0 auto 12px;} 
 .modal-content{flex:1;overflow-y:auto;width:100%;padding:0 24px 0 2px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 
-html.modal-open.keyboard-open .bottom-modal .modal-content {
-  padding-bottom: calc(24px + var(--kb-offset-bottom, 0px));
-}
-
-html.modal-open.keyboard-open #txModal .modal-content {
-  padding-bottom: calc(16px + var(--kb-offset-bottom, 0px));
-}
-
 #txModal .modal-content {
   padding: 0;
   display: flex;
@@ -3187,12 +3130,9 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 
 /* ===================== FLOATING BUTTONS ===================== */
 .floating-add-button{
-  position:fixed;
-  bottom:calc(12px + env(safe-area-inset-bottom));
   right: calc(24px + constant(safe-area-inset-right));
   right: calc(24px + env(safe-area-inset-right));
-  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
-  backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
+  overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
   /* Hard‑clip the rotated button so corners never bleed */
@@ -3201,12 +3141,9 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
 }
 /* Espelho do botão flutuante de adicionar: leva ao dia atual */
 .floating-home-button{
-  position:fixed;
-  bottom:calc(12px + env(safe-area-inset-bottom));
   left: calc(24px + constant(safe-area-inset-left));
   left: calc(24px + env(safe-area-inset-left));
-  z-index:1201;overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
-  backdrop-filter:blur(12px) saturate(180%);-webkit-backdrop-filter:blur(12px) saturate(180%);
+  overflow:hidden;width:64px;height:64px;border-radius:50%;background-color:rgba(255,255,255,.05);
   border:none;box-shadow:0 4px 10px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:600;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-sizing:border-box;
   animation:pulse 4s ease-in-out infinite;
   clip-path: circle(50% at 50% 50%);
@@ -3270,12 +3207,6 @@ html[data-theme="light"] .floating-pill .pill-highlight{
 /* Light theme: make masked glyphs dark */
 html[data-theme="light"] .pill-icon{ background:#111 !important; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important; }
 
-/* Ajustes quando o teclado estiver aberto (iOS 26):
-   os botões já acompanham o viewport reduzido, então mantemos a mesma âncora */
-html[data-vv-kb="1"] .floating-add-button,
-html[data-vv-kb="1"] .floating-home-button {
-  bottom: calc(12px + env(safe-area-inset-bottom));
-}
 .floating-add-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 .floating-home-button::before{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid #5a5a5a;opacity:.3;pointer-events:none;z-index:1;}
 /* Oculta botões flutuantes quando um modal está aberto (ficariam acima do modal) */

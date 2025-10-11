@@ -173,38 +173,20 @@ export function createElement(tag, attributes = {}, content = '') {
  * prevent scrolling. When no modals are visible, the lock is released.
  */
 export function updateModalOpenState() {
-  const root = document.documentElement || document.body;
+  const root = document.documentElement;
   const hasVisibleModal = !!document.querySelector('.bottom-modal:not(.hidden)');
   root.classList.toggle('modal-open', hasVisibleModal);
-  try {
-    if (hasVisibleModal) {
-      root.dataset.kbModal = '1';
-    } else {
-      if (root.dataset) {
-        root.dataset.kbModal = '0';
-      }
-      root.classList.remove('modal-keyboard-open');
-      if (typeof window !== 'undefined' && typeof window.__releaseModalTransformLock === 'function') {
-        try {
-          window.__releaseModalTransformLock();
-        } catch {
-          // ignore cleanup issues
-        }
-      }
-    }
-  } catch {
-    // ignore dataset access issues
-  }
+  const body = document.body;
   try {
     if (hasVisibleModal) {
       // Lock body scrolling
       if (!root.classList.contains('modal-locked')) {
         const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${scrollY}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.left = '0';
+        body.style.right = '0';
+        body.style.width = '100%';
         root.classList.add('modal-locked');
         root.dataset.modalScroll = String(scrollY);
       }
@@ -212,11 +194,11 @@ export function updateModalOpenState() {
       if (root.classList.contains('modal-locked')) {
         root.classList.remove('modal-locked');
         const prev = parseInt(root.dataset.modalScroll || '0', 10) || 0;
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.width = '';
         window.scrollTo(0, prev);
         try {
           delete root.dataset.modalScroll;
