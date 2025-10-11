@@ -178,6 +178,18 @@ export function updateModalOpenState() {
   root.classList.toggle('modal-open', hasVisibleModal);
   try {
     if (hasVisibleModal) {
+      root.dataset.kbModal = '1';
+    } else {
+      if (root.dataset) {
+        root.dataset.kbModal = '0';
+      }
+      root.classList.remove('modal-keyboard-open');
+    }
+  } catch {
+    // ignore dataset access issues
+  }
+  try {
+    if (hasVisibleModal) {
       // Lock body scrolling
       if (!root.classList.contains('modal-locked')) {
         const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
