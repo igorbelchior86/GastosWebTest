@@ -201,8 +201,24 @@ export function updateModalOpenState() {
       } else {
         wrapper.style.removeProperty('overflow');
       }
-      // Force reflow to ensure scroll is properly restored
-      wrapper.offsetHeight;
+      // iOS-specific scroll restoration
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        const currentScrollTop = wrapper.scrollTop;
+        // Force scroll state reset for iOS Safari
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.webkitOverflowScrolling = 'auto';
+        wrapper.offsetHeight; // force reflow
+        wrapper.style.overflow = 'auto';
+        wrapper.style.webkitOverflowScrolling = 'touch';
+        wrapper.scrollTop = currentScrollTop;
+        // Trigger scroll event to refresh iOS scroll state
+        setTimeout(() => {
+          wrapper.dispatchEvent(new Event('scroll'));
+        }, 10);
+      } else {
+        // Force reflow to ensure scroll is properly restored
+        wrapper.offsetHeight;
+      }
       try {
         delete wrapper.dataset.prevOverflow;
         delete wrapper.dataset.prevPointerEvents;

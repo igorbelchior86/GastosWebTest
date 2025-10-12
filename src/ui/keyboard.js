@@ -49,17 +49,22 @@ export function initKeyboardAndScrollHandlers() {
     const currentModalState = anyModalOpen();
     if (lastModalState && !currentModalState) {
       // Modal was just closed - force scroll cleanup for Safari iOS
-      if (/Safari/i.test(navigator.userAgent) && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         setTimeout(() => {
           const wrapper = document.querySelector('.wrapper');
           if (wrapper) {
             const currentScrollTop = wrapper.scrollTop;
+            // Force scroll container reset for iOS
             wrapper.style.overflow = 'hidden';
+            wrapper.style.webkitOverflowScrolling = 'auto';
             wrapper.offsetHeight; // force reflow
             wrapper.style.overflow = 'auto';
+            wrapper.style.webkitOverflowScrolling = 'touch';
             wrapper.scrollTop = currentScrollTop;
+            // Additional iOS fix: trigger scroll event to refresh internal state
+            wrapper.dispatchEvent(new Event('scroll'));
           }
-        }, 50);
+        }, 100);
       }
     }
     lastModalState = currentModalState;
@@ -83,6 +88,16 @@ export function initKeyboardAndScrollHandlers() {
     if (isInScrollableModal(target)) return;
     e.preventDefault();
   }, { passive: false });
+
+  // Additional iOS scroll fix - listen for modal state changes
+  const modalObserver = new MutationObserver(() => {
+    resetScrollStateIfNeeded();
+  });
+  
+  // Watch for class changes on bottom-modal elements
+  document.querySelectorAll('.bottom-modal').forEach(modal => {
+    modalObserver.observe(modal, { attributes: true, attributeFilter: ['class'] });
+  });
 
   // iOS 16/17 keyboard offset fix. When the virtual keyboard
   // appears, the viewport shrinks and can leave large blank areas
