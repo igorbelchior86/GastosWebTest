@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b42)';
+const APP_VERSION = 'v1.4.9(b43)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -585,7 +585,9 @@ function toggleTxModal(){
   if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
   if(isOpening)focusValueField();
   
-  // Update modal state with aggressive iOS scroll fix
+  // Update modal state - simplified approach
+  updateModalOpenState();
+  
   if(!isOpening){
     isEditing=null;
     pendingEditMode=null;
@@ -595,46 +597,23 @@ function toggleTxModal(){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
     
-    // Aggressive iOS Safari scroll restoration
+    // iOS-specific: Force wrapper scroll restoration by mimicking what other modals do
     if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
-      // First update modal state
-      updateModalOpenState();
-      
       setTimeout(() => {
         const wrapper = document.querySelector('.wrapper');
-        const root = document.documentElement;
         if(wrapper){
-          const currentScrollTop = wrapper.scrollTop;
-          
-          // Force complete scroll reset
+          // Mimic the exact sequence that settings modal uses
+          const scrollPos = wrapper.scrollTop;
           wrapper.style.overflow = 'hidden';
-          wrapper.style.webkitOverflowScrolling = 'auto';
-          wrapper.style.transform = 'translateZ(0)';
-          root.classList.remove('modal-open', 'modal-locked');
+          wrapper.offsetHeight; // Force reflow
+          wrapper.style.overflow = '';
+          wrapper.scrollTop = scrollPos;
           
-          // Force multiple reflows
-          wrapper.offsetHeight;
-          document.body.offsetHeight;
-          
-          // Restore scrolling
-          wrapper.style.overflow = 'auto';
-          wrapper.style.webkitOverflowScrolling = 'touch';
-          wrapper.style.transform = '';
-          wrapper.scrollTop = currentScrollTop;
-          
-          // Final cleanup after animation frame
-          requestAnimationFrame(() => {
-            wrapper.dispatchEvent(new Event('scroll'));
-            wrapper.dispatchEvent(new Event('touchstart'));
-            wrapper.dispatchEvent(new Event('touchend'));
-          });
+          // Re-trigger updateModalOpenState to ensure clean state
+          updateModalOpenState();
         }
-      }, 100);
-    } else {
-      updateModalOpenState();
+      }, 50);
     }
-  } else {
-    updateModalOpenState();
   }
 }
 
