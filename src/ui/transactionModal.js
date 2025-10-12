@@ -230,7 +230,20 @@ export async function addTx() {
   const addTxInternal = typeof addTransaction === 'function' ? addTransaction : (tx) => { g.transactions = getTxs().concat([tx]); };
   const saveFn = typeof save === 'function' ? save : (() => {});
   const renderFn = typeof renderTable === 'function' ? renderTable : (() => {});
-  const toggleModalFn = typeof toggleTxModal === 'function' ? toggleTxModal : (() => {});
+  const toggleModalFn = typeof toggleTxModal === 'function' ? toggleTxModal : () => {
+    // Fallback: close modal directly if toggleTxModal is not available
+    const modal = document.getElementById('txModal');
+    if (modal && !modal.classList.contains('hidden')) {
+      modal.classList.add('hidden');
+      // Reset button rotation
+      const openBtn = document.getElementById('openTxModal');
+      if (openBtn) openBtn.style.transform = 'rotate(0deg)';
+      // Update modal state
+      if (typeof g.updateModalOpenState === 'function') {
+        g.updateModalOpenState();
+      }
+    }
+  };
   const showToastFn = typeof showToast === 'function' ? showToast : ((m,t) => { try { notify && notify(m, t); } catch(_) {} });
   // Helper: ensure todayISO is available
   const todayFn = typeof todayISO === 'function' ? todayISO : (() => (new Date()).toISOString().slice(0,10));
@@ -351,7 +364,10 @@ export async function addTx() {
       if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
       saveFn('tx', getTxs());
       toggleModalFn();
-      renderFn();
+      // Render after modal closes
+      setTimeout(() => {
+        renderFn();
+      }, 250);
       // Custom edit confirmation toast
       const formattedVal = fmtCurrency(parseCurrency(val && val.value));
       const recValue = recurrence ? recurrence.value : '';
@@ -499,7 +515,10 @@ export async function addTx() {
       // Persist and rerender
       saveFn('tx', getTxs());
       toggleModalFn();
-      renderFn();
+      // Render after modal closes
+      setTimeout(() => {
+        renderFn();
+      }, 250);
       showToastFn('Pagamento de fatura lançado', 'success');
       // Write back state
       g.isEditing = isEditing;
@@ -515,7 +534,12 @@ export async function addTx() {
       const activeTypeEl = document.querySelector('.value-toggle button.active');
       const activeType = activeTypeEl && activeTypeEl.dataset ? activeTypeEl.dataset.type : 'expense';
       if (activeType === 'expense') newVal = -Math.abs(newVal);
-      const newMethod  = met && met.value;
+      // Get method from active button or hidden select
+      let newMethod = met && met.value;
+      if (!newMethod || newMethod === 'undefined') {
+        const activeMethodBtn = document.querySelector('.switch-option.active');
+        newMethod = activeMethodBtn ? activeMethodBtn.dataset.method : 'Dinheiro';
+      }
       const newOpDate  = date && date.value;
       const newPostDate = typeof post === 'function' ? post(newOpDate, newMethod) : newOpDate;
       const newRecurrence  = recurrence && recurrence.value;
@@ -538,8 +562,14 @@ export async function addTx() {
       const updatedTxs = [...currentTxs, newTx];
       setTxs(updatedTxs);
       
-      // Update global transactions reference
+      // Update ALL global references to transactions
       g.transactions = updatedTxs;
+      if (window.__gastos) window.__gastos.transactions = updatedTxs;
+      
+      // Force update the module-level transactions variable
+      if (typeof window.setTransactions === 'function') {
+        window.setTransactions(updatedTxs);
+      }
       
       // Persist to storage
       saveFn('tx', updatedTxs);
@@ -552,10 +582,10 @@ export async function addTx() {
       // Close modal
       toggleModalFn();
       
-      // Force re-render after modal closes
+      // Single render after modal animation completes
       setTimeout(() => {
         renderFn();
-      }, 200);
+      }, 250);
       
       showToastFn('Operação adicionada', 'success');
       // Write back state

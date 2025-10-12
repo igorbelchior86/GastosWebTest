@@ -136,7 +136,17 @@ export function runBootstrap() {
 
   // Hook up card modal triggers and add/edit buttons
   if (typeof addCardBtn !== 'undefined' && addCardBtn) addCardBtn.onclick = addCard;
-  if (typeof addBtn !== 'undefined' && addBtn) addBtn.onclick = addTx;
+  if (typeof addBtn !== 'undefined' && addBtn) {
+    addBtn.onclick = async () => {
+      // Get addTx from global context when clicked, not when bootstrap runs
+      const g = window.__gastos;
+      if (g && typeof g.addTx === 'function') {
+        await g.addTx();
+      } else if (window.addTx && typeof window.addTx === 'function') {
+        await window.addTx();
+      }
+    };
+  }
   if (typeof openCardBtn !== 'undefined' && openCardBtn && openCardBtn) openCardBtn.onclick = () => showCardModal();
   if (typeof closeCardModal !== 'undefined' && closeCardModal) closeCardModal.onclick = hideCardModal;
   if (cardModal) {

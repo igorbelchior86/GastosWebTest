@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b35)';
+const APP_VERSION = 'v1.4.9(b41)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -651,7 +651,7 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcelRow'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR};
+window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,addTx:null};
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -881,6 +881,8 @@ function openPayInvoiceModal(cardName,dueISO,remaining,totalAbs,adjustedBefore){
 
 addTx=async()=>addTxMod();
 if (typeof window !== 'undefined') window.addTx = addTx;
+// Update the global context with the real addTx function
+if (window.__gastos) window.__gastos.addTx = addTx;
 // Removed unused transaction form helper stubs (collectTxFormData, buildTransaction, finalizeTransaction, resetTxForm)
 
 
