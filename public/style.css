@@ -967,6 +967,7 @@ html.kb-lock-shift.keyboard-open {
 html.modal-open {
   transform: none !important;
   will-change: auto !important;
+  --app-footer-gap: calc(24px + var(--safe-area-bottom));
 }
 
 html.modal-open.keyboard-open {
@@ -1072,12 +1073,6 @@ body{display:block;}
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* evita bounce do body */
   background: transparent;
-}
-
-.wrapper.modal-locked {
-  overflow: hidden;
-  pointer-events: none;
-  touch-action: none;
 }
 
 /* Spacer real no final do conteúdo do acordeão: mantém
