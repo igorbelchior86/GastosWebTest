@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b27)';
+const APP_VERSION = 'v1.4.9(b29)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -573,10 +573,7 @@ const closeTxModal = document.getElementById('closeTxModal');
 /**
  * Toggle the visibility of the transaction modal.
  */
-function toggleTxModal(){const isOpening=txModal.classList.contains('hidden');if(isOpening){if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}if(!isEditing){resetTxModal();}}txModal.classList.toggle('hidden');if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';if(isOpening)focusValueField();updateModalOpenState();if(!isOpening){isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}}}
-
-
-if(openTxBtn)openTxBtn.onclick=()=>{isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}toggleTxModal();focusValueField();};
+function toggleTxModal(){const isOpening=txModal.classList.contains('hidden');if(isOpening){if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}if(!isEditing){resetTxModal();}}txModal.classList.toggle('hidden');if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';if(isOpening)focusValueField();updateModalOpenState();if(!isOpening){isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}try{if(val)val.blur();}catch(_){}}}
 
 if(closeTxModal)closeTxModal.onclick=toggleTxModal;if(txModal)txModal.onclick=e=>{if(e.target===txModal)toggleTxModal();};
 // Bottom pill navigation and scroll/home/settings interactions are wired up in uiEventHandlers.js

@@ -201,6 +201,8 @@ export function updateModalOpenState() {
       } else {
         wrapper.style.removeProperty('overflow');
       }
+      // Force reflow to ensure scroll is properly restored
+      wrapper.offsetHeight;
       try {
         delete wrapper.dataset.prevOverflow;
         delete wrapper.dataset.prevPointerEvents;
