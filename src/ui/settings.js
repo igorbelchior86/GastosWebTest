@@ -11,7 +11,8 @@
 import { cacheGet, cacheSet } from '../utils/cache.js';
 import { applyCurrencyProfile, getAvailableProfiles, getCurrentProfile } from '../utils/currencyProfile.js';
 import { getRuntimeProfile } from '../utils/profile.js';
-import { showModal } from '../utils/dom.js';
+import { showModal, updateModalOpenState } from '../utils/dom.js';
+import { askConfirmLogout, askConfirmReset } from './modalHelpers.js';
 
 /**
  * Apply theme preference to the document
@@ -510,19 +511,19 @@ export function setupSettings(settingsModalEl) {
     const resetBtn = box.querySelector('#resetDataBtn');
     if (resetBtn) {
       resetBtn.onclick = async () => {
-        if (confirm('Deseja realmente APAGAR TODOS OS DADOS? Esta ação é irreversível.')) {
-          try {
+        try {
+          const shouldReset = await askConfirmReset();
+            
+          if (shouldReset) {
             // Call the global reset function if available
             if (typeof window.performResetAllData === 'function') {
               await window.performResetAllData(false); // false = don't ask confirm again
             }
             settingsModalEl.classList.add('hidden');
-            if (typeof window.updateModalOpenState === 'function') {
-              window.updateModalOpenState();
-            }
-          } catch (err) {
-            console.error('Reset failed:', err);
+            updateModalOpenState();
           }
+        } catch (err) {
+          console.error('Reset failed:', err);
         }
       };
     }
@@ -532,25 +533,29 @@ export function setupSettings(settingsModalEl) {
     if (logoutBtn) {
       logoutBtn.onclick = async () => {
         try {
-          if (window.Auth && typeof window.Auth.signOut === 'function') {
-            await window.Auth.signOut();
+          const shouldLogout = await askConfirmLogout();
+            
+          if (shouldLogout) {
+            if (window.Auth && typeof window.Auth.signOut === 'function') {
+              await window.Auth.signOut();
+            }
+            // Clear cached profile
+            try {
+              cacheSet('profile', null);
+            } catch {
+              /* ignore */
+            }
+            // Hide modal and restore page scroll state
+            settingsModalEl.classList.add('hidden');
+            updateModalOpenState();
           }
-        } catch {
-          /* ignore */
-        }
-        // Clear cached profile
-        try {
-          cacheSet('profile', null);
-        } catch {
-          /* ignore */
-        }
-        // Hide modal and restore page scroll state
-        settingsModalEl.classList.add('hidden');
-        if (typeof window.updateModalOpenState === 'function') {
-          window.updateModalOpenState();
+        } catch (err) {
+          console.error('Logout failed:', err);
         }
       };
     }
+    
+
   }
 
   /**

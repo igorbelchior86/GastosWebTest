@@ -705,9 +705,8 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   margin-bottom: 0; /* Remove margem do último item */
 }
 
-/* MOVIDO PARA LINHA 625 - Grid properties consolidadas com padding */
-/* Flatten the .op-main wrapper so its children participate in the grid */
-#plannedModal .planned-list > li .op-main { display: contents; }
+/* DESABILITADO - Grid system quebra o swipe-wrapper */
+/* #plannedModal .planned-list > li .op-main { display: contents; } */
 /* Place left block (checkbox + descrição) on row 1, col 1 */
 /* Planned modal: left block (checkbox + descrição + método) */
 #plannedModal .planned-list > li .op-left {
@@ -729,10 +728,8 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
   padding-left: var(--check-space) !important; /* alinha com a descrição */
   letter-spacing: 0px;
 }
-/* Make .op-right contribute its children directly to the grid */
-#plannedModal .planned-list > li .op-right {
-  display: contents !important;
-}
+/* DESABILITADO - Grid system quebra o swipe-wrapper */
+/* #plannedModal .planned-list > li .op-right { display: contents !important; } */
 /* Any other child inside .op-right (e.g., "Cartão Amex") becomes the method line under the description */
 #plannedModal .planned-list > li .op-right > :not(.value) {
   grid-column: 1;
@@ -776,18 +773,7 @@ html[data-theme="light"] #currencyProfileModal .currency-profile-details {
 }
 
 /* =================== VALORES ALINHADOS À DIREITA (RESTAURADO) =================== */
-#plannedModal .planned-list > li .op-line {
-  position: relative !important;
-  display: grid !important;
-  grid-template-columns: 1fr auto !important;
-  grid-template-rows: auto auto !important;
-  column-gap: 12px !important;
-  row-gap: 4px !important;
-  align-items: center !important;
-  padding: 16px 120px 16px 20px !important; /* Altura mais compacta */
-  min-height: 52px !important; /* Altura mínima reduzida */
-  box-sizing: border-box !important;
-}
+/* REMOVIDO: regra conflitante que quebrava o alinhamento do swipe */
 
 #plannedModal .planned-list > li .op-right .value {
   position: absolute !important;
@@ -2275,12 +2261,97 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 .swipe-actions .edit{color:var(--blue);} 
 .swipe-actions .danger{color:var(--red);} 
 
-/* ================== SWIPE ACTIONS NO MODAL PLANEJADOS ================== */
+/* ================== SWIPE ACTIONS NO MODAL PLANEJADOS - SOLUÇÃO DEFINITIVA ================== */
+
+/* FORÇAR ALINHAMENTO TOTAL - ZERO MARGEM/PADDING */
+#plannedModal .planned-cash {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+#plannedModal .swipe-wrapper {
+  position: relative !important;
+  height: 68px !important;
+  margin: 0 0 12px 0 !important; /* Espaçamento direto no swipe-wrapper */
+  padding: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  display: block !important;
+}
+
+#plannedModal .swipe-wrapper .op-line {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 68px !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  transition: transform 0.2s ease; /* JS controla o transform */
+  background: rgba(255,255,255,0.08) !important;
+  border-radius: 10px !important;
+  padding: 12px 8px 12px 16px !important; /* Restaurar padding esquerdo */
+  box-sizing: border-box !important;
+  border: none !important;
+}
+
 #plannedModal .swipe-actions {
-  height: 52px !important; /* Mesma altura mínima dos cards */
-  top: 50% !important;
-  bottom: auto !important;
-  transform: translateY(-50%) !important; /* Centralizar verticalmente */
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important; /* Começar do mesmo ponto */
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 68px !important;
+  width: 96px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important; /* Espaçamento reduzido entre ícones */
+  background: transparent;
+  border-radius: 0 10px 10px 0 !important;
+  opacity: 0; /* Escondido por padrão - JS controla */
+  transition: opacity 0.2s ease;
+  z-index: 2 !important;
+  margin-left: auto !important; /* Empurrar para a direita */
+}
+
+/* Botões de ação - ícones brancos com espaçamento reduzido */
+#plannedModal .swipe-actions button {
+  background: transparent !important;
+  border: none !important;
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease !important;
+}
+
+#plannedModal .swipe-actions button:hover {
+  transform: scale(1.1) !important;
+}
+
+#plannedModal .swipe-actions .icon-action {
+  background-color: #fff !important;
+}
+
+/* O sistema de swipe controla opacity e transform via JS inline - remover conflitos CSS */
+#plannedModal .swipe-actions {
+  /* Remover !important para permitir controle via JS */
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#plannedModal .op-line {
+  /* Remover !important para permitir controle via JS */
+  transition: transform 0.2s ease;
 }
 
 
@@ -3914,38 +3985,71 @@ summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0
 /* Planned items as cards in Planned Modal */
 /* Planned items as cards in Planned Modal */
 #plannedModal #plannedList > li.planned-cash {
-  background: rgba(255,255,255,0.08);
+  background: transparent !important; /* Deixar o swipe-wrapper controlar o fundo */
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  padding: 12px 16px;
+  padding: 0 !important;
   border-radius: 10px;
-  /* switch from flex to grid to control placement */
-  display: grid;
-  grid-template-columns: auto minmax(0,1fr) auto; /* checkbox + descrição + valor */
-  grid-template-rows: auto auto;                  /* linha 1: principal, linha 2: detalhes */
-  column-gap: 12px;
-  row-gap: 2px;
-  align-items: center;
+  display: block !important;
   font-family: 'Inter', sans-serif;
   line-height: 1.5;
-  min-height: 44px;
-  margin-bottom: 8px;
+  height: 68px !important; /* Altura fixa igual ao swipe-wrapper */
+  margin-bottom: 12px !important; /* Espaçamento aumentado entre cards */
   width: 100%;
   box-sizing: border-box;
+  overflow: hidden !important;
+  position: relative !important;
 }
 
-/* Grid-based layout for planned modal children */
-/* Grid-based layout for planned modal children */
-#plannedModal #plannedList .planned-cash .op-line { display: contents; }
-#plannedModal #plannedList .planned-cash .op-main { display: contents; }
+/* Layout interno do texto (sem quebrar o swipe-wrapper) */
 #plannedModal #plannedList .planned-cash .op-left {
-  grid-column: 1 / span 2;
-  grid-row: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex: 1 !important;
+  max-width: calc(100% - 120px) !important; /* Menos espaço reservado para o valor */
+  overflow: visible !important; /* Permitir que o ícone apareça */
 }
-#plannedModal #plannedList .planned-cash .op-right { display: contents; }
+
+#plannedModal #plannedList .planned-cash .left-text {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: visible !important; /* Permitir que o ícone apareça */
+}
+
+#plannedModal #plannedList .planned-cash .left-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-weight: 500 !important;
+  font-size: 16px !important; /* Restaurar tamanho original */
+  overflow: visible !important; /* Permitir que o ícone apareça */
+  white-space: nowrap !important;
+}
+
+#plannedModal #plannedList .planned-cash .timestamp {
+  font-size: 12px !important;
+  color: var(--txt-muted) !important;
+  margin: 0 !important;
+}
+
+#plannedModal #plannedList .planned-cash .op-right {
+  position: absolute !important;
+  right: 1px !important; /* Padding direito quase zero */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  max-width: 110px !important; /* Largura máxima menor para dar mais espaço ao texto */
+}
+
+#plannedModal #plannedList .planned-cash .value {
+  font-weight: 600 !important;
+  font-size: 14px !important; /* Fonte menor */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important; /* Reticências se muito longo */
+}
 #plannedModal #plannedList .planned-cash .op-right .value {
   grid-column: 3;
   grid-row: 1;

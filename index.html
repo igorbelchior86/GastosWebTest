@@ -15,8 +15,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
   <!-- Stylesheets live in the public folder now that index.html is at the root -->
-  <link rel="stylesheet" href="public/style.css?v=1.4.9(b53)">
-  <link rel="stylesheet" href="public/login.css?v=1.4.9(b53)">
+      <link rel="stylesheet" href="public/style.css?v=b75">
+  <link rel="stylesheet" href="public/login.css?v=1.4.9(b58)">
 
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="public/icons/icon-192x192.png">
@@ -219,6 +219,34 @@
     </button>
   </div>
   <button id="openTxModal" class="floating-add-button" title="Nova operação" style="display: none;">＋</button>
+
+  <!-- Modal Confirmar sair da conta -->
+  <div id="confirmLogoutModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmLogoutTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmLogoutTitle">Sair da conta</h2>
+      <button id="closeConfirmLogout" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="confirmLogoutText" style="margin: 6px 0 4px; color: var(--txt-main); text-align:center;">Deseja mesmo desconectar?</p>
+        <button id="confirmLogoutYes" class="action-btn">Sim</button>
+        <button id="confirmLogoutNo" class="action-btn cancel-btn">Não</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar apagar dados -->
+  <div id="confirmResetModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmResetTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmResetTitle">Apagar Todos os Dados</h2>
+      <button id="closeConfirmReset" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="confirmResetText" style="margin: 6px 0 4px; color: var(--txt-main); opacity:0.95; text-align:center;">⚠️ Esta ação apagará permanentemente todas as suas transações, cartões e configurações. Não poderá ser desfeita.</p>
+        <button id="confirmResetYes" class="action-btn danger-btn">Apagar Tudo</button>
+        <button id="confirmResetNo" class="action-btn cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Load the compat layer and modules from the new locations -->
   <script type="module" src="src/compat/globals.js"></script>

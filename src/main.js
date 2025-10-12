@@ -47,7 +47,7 @@ import { safeFmtCurrency as _safeFmtCurrency,safeFmtNumber as _safeFmtNumber,saf
 import { normalizeTransactionRecord as _normalizeTransactionRecord,ensureCashCard as _ensureCashCard } from './utils/txRecord.js';
 import { createStartRealtime } from './startRealtimeHelper.js';
 
-import { askMoveToToday as askMoveToTodayMod,askConfirmLogout as askConfirmLogoutMod,scheduleAfterKeyboard as scheduleAfterKeyboardMod,flushKeyboardDeferredTasks as flushKeyboardDeferredTasksMod } from './ui/modalHelpers.js';
+import { askMoveToToday as askMoveToTodayMod,askConfirmLogout as askConfirmLogoutMod,askConfirmReset as askConfirmResetMod,scheduleAfterKeyboard as scheduleAfterKeyboardMod,flushKeyboardDeferredTasks as flushKeyboardDeferredTasksMod } from './ui/modalHelpers.js';
 
 const state = appState;
 
@@ -65,6 +65,7 @@ const scheduleAfterKeyboard = scheduleAfterKeyboardMod;
 const flushKeyboardDeferredTasks = flushKeyboardDeferredTasksMod;
 const askMoveToToday    = askMoveToTodayMod;
 const askConfirmLogout  = askConfirmLogoutMod;
+const askConfirmReset   = askConfirmResetMod;
 
 const resetTxModal       = resetTxModalMod;
 const updateModalOpenState = updateModalOpenStateMod;
@@ -650,7 +651,7 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,addTx:null};
+window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,addTx:null};
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -658,6 +659,8 @@ window.refreshMethods = refreshMethods;
 window.renderCardList = renderCardList;
 window.initStart = initStart;
 window.ensureStartSetFromBalance = ensureStartSetFromBalance;
+window.askConfirmLogout = askConfirmLogout;
+window.askConfirmReset = askConfirmReset;
 
 try {
   const offlineApi = initOfflineQueue({

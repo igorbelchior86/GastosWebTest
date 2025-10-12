@@ -106,3 +106,39 @@ export function askConfirmLogout() {
     updateModalOpenState();
   });
 }
+
+/**
+ * Prompts the user to confirm resetting all data. Uses a custom modal when 
+ * available or falls back to window.confirm. Returns a promise that resolves 
+ * with the user's choice.
+ * @returns {Promise<boolean>} Resolves with true if the user confirms reset.
+ */
+export function askConfirmReset() {
+  const confirmResetModal = document.getElementById('confirmResetModal');
+  const confirmResetYes   = document.getElementById('confirmResetYes');
+  const confirmResetNo    = document.getElementById('confirmResetNo');
+  const closeConfirmReset = document.getElementById('closeConfirmReset');
+
+  if (!confirmResetModal || !confirmResetYes || !confirmResetNo) {
+    return Promise.resolve(window.confirm('⚠️ Esta ação apagará permanentemente todas as suas transações, cartões e configurações. Não poderá ser desfeita. Deseja continuar?'));
+  }
+  
+  return new Promise(resolve => {
+    const cleanup = () => {
+      confirmResetModal.classList.add('hidden');
+      updateModalOpenState();
+      confirmResetYes.onclick = null;
+      confirmResetNo.onclick = null;
+      if (closeConfirmReset) closeConfirmReset.onclick = null;
+      confirmResetModal.onclick = null;
+    };
+    
+    confirmResetYes.onclick = () => { cleanup(); resolve(true); };
+    confirmResetNo.onclick = () => { cleanup(); resolve(false); };
+    if (closeConfirmReset) closeConfirmReset.onclick = () => { cleanup(); resolve(false); };
+    confirmResetModal.onclick = (e) => { if (e.target === confirmResetModal) { cleanup(); resolve(false); } };
+    
+    confirmResetModal.classList.remove('hidden');
+    updateModalOpenState();
+  });
+}

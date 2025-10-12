@@ -167,11 +167,14 @@ export function setupPlannedModal() {
   }
 
   /**
-   * Placeholder for additional planned-modal behaviours (swipes, etc.).
-   * Currently unused; defined for future extension.
+   * Initialize swipe actions for planned transactions.
    */
   function bindPlannedActions() {
-    // Intentionally left blank
+    // Initialize swipe for the planned modal specifically
+    const { initSwipe } = g;
+    if (typeof initSwipe === 'function' && plannedList) {
+      initSwipe(plannedList, '.swipe-wrapper', '.swipe-actions', '.op-line', 'plannedSwipeInit');
+    }
   }
 
   function renderPlannedModal() {
