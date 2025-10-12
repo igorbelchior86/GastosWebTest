@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b32)';
+const APP_VERSION = 'v1.4.9(b34)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -573,10 +573,53 @@ const closeTxModal = document.getElementById('closeTxModal');
 /**
  * Toggle the visibility of the transaction modal.
  */
-function toggleTxModal(){const isOpening=txModal.classList.contains('hidden');if(isOpening){if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}if(!isEditing){resetTxModal();}}txModal.classList.toggle('hidden');if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';if(isOpening)focusValueField();updateModalOpenState();if(!isOpening){isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){try{window.__unlockKeyboardGap();}catch(_){}}}}
+function toggleTxModal(){
+  const isOpening=txModal.classList.contains('hidden');
+  if(isOpening){
+    if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
+      try{window.__unlockKeyboardGap();}catch(_){}
+    }
+    if(!isEditing){resetTxModal();}
+  }
+  txModal.classList.toggle('hidden');
+  if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
+  if(isOpening)focusValueField();
+  
+  // Update modal state with iOS scroll fix
+  if(!isOpening){
+    // Modal is closing - force scroll restoration for iOS
+    setTimeout(() => {
+      updateModalOpenState();
+      if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
+        const wrapper = document.querySelector('.wrapper');
+        if(wrapper){
+          const currentScrollTop = wrapper.scrollTop;
+          wrapper.style.overflow = 'hidden';
+          wrapper.offsetHeight; // force reflow
+          wrapper.style.overflow = 'auto';
+          wrapper.scrollTop = currentScrollTop;
+        }
+      }
+    }, 50);
+    isEditing=null;
+    pendingEditMode=null;
+    pendingEditTxId=null;
+    pendingEditTxIso=null;
+    if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
+      try{window.__unlockKeyboardGap();}catch(_){}
+    }
+  } else {
+    updateModalOpenState();
+  }
+}
 
 
-if(openTxBtn)openTxBtn.onclick=()=>{isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}toggleTxModal();focusValueField();};
+if(openTxBtn)openTxBtn.onclick=()=>{
+  isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;
+  if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}
+  toggleTxModal();
+  focusValueField();
+};
 
 if(closeTxModal)closeTxModal.onclick=toggleTxModal;if(txModal)txModal.onclick=e=>{if(e.target===txModal)toggleTxModal();};
 // Bottom pill navigation and scroll/home/settings interactions are wired up in uiEventHandlers.js

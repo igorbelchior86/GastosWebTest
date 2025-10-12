@@ -533,11 +533,30 @@ export async function addTx() {
         ts: new Date().toISOString(),
         modifiedAt: new Date().toISOString()
       };
-      try { addTxInternal(newTx); } catch (_) { setTxs(getTxs().concat([newTx])); }
-      // Persist
-      saveFn('tx', getTxs());
+      // Force add transaction to state immediately
+      const currentTxs = getTxs() || [];
+      const updatedTxs = [...currentTxs, newTx];
+      setTxs(updatedTxs);
+      
+      // Update global transactions reference
+      g.transactions = updatedTxs;
+      
+      // Persist to storage
+      saveFn('tx', updatedTxs);
+      
+      // Reset form before closing
+      if (desc) desc.value = '';
+      if (val) val.value = '';
+      if (date) date.value = todayFn();
+      
+      // Close modal
       toggleModalFn();
-      renderFn();
+      
+      // Force re-render after modal closes
+      setTimeout(() => {
+        renderFn();
+      }, 200);
+      
       showToastFn('Operação adicionada', 'success');
       // Write back state
       g.isEditing = isEditing;
