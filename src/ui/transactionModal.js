@@ -350,8 +350,8 @@ export async function addTx() {
       if (addBtn) addBtn.textContent = 'Adicionar';
       if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
       saveFn('tx', getTxs());
-      renderFn();
       toggleModalFn();
+      renderFn();
       // Custom edit confirmation toast
       const formattedVal = fmtCurrency(parseCurrency(val && val.value));
       const recValue = recurrence ? recurrence.value : '';
@@ -498,8 +498,8 @@ export async function addTx() {
       g.pendingInvoiceCtx = null;
       // Persist and rerender
       saveFn('tx', getTxs());
-      renderFn();
       toggleModalFn();
+      renderFn();
       showToastFn('Pagamento de fatura lançado', 'success');
       // Write back state
       g.isEditing = isEditing;
@@ -536,8 +536,8 @@ export async function addTx() {
       try { addTxInternal(newTx); } catch (_) { setTxs(getTxs().concat([newTx])); }
       // Persist
       saveFn('tx', getTxs());
-      renderFn();
       toggleModalFn();
+      renderFn();
       showToastFn('Operação adicionada', 'success');
       // Write back state
       g.isEditing = isEditing;
