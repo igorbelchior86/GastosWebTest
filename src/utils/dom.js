@@ -167,7 +167,7 @@ export function createElement(tag, attributes = {}, content = '') {
 }
 
 /**
- * Update the document’s modal open state. When any element with the
+ * Update the document's modal open state. When any element with the
  * `.bottom-modal` class is visible (i.e. not hidden), the root element
  * receives the class `modal-open`. In this state, the body is locked to
  * prevent scrolling. When no modals are visible, the lock is released.
@@ -208,17 +208,6 @@ export function updateModalOpenState() {
         wrapper.removeAttribute('data-prev-overflow');
         wrapper.removeAttribute('data-prev-pointer-events');
       }
-      requestAnimationFrame(() => {
-        if (document.querySelector('.bottom-modal:not(.hidden)')) return;
-        const currentOverflow = wrapper.style.overflow;
-        wrapper.style.overflow = 'hidden';
-        wrapper.offsetHeight;
-        if (currentOverflow) {
-          wrapper.style.overflow = currentOverflow;
-        } else {
-          wrapper.style.removeProperty('overflow');
-        }
-      });
     }
   } catch {
     // Fail silently
