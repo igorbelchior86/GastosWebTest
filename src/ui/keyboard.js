@@ -47,8 +47,26 @@ export function initKeyboardAndScrollHandlers() {
   // after a modal closes by toggling overflow styles.
   function resetScrollStateIfNeeded() {
     const currentModalState = anyModalOpen();
-    // Disable automatic scroll reset - let toggleTxModal handle it
-    // to avoid conflicts with the more aggressive restoration
+    if (lastModalState && !currentModalState) {
+      // Modal was just closed - force scroll cleanup for Safari iOS
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        setTimeout(() => {
+          const wrapper = document.querySelector('.wrapper');
+          if (wrapper) {
+            const currentScrollTop = wrapper.scrollTop;
+            // Force scroll container reset for iOS
+            wrapper.style.overflow = 'hidden';
+            wrapper.style.webkitOverflowScrolling = 'auto';
+            wrapper.offsetHeight; // force reflow
+            wrapper.style.overflow = 'auto';
+            wrapper.style.webkitOverflowScrolling = 'touch';
+            wrapper.scrollTop = currentScrollTop;
+            // Additional iOS fix: trigger scroll event to refresh internal state
+            wrapper.dispatchEvent(new Event('scroll'));
+          }
+        }, 100);
+      }
+    }
     lastModalState = currentModalState;
   }
 

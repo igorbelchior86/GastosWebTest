@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b43)';
+const APP_VERSION = 'v1.4.9(b44)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -585,7 +585,6 @@ function toggleTxModal(){
   if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
   if(isOpening)focusValueField();
   
-  // Update modal state - simplified approach
   updateModalOpenState();
   
   if(!isOpening){
@@ -597,22 +596,24 @@ function toggleTxModal(){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
     
-    // iOS-specific: Force wrapper scroll restoration by mimicking what other modals do
+    // iOS Safari scroll fix: simulate settings modal open/close to unlock scroll
     if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
       setTimeout(() => {
-        const wrapper = document.querySelector('.wrapper');
-        if(wrapper){
-          // Mimic the exact sequence that settings modal uses
-          const scrollPos = wrapper.scrollTop;
-          wrapper.style.overflow = 'hidden';
-          wrapper.offsetHeight; // Force reflow
-          wrapper.style.overflow = '';
-          wrapper.scrollTop = scrollPos;
+        const settingsModal = document.getElementById('settingsModal');
+        if(settingsModal){
+          // Silently open settings modal (invisible)
+          settingsModal.style.visibility = 'hidden';
+          settingsModal.classList.remove('hidden');
+          if(typeof updateModalOpenState === 'function') updateModalOpenState();
           
-          // Re-trigger updateModalOpenState to ensure clean state
-          updateModalOpenState();
+          // Immediately close it
+          setTimeout(() => {
+            settingsModal.classList.add('hidden');
+            settingsModal.style.visibility = '';
+            if(typeof updateModalOpenState === 'function') updateModalOpenState();
+          }, 10);
         }
-      }, 50);
+      }, 100);
     }
   }
 }

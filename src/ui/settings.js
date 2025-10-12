@@ -3,7 +3,7 @@
  *
  * This module encapsulates rendering of the Settings modal, including
  * fetching the user's profile from Firebase Auth (when available),
- * caching it locally, and wiring up the sign‑out button. To use it,
+ * caching it locally, and wiring up the sign‑out butt          <div class="version-number">v1.4.9(b44)</div>n. To use it,
  * call `setupSettings` with the modal element. It returns an object
  * containing `openSettings`, `closeSettings` and `renderSettings`.
  */
@@ -223,7 +223,7 @@ export function setupSettings(settingsModalEl) {
       <h3 class="settings-section-title">Sobre</h3>
       <div class="settings-list">
         <div class="settings-item">
-          <div class="version-number">v1.4.9(b43)</div>
+          <div class="version-number">v1.4.9(b41)</div>
         </div>
         <div class="settings-item danger">
           <button id="resetDataBtn" class="settings-cta">
