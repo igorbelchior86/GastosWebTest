@@ -11,29 +11,29 @@ import { updateModalOpenState as syncRootModalState } from '../utils/dom.js';
 export function resetTxModal() {
   try {
     // Get modal elements
-    const val = document.getElementById('val');
+    const val = document.getElementById('value');
     const desc = document.getElementById('desc');
-    const card = document.getElementById('card');
+    const method = document.getElementById('method');
     const installments = document.getElementById('installments');
-    const invoiceParcelCheckbox = document.getElementById('invoiceParcelCheckbox');
+    const invoiceParcelCheckbox = document.getElementById('invoiceParcel');
     const parcelasBlock = document.getElementById('parcelasBlock');
     const recurrence = document.getElementById('recurrence');
 
     // Reset form fields
     if (val) val.value = '';
     if (desc) desc.value = '';
-    if (card && card.options.length > 0) card.selectedIndex = 0;
-    if (recurrence) recurrence.value = 'none';
+    if (method && method.options.length > 0) method.selectedIndex = 0;
+    if (recurrence) recurrence.value = '';
 
     // Reset invoice parcel settings
     if (invoiceParcelCheckbox) {
       invoiceParcelCheckbox.checked = false;
     }
     if (parcelasBlock) {
-      parcelasBlock.style.display = 'none';
+      parcelasBlock.classList.add('hidden');
     }
     if (installments) {
-      installments.value = '2';
+      installments.value = '1';
     }
 
     // Reset any edit mode indicators
@@ -44,9 +44,9 @@ export function resetTxModal() {
     }
 
     // Reset modal title
-    const modalTitle = modal?.querySelector('.modal-title');
+    const modalTitle = modal?.querySelector('h2');
     if (modalTitle) {
-      modalTitle.textContent = 'Nova Transação';
+      modalTitle.textContent = 'Lançar operação';
     }
 
     // Clear any error states
@@ -99,7 +99,7 @@ export function updateModalOpenState() {
  */
 export function focusValueField() {
   try {
-    const val = document.getElementById('val');
+    const val = document.getElementById('value');
     if (val) {
       // Small delay to ensure modal is fully visible
       setTimeout(() => {
@@ -121,9 +121,9 @@ export function setEditMode(transaction) {
     if (!transaction) return;
 
     const modal = document.getElementById('txModal');
-    const val = document.getElementById('val');
+    const val = document.getElementById('value');
     const desc = document.getElementById('desc');
-    const card = document.getElementById('card');
+    const method = document.getElementById('method');
 
     // Mark modal as in edit mode
     if (modal) {
@@ -132,31 +132,31 @@ export function setEditMode(transaction) {
     }
 
     // Update modal title
-    const modalTitle = modal?.querySelector('.modal-title');
+    const modalTitle = modal?.querySelector('h2');
     if (modalTitle) {
-      modalTitle.textContent = 'Editar Transação';
+      modalTitle.textContent = 'Editar operação';
     }
 
     // Populate form fields
-    if (val) val.value = transaction.value ? Math.abs(transaction.value).toString() : '';
+    if (val) val.value = transaction.val ? Math.abs(transaction.val).toString() : '';
     if (desc) desc.value = transaction.desc || '';
-    if (card && transaction.card) {
-      const option = Array.from(card.options).find(opt => opt.value === transaction.card);
+    if (method && transaction.method) {
+      const option = Array.from(method.options).find(opt => opt.value === transaction.method);
       if (option) {
-        card.value = transaction.card;
+        method.value = transaction.method;
       }
     }
 
     // Handle invoice parcel data if present
-    if (transaction.invoice) {
-      const invoiceParcelCheckbox = document.getElementById('invoiceParcelCheckbox');
+    if (transaction.installments > 1) {
+      const invoiceParcelCheckbox = document.getElementById('invoiceParcel');
       const installments = document.getElementById('installments');
       const parcelasBlock = document.getElementById('parcelasBlock');
 
-      if (invoiceParcelCheckbox && transaction.invoice.total > 1) {
+      if (invoiceParcelCheckbox) {
         invoiceParcelCheckbox.checked = true;
-        if (parcelasBlock) parcelasBlock.style.display = 'block';
-        if (installments) installments.value = transaction.invoice.total.toString();
+        if (parcelasBlock) parcelasBlock.classList.remove('hidden');
+        if (installments) installments.value = transaction.installments.toString();
       }
     }
 
@@ -171,28 +171,25 @@ export function setEditMode(transaction) {
  */
 export function getFormData() {
   try {
-    const val = document.getElementById('val');
+    const val = document.getElementById('value');
     const desc = document.getElementById('desc');
-    const card = document.getElementById('card');
+    const method = document.getElementById('method');
     const recurrence = document.getElementById('recurrence');
-    const invoiceParcelCheckbox = document.getElementById('invoiceParcelCheckbox');
+    const invoiceParcelCheckbox = document.getElementById('invoiceParcel');
     const installments = document.getElementById('installments');
 
-    if (!val || !desc || !card) return null;
+    if (!val || !desc || !method) return null;
 
     const data = {
       value: parseFloat(val.value) || 0,
       desc: desc.value.trim(),
-      card: card.value,
-      recurrence: recurrence?.value || 'none'
+      method: method.value,
+      recurrence: recurrence?.value || ''
     };
 
     // Add invoice data if applicable
     if (invoiceParcelCheckbox?.checked && installments) {
-      data.invoice = {
-        installment: 1,
-        total: parseInt(installments.value, 10) || 2
-      };
+      data.installments = parseInt(installments.value, 10) || 1;
     }
 
     return data;
@@ -211,9 +208,9 @@ export function validateForm() {
   const errors = [];
   
   try {
-    const val = document.getElementById('val');
+    const val = document.getElementById('value');
     const desc = document.getElementById('desc');
-    const card = document.getElementById('card');
+    const method = document.getElementById('method');
 
     // Clear previous errors
     clearFieldErrors();
@@ -230,10 +227,10 @@ export function validateForm() {
       markFieldError(desc);
     }
 
-    // Validate card selection
-    if (!card?.value) {
-      errors.push('Cartão deve ser selecionado');
-      markFieldError(card);
+    // Validate method selection
+    if (!method?.value) {
+      errors.push('Método deve ser selecionado');
+      markFieldError(method);
     }
 
   } catch (error) {
@@ -261,7 +258,7 @@ function markFieldError(field) {
  * Clears error states from all form fields
  */
 function clearFieldErrors() {
-  const fields = ['val', 'desc', 'card'].map(id => document.getElementById(id));
+  const fields = ['value', 'desc', 'method'].map(id => document.getElementById(id));
   fields.forEach(field => {
     if (field) {
       field.classList.remove('error');

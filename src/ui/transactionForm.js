@@ -36,7 +36,7 @@ export function setupTransactionForm({
     if (valueInput.type !== 'tel') valueInput.type = 'tel';
     valueInput.setAttribute('inputmode', 'decimal');
     valueInput.setAttribute('enterkeyhint', 'done');
-    valueInput.setAttribute('pattern', '[0-9.,]*');
+    valueInput.setAttribute('pattern', '');
   } catch (_) {}
 
   // Helper to parse digits and apply formatting

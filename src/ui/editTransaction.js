@@ -93,7 +93,7 @@ export function setupEditTransaction() {
     // 5) Recurrence / installments
     if (recurrence) recurrence.value = t.recurrence || '';
     if (installments) installments.value = String(t.installments || 1);
-    // 6) Update state and labels
+    // 6) Update state and labels BEFORE opening modal
     g.isEditing = id;
     if (addBtn) addBtn.textContent = 'Salvar';
     if (txModalTitle) txModalTitle.textContent = 'Editar operação';

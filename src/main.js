@@ -580,11 +580,14 @@ function toggleTxModal(){
     if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
-    if(!isEditing){resetTxModal();}
+    // Only reset modal if not in editing mode
+    const g = window.__gastos;
+    if(!isEditing && !g?.isEditing){resetTxModal();}
   }
   txModal.classList.toggle('hidden');
   if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
-  if(isOpening)focusValueField();
+  const g = window.__gastos;
+  if(isOpening && !isEditing && !g?.isEditing)focusValueField();
   
   // Update modal state with iOS scroll fix
   if(!isOpening){
