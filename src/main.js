@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b44)';
+const APP_VERSION = 'v1.4.9(b45)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -596,24 +596,32 @@ function toggleTxModal(){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
     
-    // iOS Safari scroll fix: simulate settings modal open/close to unlock scroll
+    // iOS Safari scroll unlock gambiarra: force micro-scroll to wake up scroll system
     if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
       setTimeout(() => {
-        const settingsModal = document.getElementById('settingsModal');
-        if(settingsModal){
-          // Silently open settings modal (invisible)
-          settingsModal.style.visibility = 'hidden';
-          settingsModal.classList.remove('hidden');
-          if(typeof updateModalOpenState === 'function') updateModalOpenState();
+        const wrapper = document.querySelector('.wrapper');
+        if(wrapper){
+          const originalScrollTop = wrapper.scrollTop;
           
-          // Immediately close it
+          // Gambiarra #2: Force micro scroll movements to unlock Safari
+          wrapper.scrollTop = originalScrollTop + 1;
           setTimeout(() => {
-            settingsModal.classList.add('hidden');
-            settingsModal.style.visibility = '';
-            if(typeof updateModalOpenState === 'function') updateModalOpenState();
+            wrapper.scrollTop = originalScrollTop - 1; 
+            setTimeout(() => {
+              wrapper.scrollTop = originalScrollTop;
+              
+              // Additional gambiarra: force touch events that Safari expects
+              const touchStart = new TouchEvent('touchstart', { bubbles: true });
+              const touchEnd = new TouchEvent('touchend', { bubbles: true });
+              wrapper.dispatchEvent(touchStart);
+              setTimeout(() => {
+                wrapper.dispatchEvent(touchEnd);
+              }, 10);
+              
+            }, 10);
           }, 10);
         }
-      }, 100);
+      }, 150);
     }
   }
 }
