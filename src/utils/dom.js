@@ -178,37 +178,10 @@ export function updateModalOpenState() {
   root.classList.toggle('modal-open', hasVisibleModal);
   try {
     const wrapper = document.querySelector('.wrapper');
-    if (!wrapper) return;
-    if (hasVisibleModal) {
-      if (!root.classList.contains('modal-locked')) {
-        root.classList.add('modal-locked');
-        wrapper.dataset.prevOverflow = wrapper.style.overflow ?? '';
-        wrapper.dataset.prevPointerEvents = wrapper.style.pointerEvents ?? '';
-        wrapper.style.overflow = 'hidden';
-        wrapper.style.pointerEvents = 'none';
-      }
-    } else if (root.classList.contains('modal-locked')) {
-      root.classList.remove('modal-locked');
-      const prevOverflow = wrapper.dataset.prevOverflow;
-      const prevPointer = wrapper.dataset.prevPointerEvents;
-      if (prevOverflow !== undefined) {
-        wrapper.style.overflow = prevOverflow;
-      } else {
-        wrapper.style.removeProperty('overflow');
-      }
-      if (prevPointer !== undefined) {
-        wrapper.style.pointerEvents = prevPointer;
-      } else {
-        wrapper.style.removeProperty('pointer-events');
-      }
-      try {
-        delete wrapper.dataset.prevOverflow;
-        delete wrapper.dataset.prevPointerEvents;
-      } catch {
-        wrapper.removeAttribute('data-prev-overflow');
-        wrapper.removeAttribute('data-prev-pointer-events');
-      }
+    if (wrapper) {
+      wrapper.classList.toggle('modal-locked', hasVisibleModal);
     }
+    root.classList.toggle('modal-locked', hasVisibleModal);
   } catch {
     // Fail silently
   }

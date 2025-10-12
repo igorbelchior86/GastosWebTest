@@ -1074,6 +1074,12 @@ body{display:block;}
   background: transparent;
 }
 
+.wrapper.modal-locked {
+  overflow: hidden;
+  pointer-events: none;
+  touch-action: none;
+}
+
 /* Spacer real no final do conteúdo do acordeão: mantém
    o último dia visível acima do pseudo‑footer SEM depender
    de reflows disparados pelo botão Home */
