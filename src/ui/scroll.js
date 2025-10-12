@@ -86,13 +86,43 @@ export function scrollTodayIntoView() {
           if (measured > 0) stickyHeightGuess = measured;
         }
         const stickyHeight = stickyHeightGuess || 0;
+        
+        // iOS Safari specific adjustments
+        const isIOSSafari = /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
+                           /Safari/i.test(navigator.userAgent) && 
+                           !/Chrome|CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent);
+        
         // Reserve space for a floating footer if defined via CSS custom property
         const footerReserve = parseInt(
           getComputedStyle(document.documentElement).getPropertyValue('--floating-footer-height') || '0',
           10
         );
-        const gap = 16;
-        const targetOffset = headerHeight + stickyHeight + gap;
+        
+        // iOS Safari scroll positioning fix
+        let gap = 16;
+        let iosAdjustment = 0;
+        
+        if (isIOSSafari) {
+          // iOS Safari tends to have extra spacing issues, reduce the offset
+          const monthHeader = dayEl.closest('details.month')?.querySelector('summary');
+          const monthHeaderHeight = monthHeader ? monthHeader.offsetHeight : 52; // fallback
+          
+          // Strategy 1: Reduce by one month-header height (more aggressive)
+          iosAdjustment = -Math.floor(monthHeaderHeight * 1.0); // Full month-header reduction
+          
+          // Strategy 2: Dynamic viewport-aware adjustment  
+          const viewportHeight = window.innerHeight;
+          const safeAreaTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0');
+          
+          // If we have safe area (notch devices), be more conservative
+          if (safeAreaTop > 0) {
+            iosAdjustment = -Math.floor(monthHeaderHeight * 0.75);
+          }
+          
+          console.log('iOS Safari detected - applying adjustment:', iosAdjustment, 'monthHeaderHeight:', monthHeaderHeight, 'safeAreaTop:', safeAreaTop);
+        }
+        
+        const targetOffset = headerHeight + stickyHeight + gap + iosAdjustment;
         const wrapRect = wrap.getBoundingClientRect();
         const dayRect = dayEl.getBoundingClientRect();
         const currentRelativeTop = dayRect.top - wrapRect.top;
@@ -110,6 +140,17 @@ export function scrollTodayIntoView() {
         ) {
           return;
         }
+        console.log('ScrollToday Debug:', {
+          isIOSSafari,
+          headerHeight,
+          stickyHeight,
+          gap,
+          iosAdjustment,
+          targetOffset,
+          targetTop,
+          currentRelativeTop: dayRect.top - wrapRect.top
+        });
+        
         console.log('About to call animateWrapperScroll with targetTop:', targetTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
         animateWrapperScroll(targetTop);
       } catch (err) {
