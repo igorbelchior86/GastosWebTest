@@ -79,15 +79,60 @@ function hide() {
   console.log('LoginView: Login hidden');
 }
 
+// Check if user was previously authenticated
+function hasPreviousAuth() {
+  try {
+    // Check Firebase Auth persistence keys that indicate previous successful login
+    const keys = Object.keys(localStorage);
+    const hasFirebaseAuth = keys.some(key => 
+      key.startsWith('firebase:authUser:') || 
+      key.includes('firebase:host:')
+    );
+    
+    // Also check IndexedDB-based persistence (for non-iOS PWA)
+    const hasIndexedDBAuth = keys.some(key => 
+      key.startsWith('firebaseLocalStorageDb#') ||
+      key.includes('firebase-heartbeat')
+    );
+    
+    console.log('LoginView: Previous auth check -', { hasFirebaseAuth, hasIndexedDBAuth });
+    return hasFirebaseAuth || hasIndexedDBAuth;
+  } catch (e) {
+    console.warn('LoginView: Error checking previous auth:', e);
+    return false;
+  }
+}
+
 // React to auth state
 function hookAuth() {
+  // Check for previous authentication before showing login
+  const hadPreviousAuth = hasPreviousAuth();
+  console.log('LoginView: Had previous auth:', hadPreviousAuth);
+  
   const update = (user) => {
     console.log('LoginView: Auth state update -', user ? user.email : 'signed out');
     
     if (!user || user.isAnonymous) {
-      show();
-      // Hide main app when no user
-      hideMainApp();
+      // Only show login immediately if this is truly the first time
+      if (!hadPreviousAuth) {
+        show();
+        hideMainApp();
+      } else {
+        // User had previous auth but state not ready yet - keep skeleton visible
+        console.log('LoginView: Previous auth detected, keeping skeleton visible during restoration...');
+        // Don't hide app here - keep skeleton visible
+        
+        // Give Firebase time to restore auth state
+        setTimeout(() => {
+          // If still no user after waiting, then show login
+          const currentUser = window.Auth ? window.Auth.currentUser : null;
+          if (!currentUser || currentUser.isAnonymous) {
+            console.log('LoginView: Auth not restored after timeout, showing login');
+            hideMainApp();
+            show();
+          }
+        }, 1500); // Wait 1.5 seconds for auth restoration
+      }
     } else {
       // User authenticated - reset button state and show main app
       const btn = document.querySelector('#googleBtn');
@@ -123,7 +168,7 @@ function hookAuth() {
 // App visibility management
 function hideMainApp() {
   const wrapper = document.querySelector('.wrapper');
-  const header = document.querySelector('header');
+  const header = document.querySelector('header, .app-header');
   const floatingPill = document.querySelector('.floating-pill');
   const floatingAddButton = document.querySelector('.floating-add-button');
   
@@ -137,7 +182,7 @@ function hideMainApp() {
 
 function showMainApp() {
   const wrapper = document.querySelector('.wrapper');
-  const header = document.querySelector('header');
+  const header = document.querySelector('header, .app-header');
   const floatingPill = document.querySelector('.floating-pill');
   const floatingAddButton = document.querySelector('.floating-add-button');
   
@@ -148,7 +193,10 @@ function showMainApp() {
     floatingAddButton: !!floatingAddButton
   });
   
-  if (wrapper) wrapper.style.display = '';
+  if (wrapper) {
+    wrapper.style.display = '';
+    wrapper.classList.remove('app-hidden');
+  }
   if (header) header.style.display = '';
   if (floatingPill) floatingPill.style.display = '';
   if (floatingAddButton) floatingAddButton.style.display = '';
@@ -173,8 +221,16 @@ function hookOnline() {
 // Public API
 window.LoginView = { show, hide, showMainApp, hideMainApp };
 
-// Boot - Hide main app by default and show login
-hideMainApp(); // Hide app immediately on load
+// Boot - Only hide main app immediately if no previous auth
+const hadPreviousAuth = hasPreviousAuth();
+if (!hadPreviousAuth) {
+  hideMainApp(); // Hide app only if this is the first time
+  show(); // Show login immediately for first-time users
+} else {
+  console.log('LoginView: Previous auth detected, showing skeleton app during auth restoration');
+  // Show skeleton app immediately when previous auth is detected
+  showMainApp();
+}
 hookAuth();
 hookOnline();
 

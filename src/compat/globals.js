@@ -157,6 +157,19 @@ if (typeof window !== 'undefined') {
       console.warn('Failed to dispatch auth:state event:', err);
     }
   });
+  
+  // Immediately check current auth state and dispatch event (critical for PWA resume)
+  setTimeout(() => {
+    try {
+      const currentUser = AuthService.getCurrentUser();
+      console.log('globals: Initial auth check -', currentUser ? currentUser.email : 'not signed in');
+      document.dispatchEvent(new CustomEvent('auth:state', { 
+        detail: { user: currentUser } 
+      }));
+    } catch (err) {
+      console.warn('Failed to dispatch initial auth:state event:', err);
+    }
+  }, 50);
 
   // Create auth proxy
   const authProxy = {

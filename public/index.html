@@ -311,10 +311,42 @@
   <script>
   (function(){
     try{
+      // Check for previous authentication
+      function hasPreviousAuth() {
+        try {
+          var keys = Object.keys(localStorage);
+          var hasFirebaseAuth = keys.some(function(key) { 
+            return key.indexOf('firebase:authUser:') === 0 || key.indexOf('firebase:host:') !== -1;
+          });
+          var hasIndexedDBAuth = keys.some(function(key) { 
+            return key.indexOf('firebaseLocalStorageDb#') === 0 || key.indexOf('firebase-heartbeat') !== -1;
+          });
+          return hasFirebaseAuth || hasIndexedDBAuth;
+        } catch (e) {
+          return false;
+        }
+      }
+      
       // Mark skeleton boot so CSS can hide the start-balance box
       document.documentElement.classList.add('skeleton-boot');
       var wrap = document.querySelector('.wrapper');
-      if (wrap) wrap.classList.remove('app-hidden');
+      if (wrap) {
+        wrap.classList.remove('app-hidden');
+        wrap.style.display = '';
+      }
+      
+      // If user had previous auth, show all app elements immediately for skeleton
+      if (hasPreviousAuth()) {
+        console.log('Skeleton: Previous auth detected, showing full app skeleton');
+        var header = document.querySelector('.app-header');
+        var floatingPill = document.querySelector('.floating-pill');
+        var floatingAddButton = document.querySelector('.floating-add-button');
+        
+        if (header) header.style.display = '';
+        if (floatingPill) floatingPill.style.display = '';
+        if (floatingAddButton) floatingAddButton.style.display = '';
+      }
+      
       var acc = document.getElementById('accordion');
       if (!acc || acc.children.length) return;
       var now = new Date();

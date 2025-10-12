@@ -107,11 +107,28 @@ async function completeRedirectIfAny() {
   return null;
 }
 
-// Simple redirect handling - just check once
+// Enhanced redirect handling for PWA resume
+const handleRedirectOnStartup = async () => {
+  try {
+    console.log('Auth: Checking for redirect result on startup...');
+    const result = await completeRedirectIfAny();
+    if (result && result.user) {
+      console.log('Auth: Startup redirect completed for', result.user.email);
+    } else {
+      console.log('Auth: No pending redirect found');
+    }
+  } catch (err) {
+    console.warn('Auth: Startup redirect check failed:', err);
+  }
+};
+
+// Check for redirects immediately and again after a delay (PWA resume scenario)
+handleRedirectOnStartup();
 if (isIOS && standalone) {
-  completeRedirectIfAny();
+  // For iOS PWA, check again after a short delay in case auth state restoration is slow
+  setTimeout(handleRedirectOnStartup, 500);
 } else {
-  completeRedirectIfAny();
+  setTimeout(handleRedirectOnStartup, 200);
 }
 
 async function signInWithGoogle() {

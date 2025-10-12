@@ -93,6 +93,18 @@ export async function init(config) {
       }
     });
   });
+  
+  // Complete any pending redirect immediately after init (critical for PWA resume)
+  setTimeout(async () => {
+    try {
+      const result = await completeRedirectIfAny();
+      if (result && result.user) {
+        console.log('AuthService: Completed pending redirect for', result.user.email);
+      }
+    } catch (err) {
+      console.warn('AuthService: Error completing redirect:', err);
+    }
+  }, 100);
 }
 
 /**
