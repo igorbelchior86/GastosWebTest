@@ -1,6 +1,6 @@
 // Cache principal. Mantemos um único bucket e confiamos em URLs versionadas
 // e estratégias de atualização para evitar precisar "bump" manual a cada release.
-const CACHE = 'app-cache-1.4.9-b34';
+const CACHE = 'app-cache-1.4.9-b35';
 
 const RUNTIME = { pages: 'pages-v1', assets: 'assets-v1', cdn: 'cdn-v1' };
 const ASSETS = [
@@ -26,6 +26,10 @@ function urlBase64ToUint8Array(base64String) {
 // Instalação e pré-cache
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
+    // Limpa todos os caches antigos antes de criar o novo
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map(name => caches.delete(name)));
+    
     const cache = await caches.open(CACHE);
     // Força busca de rede para não recachear versões antigas controladas pelo SW anterior
     const requests = ASSETS.map(u => new Request(u, { cache: 'reload' }));
@@ -37,13 +41,17 @@ self.addEventListener('install', event => {
 
 // Ativa novo SW imediatamente
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    // Limpa todos os caches antigos
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    
+    // Força reload de todas as páginas abertas
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(client => client.navigate(client.url));
+    
+    return self.clients.claim();
+  })());
 });
 
 // Intercepta requisições
