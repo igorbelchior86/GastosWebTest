@@ -8,24 +8,6 @@
  */
 export function scrollTodayIntoView() {
   console.log('scrollTodayIntoView called');
-  
-  // iOS Safari device-specific calibration cache
-  const getDeviceCalibration = () => {
-    try {
-      const cached = localStorage.getItem('ios_scroll_calibration');
-      return cached ? JSON.parse(cached) : null;
-    } catch { return null; }
-  };
-  
-  const saveDeviceCalibration = (adjustment) => {
-    try {
-      localStorage.setItem('ios_scroll_calibration', JSON.stringify({
-        adjustment,
-        timestamp: Date.now(),
-        userAgent: navigator.userAgent
-      }));
-    } catch { /* ignore */ }
-  };
   const g = typeof window !== 'undefined' ? window.__gastos || {} : {};
   console.log('window.__gastos:', g);
   const todayISO = g.todayISO || (() => {
@@ -109,54 +91,21 @@ export function scrollTodayIntoView() {
           getComputedStyle(document.documentElement).getPropertyValue('--floating-footer-height') || '0',
           10
         );
-        let gap = 16;
-        
-        // iOS Safari calibration - measure actual vs expected positioning
+        // Simple fixed offset approach - no complex calculations
         const isIOSSafari = /iPhone|iPad|iPod/i.test(navigator.userAgent) && /Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent);
         
+        let gap;
+        
         if (isIOSSafari) {
-          // Find a month header to use as reference measurement
-          const monthEl = dayEl.closest('details.month');
-          const monthSummary = monthEl?.querySelector('summary.month-divider');
-          
-          if (monthSummary) {
-            const monthHeaderHeight = monthSummary.offsetHeight || 52;
-            
-            // Check for device-specific calibration
-            const deviceCalibration = getDeviceCalibration();
-            let adjustment = monthHeaderHeight; // Default: one month header
-            
-            if (deviceCalibration && deviceCalibration.adjustment) {
-              // Use learned adjustment for this device
-              adjustment = deviceCalibration.adjustment;
-              console.log('Using cached iOS calibration:', adjustment);
-            } else {
-              // First-time calibration - try different adjustments
-              const viewportHeight = window.innerHeight;
-              const isCompactDevice = viewportHeight < 700; // iPhone SE, etc.
-              
-              if (isCompactDevice) {
-                adjustment = monthHeaderHeight * 1.5; // More aggressive on smaller screens
-              } else {
-                adjustment = monthHeaderHeight * 1.2; // Standard adjustment
-              }
-              
-              // Save this calibration for future use
-              saveDeviceCalibration(adjustment);
-              console.log('First-time iOS calibration saved:', adjustment);
-            }
-            
-            // Apply the calibration
-            gap = Math.max(4, gap - adjustment);
-            
-            console.log('iOS Safari scroll calibration:', {
-              originalGap: 16,
-              monthHeaderHeight,
-              adjustment,
-              adjustedGap: gap,
-              viewportHeight: window.innerHeight
-            });
-          }
+          // Fixed pixel distance from sticky header for iOS Safari
+          // Adjust this value to get perfect positioning:
+          // - Increase = further from header (more gap)  
+          // - Decrease = closer to header (less gap)
+          gap = 20; // Current: 20px from sticky header
+          console.log('iOS Safari: Using fixed offset -', gap + 'px from sticky header');
+        } else {
+          // Standard gap for other browsers  
+          gap = 16;
         }
         
         const targetOffset = headerHeight + stickyHeight + gap;
@@ -182,18 +131,14 @@ export function scrollTodayIntoView() {
           return;
         }
         // Debug logging for position analysis
-        if (isIOSSafari) {
-          console.log('iOS Safari scroll debug:', {
-            headerHeight,
-            stickyHeight,
-            gap,
-            targetOffset,
-            currentRelativeTop,
-            delta,
-            targetTop,
-            tolerance
-          });
-        }
+        console.log('Scroll positioning:', {
+          browser: isIOSSafari ? 'iOS Safari' : 'Other',
+          headerHeight,
+          stickyHeight, 
+          gap,
+          targetOffset,
+          finalPosition: `${gap}px from sticky header`
+        });
         
         console.log('About to call animateWrapperScroll with targetTop:', targetTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
         animateWrapperScroll(targetTop);
