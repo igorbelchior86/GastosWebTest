@@ -178,7 +178,29 @@ export function updateModalOpenState() {
   root.classList.toggle('modal-open', hasVisibleModal);
   try {
     const wrapper = document.querySelector('.wrapper');
-    if (wrapper) {
+    if (!wrapper) return;
+    if (hasVisibleModal) {
+      if (!root.classList.contains('modal-locked')) {
+        root.classList.add('modal-locked');
+        wrapper.dataset.prevOverflow = wrapper.style.overflow || '';
+        wrapper.dataset.prevPointerEvents = wrapper.style.pointerEvents || '';
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.pointerEvents = 'none';
+      }
+    } else if (root.classList.contains('modal-locked')) {
+      root.classList.remove('modal-locked');
+      const prevOverflow = wrapper.dataset.prevOverflow || '';
+      const prevPointer = wrapper.dataset.prevPointerEvents || '';
+      if (prevPointer) {
+        wrapper.style.pointerEvents = prevPointer;
+      } else {
+        wrapper.style.removeProperty('pointer-events');
+      }
+      if (prevOverflow) {
+        wrapper.style.overflow = prevOverflow;
+      } else {
+        wrapper.style.removeProperty('overflow');
+      }
       try {
         delete wrapper.dataset.prevOverflow;
         delete wrapper.dataset.prevPointerEvents;
@@ -186,10 +208,18 @@ export function updateModalOpenState() {
         wrapper.removeAttribute('data-prev-overflow');
         wrapper.removeAttribute('data-prev-pointer-events');
       }
-      wrapper.style.removeProperty('overflow');
-      wrapper.style.removeProperty('pointer-events');
+      requestAnimationFrame(() => {
+        if (document.querySelector('.bottom-modal:not(.hidden)')) return;
+        const currentOverflow = wrapper.style.overflow;
+        wrapper.style.overflow = 'hidden';
+        wrapper.offsetHeight;
+        if (currentOverflow) {
+          wrapper.style.overflow = currentOverflow;
+        } else {
+          wrapper.style.removeProperty('overflow');
+        }
+      });
     }
-    root.classList.remove('modal-locked');
   } catch {
     // Fail silently
   }
