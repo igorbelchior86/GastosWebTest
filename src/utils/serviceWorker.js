@@ -40,10 +40,10 @@ export function setupServiceWorker({ USE_MOCK, flushQueue }) {
   // (404 in certain dev servers), try the `public/` path as a fallback.
   const tryRegister = async () => {
     try {
-      return await navigator.serviceWorker.register('sw.js?v=1.4.9(b34)', { updateViaCache: 'none' });
+      return await navigator.serviceWorker.register('sw.js?v=1.4.9(b49)', { updateViaCache: 'none' });
     } catch (err) {
       try {
-        return await navigator.serviceWorker.register('public/sw.js?v=1.4.9(b34)', { updateViaCache: 'none' });
+        return await navigator.serviceWorker.register('public/sw.js?v=1.4.9(b49)', { updateViaCache: 'none' });
       } catch (err2) {
         // Swallow registration errors; service worker is an optional
         // enhancement and should not break app startup when unavailable.

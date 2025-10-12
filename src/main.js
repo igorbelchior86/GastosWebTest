@@ -268,7 +268,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b45)';
+const APP_VERSION = 'v1.4.9(b49)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -585,9 +585,21 @@ function toggleTxModal(){
   if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
   if(isOpening)focusValueField();
   
-  updateModalOpenState();
-  
+  // Update modal state with iOS scroll fix
   if(!isOpening){
+    updateModalOpenState();
+    // Simple iOS Safari scroll unlock gambiarra
+    if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
+      setTimeout(() => {
+        const wrapper = document.querySelector('.wrapper');
+        if(wrapper && wrapper.scrollTop !== undefined){
+          // Micro nudge to wake up Safari scroll system
+          const scroll = wrapper.scrollTop;
+          wrapper.scrollTo(0, scroll + 0.1);
+          wrapper.scrollTo(0, scroll);
+        }
+      }, 50);
+    }
     isEditing=null;
     pendingEditMode=null;
     pendingEditTxId=null;
@@ -595,34 +607,8 @@ function toggleTxModal(){
     if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
-    
-    // iOS Safari scroll unlock gambiarra: force micro-scroll to wake up scroll system
-    if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){
-      setTimeout(() => {
-        const wrapper = document.querySelector('.wrapper');
-        if(wrapper){
-          const originalScrollTop = wrapper.scrollTop;
-          
-          // Gambiarra #2: Force micro scroll movements to unlock Safari
-          wrapper.scrollTop = originalScrollTop + 1;
-          setTimeout(() => {
-            wrapper.scrollTop = originalScrollTop - 1; 
-            setTimeout(() => {
-              wrapper.scrollTop = originalScrollTop;
-              
-              // Additional gambiarra: force touch events that Safari expects
-              const touchStart = new TouchEvent('touchstart', { bubbles: true });
-              const touchEnd = new TouchEvent('touchend', { bubbles: true });
-              wrapper.dispatchEvent(touchStart);
-              setTimeout(() => {
-                wrapper.dispatchEvent(touchEnd);
-              }, 10);
-              
-            }, 10);
-          }, 10);
-        }
-      }, 150);
-    }
+  } else {
+    updateModalOpenState();
   }
 }
 

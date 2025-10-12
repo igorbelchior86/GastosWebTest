@@ -1,16 +1,15 @@
-// Cache principal. Mantemos um único bucket e confiamos em URLs versionadas
+//const CACHE = 'app-cache-1.4.9-b49';Cache principal. Mantemos um único bucket e confiamos em URLs versionadas
 // e estratégias de atualização para evitar precisar "bump" manual a cada release.
-const CACHE = 'app-cache-1.4.9-b49';
+const CACHE = 'app-cache-1.4.9-b46';
 
 const RUNTIME = { pages: 'pages-v1', assets: 'assets-v1', cdn: 'cdn-v1' };
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './main.js',
-  './icons/icon-192x192.png',
-  './icons/icon-180x180.png',
-  './site.webmanifest'
+  './public/style.css',
+  './public/icons/icon-192x192.png',
+  './public/icons/icon-180x180.png',
+  './public/site.webmanifest'
 ];
 
 // Helper: convert base64url VAPID key to Uint8Array
