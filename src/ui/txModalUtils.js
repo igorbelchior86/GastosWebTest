@@ -10,6 +10,7 @@ import { updateModalOpenState as syncRootModalState } from '../utils/dom.js';
  */
 export function resetTxModal() {
   try {
+    const modal = document.getElementById('txModal');
     // Get modal elements
     const val = document.getElementById('value');
     const desc = document.getElementById('desc');
@@ -37,10 +38,10 @@ export function resetTxModal() {
     }
 
     // Reset any edit mode indicators
-    const modal = document.getElementById('txModal');
     if (modal) {
       modal.classList.remove('editing');
       modal.removeAttribute('data-editing-id');
+      if (modal.dataset) delete modal.dataset.mode;
     }
 
     // Reset modal title
@@ -48,9 +49,51 @@ export function resetTxModal() {
     if (modalTitle) {
       modalTitle.textContent = 'Lançar operação';
     }
+    const addBtn = document.getElementById('addBtn');
+    if (addBtn) addBtn.textContent = 'Adicionar';
+
+    // Reset value toggle to expense
+    const valueToggleButtons = document.querySelectorAll('.value-toggle button');
+    valueToggleButtons.forEach((btn) => btn.classList.remove('active'));
+    const defaultToggle = Array.from(valueToggleButtons).find((btn) => btn.dataset?.type === 'expense');
+    if (defaultToggle) defaultToggle.classList.add('active');
+
+    // Reset method buttons to Dinheiro
+    const methodButtons = document.querySelectorAll('.method-switch .switch-option');
+    methodButtons.forEach((btn) => btn.classList.remove('active'));
+    const cashBtn = Array.from(methodButtons).find((btn) => btn.dataset?.method === 'Dinheiro');
+    if (cashBtn) cashBtn.classList.add('active');
+    const methodSwitch = document.querySelector('.method-switch');
+    if (methodSwitch) methodSwitch.dataset.selected = 'Dinheiro';
+    if (method) method.value = 'Dinheiro';
+
+    // Hide card selector
+    const cardSelector = document.getElementById('cardSelector');
+    if (cardSelector) {
+      cardSelector.innerHTML = '';
+      cardSelector.hidden = true;
+    }
+    // Ensure invoice parcel controls hidden
+    const invoiceRow = document.getElementById('invoiceParcelRow');
+    const invoiceCheckbox = document.getElementById('invoiceParcel');
+    if (invoiceRow) invoiceRow.style.display = 'none';
+    if (invoiceCheckbox) invoiceCheckbox.checked = false;
+    if (parcelasBlock) parcelasBlock.classList.add('hidden');
+    if (installments) installments.disabled = true;
 
     // Clear any error states
     clearFieldErrors();
+
+    // Reset global flags for pay-invoice mode
+    try {
+      const g = window.__gastos || {};
+      g.isPayInvoiceMode = false;
+      g.pendingInvoiceCtx = null;
+      g.isEditing = null;
+      g.pendingEditMode = null;
+      g.pendingEditTxId = null;
+      g.pendingEditTxIso = null;
+    } catch (_) {}
 
   } catch (error) {
     console.warn('Error resetting transaction modal:', error);

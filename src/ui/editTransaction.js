@@ -1,3 +1,5 @@
+import { isDetachedOccurrence } from '../utils/data.js';
+
 /**
  * Provides a helper to initialize the edit transaction logic. The heavy
  * implementation of `editTx` has been extracted from main.js to reduce
@@ -40,6 +42,31 @@ export function setupEditTransaction() {
     const txs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
     const t = txs.find(x => x && x.id === id);
     if (!t) return;
+    const alreadyScoped = !!g.pendingEditMode;
+    const recurrenceDetected = (() => {
+      if (t.recurrence && String(t.recurrence).trim()) return true;
+      if (t.parentId) {
+        const parent = txs.find(p => p && String(p.id) === String(t.parentId));
+        if (parent && parent.recurrence && String(parent.recurrence).trim()) return true;
+      }
+      return false;
+    })();
+    const detachedOccurrence = isDetachedOccurrence ? isDetachedOccurrence(t) : (!!t.parentId && !t.recurrence);
+    if (!alreadyScoped && recurrenceDetected && !detachedOccurrence) {
+      const scopeModal = g.editRecurrenceModal || document.getElementById('editRecurrenceModal');
+      if (scopeModal) {
+        g.pendingEditTxId = id;
+        g.pendingEditTxIso = t.opDate;
+        if (g.plannedModal && !g.plannedModal.classList.contains('hidden')) {
+          g.reopenPlannedAfterEdit = true;
+          g.plannedModal.classList.add('hidden');
+          if (typeof g.updateModalOpenState === 'function') g.updateModalOpenState();
+        }
+        scopeModal.classList.remove('hidden');
+        if (typeof g.updateModalOpenState === 'function') g.updateModalOpenState();
+        return;
+      }
+    }
     // Hard reset to avoid inheriting previous edit state
     if (typeof resetTxModal === 'function') resetTxModal();
     // 1) Description
@@ -63,16 +90,17 @@ export function setupEditTransaction() {
       valInput.value = valInput.value.replace(/^-/, '');
     }
     // 3) Payment method (pill + select + card radios)
-    if (met) met.value = t.method;
     const methodSwitch  = document.querySelector('.method-switch');
     const cardSelectorEl= document.getElementById('cardSelector');
     document.querySelectorAll('.switch-option').forEach(b => b.classList.remove('active'));
     if (t.method === 'Dinheiro') {
+      if (met) met.value = 'Dinheiro';
       if (methodSwitch) methodSwitch.dataset.selected = 'Dinheiro';
       const cashBtn = document.querySelector('.switch-option[data-method="Dinheiro"]');
       if (cashBtn) cashBtn.classList.add('active');
       if (cardSelectorEl) { cardSelectorEl.innerHTML = ''; cardSelectorEl.hidden = true; }
     } else {
+      if (met) met.value = t.method;
       if (methodSwitch) methodSwitch.dataset.selected = 'Cartão';
       const cardBtn = document.querySelector('.switch-option[data-method="Cartão"]');
       if (cardBtn) cardBtn.classList.add('active');

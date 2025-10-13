@@ -237,11 +237,7 @@ export function createStartRealtime(ctx) {
         const raw = snap.val() ?? [];
         const next = Array.isArray(raw) ? raw : Object.values(raw);
         try {
-          const cached = cacheGet ? cacheGet('cards', []) : [];
-          if (JSON.stringify(next) === JSON.stringify(cached)) {
-            if (markHydrationTargetReady) markHydrationTargetReady('cards');
-            return;
-          }
+          // Always update cards like transactions do - no cache comparison blocking
           const updatedCards = Array.isArray(next) ? next : Object.values(next || {});
           if (!updatedCards.some(c => c && c.name === 'Dinheiro')) {
             updatedCards.unshift({ name: 'Dinheiro', close: 0, due: 0 });
@@ -249,6 +245,11 @@ export function createStartRealtime(ctx) {
           setCards && setCards(updatedCards);
           cardsRef.set(getCards ? getCards() : updatedCards);
           cacheSet && cacheSet('cards', updatedCards);
+          
+          // Force update window.__gastos.cards directly
+          if (typeof window !== 'undefined' && window.__gastos) {
+            window.__gastos.cards = updatedCards;
+          }
           const fixed = recomputePostDates ? recomputePostDates() : false;
           if (fixed) {
             try { save && save('tx', transactionsRef.get()); } catch (_) {}

@@ -56,7 +56,7 @@ export function registerHydrationTarget(key, enabled) {
     console.log('registerHydrationTarget: skipping', key, 'enabled:', enabled);
     return;
   }
-  console.log('registerHydrationTarget: registering', key);
+  // Registering hydration target
   hydrationTargets.set(key, false);
 }
 
@@ -68,10 +68,10 @@ export function registerHydrationTarget(key, enabled) {
  */
 export function markHydrationTargetReady(key) {
   if (!key || !hydrationTargets.has(key)) {
-    console.log('markHydrationTargetReady: key not found or invalid:', key, 'has key:', hydrationTargets.has(key));
+    // Hydration target not found or invalid
     return;
   }
-  console.log('markHydrationTargetReady: marking', key, 'as ready');
+  // Marking hydration target as ready
   hydrationTargets.set(key, true);
   maybeCompleteHydration();
 }
@@ -87,16 +87,16 @@ function maybeCompleteHydration() {
   }
   
   const targets = Array.from(hydrationTargets.entries());
-  console.log('maybeCompleteHydration: checking targets:', targets);
+  // Checking hydration targets
   
   for (const status of hydrationTargets.values()) {
     if (status === false) {
-      console.log('maybeCompleteHydration: not all targets ready, continuing hydration');
+      // Not all targets ready, continuing hydration
       return;
     }
   }
   
-  console.log('maybeCompleteHydration: all targets ready, completing hydration');
+  // All targets ready, completing hydration
   completeHydration();
 }
 
@@ -110,7 +110,7 @@ export function completeHydration() {
     console.log('completeHydration: hydration not in progress, skipping');
     return;
   }
-  console.log('completeHydration: starting completion process');
+  // Starting hydration completion
   hydrationInProgress = false;
   hydrationTargets.clear();
   try {

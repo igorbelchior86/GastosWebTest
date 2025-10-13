@@ -100,11 +100,11 @@ export function setupSettings(settingsModalEl) {
     try {
       const cachedAvatarURL = cacheGet('avatar_url', null);
       if (cachedAvatarURL === photoURL) {
-        console.log('[settings] avatar already cached for URL:', photoURL);
+        // Avatar already cached
         return; // Already cached
       }
 
-      console.log('[settings] caching new avatar URL:', photoURL);
+      // Caching new avatar
       
       // Fetch the image and convert to blob
       const response = await fetch(photoURL);
@@ -142,7 +142,7 @@ export function setupSettings(settingsModalEl) {
       const cachedData = cacheGet('avatar_data', null);
       
       if (cachedURL === photoURL && cachedData) {
-        console.log('[settings] using cached avatar data');
+        // Using cached avatar
         return cachedData;
       }
     } catch (err) {
@@ -176,15 +176,15 @@ export function setupSettings(settingsModalEl) {
     const box = settingsModalEl.querySelector('.modal-content');
     if (!box) return;
     let profile = getProfileFromAuth();
-    console.log('[settings] profile from auth:', profile);
+    // Profile from auth loaded
     if (profile && profile.email) persistProfile(profile);
     if (!profile) {
       profile = loadCachedProfile() || { name: '', email: '', photo: '' };
       console.log('[settings] profile from cache:', profile);
     }
-    console.log('[settings] final profile photo URL:', profile.photo);
+    // Profile photo ready
     const avatarURL = profile.photo ? getAvatarURL(profile.photo) : '';
-    const avatarImg = avatarURL ? `<img src="${avatarURL}" alt="Avatar" onload="console.log('[settings] avatar loaded successfully')" onerror="console.warn('[settings] avatar failed to load:', this.src)"/>` : '';
+    const avatarImg = avatarURL ? `<img src="${avatarURL}" alt="Avatar"/>` : '';
     const sub = profile.email || '';
     const cardHTML = `
       <div class="settings-card">
@@ -265,7 +265,7 @@ export function setupSettings(settingsModalEl) {
       const currencyLink = box.querySelector('[data-action="currency"]');
       if (!currencyLink) return;
 
-        console.log('[settings] renderSettings: wiring currency selector', currencyLink);
+        // Currency selector wired
 
       // Set initial label from runtime profile
       try {
@@ -420,6 +420,23 @@ export function setupSettings(settingsModalEl) {
                     }
                   }, 100);
                   
+                  // Dispatch reset so other modules (modal, caches) return to baseline
+                  if (typeof window !== 'undefined') {
+                    try {
+                      if (typeof window.resetAppStateForProfileChange === 'function') {
+                        window.resetAppStateForProfileChange(`settings:${pid}`);
+                      }
+                    } catch (err) {
+                      console.warn('[settings] direct profile reset failed', err);
+                    }
+                    try {
+                      const evt = new CustomEvent('profileChangeReset', { detail: { profileId: pid } });
+                      window.dispatchEvent(evt);
+                    } catch (err) {
+                      console.warn('[settings] profileChangeReset event dispatch failed', err);
+                    }
+                  }
+                  
                 } catch (err) { console.warn('applyCurrencyProfile failed', err); }
               };
               list.appendChild(li);
@@ -496,6 +513,13 @@ export function setupSettings(settingsModalEl) {
               // Fallback: toggle class directly
               cardModal.classList.remove('hidden');
               try { if (typeof window.updateModalOpenState === 'function') window.updateModalOpenState(); } catch(_){}
+            }
+            
+            // Render cards list after opening modal
+            if (typeof window.renderCardList === 'function') {
+              window.renderCardList();
+            } else if (window.__gastos && typeof window.__gastos.renderCardList === 'function') {
+              window.__gastos.renderCardList();
             }
           } catch (err) {
             console.warn('[settings] failed to show card modal:', err);

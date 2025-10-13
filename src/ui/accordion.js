@@ -16,7 +16,8 @@ import { syncCurrentMonth, smartSync } from '../utils/deltaSync.js';
  * @param {HTMLElement} config.acc The accordion DOM element.
  * @param {Function} config.getTransactions Optional function to return the current transaction list.
  * @param {Array} config.transactions Fallback array of transactions if getTransactions is not provided.
- * @param {Array} config.cards List of card objects used to determine invoice cycles.
+ * @param {Array} config.cards Initial list of card objects used to determine invoice cycles.
+ * @param {Function} [config.getCards] Optional getter returning the latest cards array.
  * @param {Object} config.state Application state containing startDate and startBalance.
  * @param {Function} config.calculateDateRange Function that returns the min and max ISO date strings.
  * @param {number} config.VIEW_YEAR The currently selected year to render.
@@ -32,7 +33,8 @@ export function initAccordion(config) {
     acc,
     getTransactions,
     transactions,
-    cards,
+    cards: initialCards = [],
+    getCards,
     state,
     calculateDateRange,
     VIEW_YEAR,
@@ -54,7 +56,39 @@ export function initAccordion(config) {
 
   // Local alias for postDate calculation: compute due date for a given opDate and card.
   function post(opISO, cardName) {
-    return postDateForCard(opISO, cardName, cards);
+    return postDateForCard(opISO, cardName, resolveCards());
+  }
+
+  function resolveCards() {
+    if (typeof getCards === 'function') {
+      try {
+        const dynamicCards = getCards();
+        if (Array.isArray(dynamicCards) && dynamicCards.length) return dynamicCards;
+      } catch (_) {
+        /* ignore lookup errors */
+      }
+    }
+    if (typeof window !== 'undefined') {
+      const g = window.__gastos;
+      if (g && Array.isArray(g.cards) && g.cards.length) {
+        return g.cards;
+      }
+    }
+    return Array.isArray(initialCards) ? initialCards : [];
+  }
+
+  function formatInvoiceGroupLabel(iso) {
+    if (!iso) return '';
+    try {
+      const date = new Date(`${iso}T00:00:00`);
+      if (Number.isNaN(date.getTime())) return iso;
+      const day = String(date.getDate()).padStart(2, '0');
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'long' });
+      const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      return `${day} de ${capitalizedMonth}`;
+    } catch (_) {
+      return iso;
+    }
   }
 
   /**
@@ -370,6 +404,7 @@ export function initAccordion(config) {
         const cashImpact = cashNonRecurring + cashRecurring;
         // Build invoice groups
         const invoicesByCard = {};
+        const currentCards = resolveCards();
         const addToGroup = (cardName, tx) => {
           if (!invoicesByCard[cardName]) invoicesByCard[cardName] = [];
           invoicesByCard[cardName].push(tx);
@@ -377,7 +412,7 @@ export function initAccordion(config) {
         // Non‑recurring card transactions due today
         (txs || []).forEach(t => {
           if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
-            const validCard = cards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
+            const validCard = currentCards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
             if (!validCard) return;
             addToGroup(t.method, t);
           }
@@ -386,7 +421,7 @@ export function initAccordion(config) {
         const scanStart = new Date(iso);
         scanStart.setDate(scanStart.getDate() - 60);
         for (const master of (txs || []).filter(t => t.recurrence && t.method !== 'Dinheiro')) {
-          const validCard = cards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
+          const validCard = currentCards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
           if (!validCard) continue;
           for (let d2 = new Date(scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
             const occIso = d2.toISOString().slice(0, 10);
@@ -424,7 +459,7 @@ export function initAccordion(config) {
         dSum.className = 'day-summary';
         const saldoFormatado = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 70px; height: 14px;"></span>' : safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
-        const hasCardDue = cards.some(card => card.due === d);
+        const hasCardDue = currentCards.some(card => card.due === d);
         const hasSalary = dayTx.some(t => SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w)));
         const labelParts = [baseLabel];
         if (hasCardDue) labelParts.push('<span class="icon-invoice"></span>');
@@ -454,6 +489,30 @@ export function initAccordion(config) {
           const payIcon = document.createElement('div');
           payIcon.className = 'icon-action icon-pay';
           payBtn.appendChild(payIcon);
+          payBtn.addEventListener('click', () => {
+            const txList = typeof getTransactions === 'function' ? getTransactions() : (txs || []);
+            const totalAbs = Math.abs(invoiceTotals[cardName] || 0);
+            const paidAbs = (txList || [])
+              .filter(t => t && t.invoicePayment && t.invoicePayment.card === cardName && t.invoicePayment.dueISO === iso)
+              .reduce((sum, t) => sum + Math.abs(Number(t.val) || 0), 0);
+            const adjustedAbs = (txList || [])
+              .filter(t => t && t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === iso)
+              .reduce((sum, t) => sum + Math.abs(Number(t.invoiceAdjust.amount) || 0), 0);
+            const remaining = Math.max(0, totalAbs - paidAbs - adjustedAbs);
+            if (typeof window !== 'undefined') {
+              const openFn =
+                typeof window.openPayInvoiceModal === 'function'
+                  ? window.openPayInvoiceModal
+                  : (window.__gastos && typeof window.__gastos.openPayInvoiceModal === 'function'
+                    ? window.__gastos.openPayInvoiceModal
+                    : null);
+              if (openFn) {
+                openFn(cardName, iso, remaining, totalAbs, adjustedAbs);
+              } else {
+                console.warn('openPayInvoiceModal handler not available');
+              }
+            }
+          });
           headerActions.appendChild(payBtn);
           dDet.style.position = dDet.style.position || 'relative';
           Object.assign(headerActions.style, {
@@ -485,12 +544,47 @@ export function initAccordion(config) {
           } else {
             const invList = document.createElement('ul');
             invList.className = 'executed-list';
-            (invoicesByCard[cardName] || []).forEach(tx => {
-              const li = document.createElement('li');
-              const line = makeLine(tx, false, true);
-              if (line) li.appendChild(line);
-              invList.appendChild(li);
+            const tsKey = (tx) => {
+              if (!tx) return '';
+              if (tx.ts) return tx.ts;
+              const base = tx.opDate || tx.postDate || '';
+              return `${base}T00:00:00`;
+            };
+            const invoiceEntries = (invoicesByCard[cardName] || []).slice().sort((a, b) => {
+              const dateA = (a.opDate || a.postDate || '').slice(0, 10);
+              const dateB = (b.opDate || b.postDate || '').slice(0, 10);
+              if (dateA !== dateB) return dateB.localeCompare(dateA);
+              return tsKey(b).localeCompare(tsKey(a));
             });
+            const groupedByDay = new Map();
+            invoiceEntries.forEach((entry) => {
+              const dayIso = (entry.opDate || entry.postDate || '').slice(0, 10);
+              if (!groupedByDay.has(dayIso)) groupedByDay.set(dayIso, []);
+              groupedByDay.get(dayIso).push(entry);
+            });
+            Array.from(groupedByDay.entries())
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .forEach(([dayIso, dayEntries], groupIndex) => {
+                const headerLi = document.createElement('li');
+                headerLi.className = 'invoice-day-heading';
+                const heading = document.createElement('div');
+                heading.className = 'invoice-group-date';
+                heading.textContent = formatInvoiceGroupLabel(dayIso);
+                headerLi.appendChild(heading);
+                const divider = document.createElement('div');
+                divider.className = `invoice-divider ${groupIndex === 0 ? 'bold' : 'thin'}`;
+                headerLi.appendChild(divider);
+                invList.appendChild(headerLi);
+                dayEntries
+                  .slice()
+                  .sort((a, b) => tsKey(b).localeCompare(tsKey(a)))
+                  .forEach((tx) => {
+                    const li = document.createElement('li');
+                    const line = makeLine(tx, false, true);
+                    if (line) li.appendChild(line);
+                    invList.appendChild(li);
+                  });
+              });
             det.appendChild(invList);
           }
           dDet.appendChild(det);

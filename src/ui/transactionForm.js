@@ -91,7 +91,11 @@ export function setupTransactionForm({
     const container = document.getElementById('cardSelector');
     if (!container) return;
     container.innerHTML = '';
-    const filtered = (Array.isArray(cards) ? cards : []).filter((c) => c && c.name !== 'Dinheiro');
+    
+    // Get current cards from global state instead of captured variable
+    const currentCards = (window.__gastos && window.__gastos.cards) || cards || [];
+    const filtered = (Array.isArray(currentCards) ? currentCards : []).filter((c) => c && c.name !== 'Dinheiro');
+    
     filtered.forEach((c) => {
       const label = document.createElement('label');
       label.style.flex = '1';
@@ -182,7 +186,13 @@ export function renderCardSelectorHelper({ cards = [], hiddenSelect }) {
   const container = document.getElementById('cardSelector');
   if (!container) return;
   container.innerHTML = '';
-  const filtered = (Array.isArray(cards) ? cards : []).filter((c) => c && c.name !== 'Dinheiro');
+  
+  // Use provided cards or get current cards from global state
+  const currentCards = (Array.isArray(cards) && cards.length > 0) 
+    ? cards 
+    : ((window.__gastos && window.__gastos.cards) || []);
+  const filtered = (Array.isArray(currentCards) ? currentCards : []).filter((c) => c && c.name !== 'Dinheiro');
+  
   filtered.forEach((c) => {
     const label = document.createElement('label');
     label.style.flex = '1';

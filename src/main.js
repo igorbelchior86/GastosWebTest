@@ -532,6 +532,8 @@ if (!USE_MOCK) {
   transactions = getTransactions();
   setCards(cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]));
   try { cards = getCards(); } catch (_) { cards = cacheGet('cards', [{name:'Dinheiro',close:0,due:0}]); }
+  // Ensure window.__gastos.cards is synchronized with local cards array
+  window.__gastos.cards = cards;
   setStartBalance(cacheGet('startBal', null));
   setStartDate(normalizeISODate(cacheGet('startDate', null)));
   if (state.startDate == null && (state.startBalance === 0 || state.startBalance === '0')) {
@@ -611,6 +613,7 @@ function toggleTxModal(){
     if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
+    try { resetTxModal(); } catch (_) {}
   } else {
     updateModalOpenState();
   }
@@ -654,7 +657,7 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,addTx:null};
+window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,cards,openPayInvoiceModal,resetTxModal,resetAppStateForProfileChange,addTx:null};
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -664,6 +667,47 @@ window.initStart = initStart;
 window.ensureStartSetFromBalance = ensureStartSetFromBalance;
 window.askConfirmLogout = askConfirmLogout;
 window.askConfirmReset = askConfirmReset;
+window.openPayInvoiceModal = openPayInvoiceModal;
+window.resetTxModal = resetTxModal;
+window.resetAppStateForProfileChange = resetAppStateForProfileChange;
+window.setCards = (list) => {
+  const next = setCards(list);
+  try {
+    cards = Array.isArray(next) ? next.slice() : [];
+    if (window.__gastos) window.__gastos.cards = cards.slice();
+    try { refreshMethods(); } catch (_) {}
+    try { renderCardList(); } catch (_) {}
+  } catch (_) {}
+  return next;
+};
+window.setTransactions = (list) => {
+  const next = setTransactions(list);
+  try {
+    transactions = Array.isArray(next) ? next.slice() : [];
+    if (window.__gastos) window.__gastos.transactions = transactions.slice();
+    try { renderTable(); } catch (_) {}
+  } catch (_) {}
+  return next;
+};
+try {
+  if (window.__gastos) {
+    window.__gastos.setCards = window.setCards;
+    window.__gastos.setTransactions = window.setTransactions;
+    window.__gastos.resetAppStateForProfileChange = resetAppStateForProfileChange;
+  }
+} catch (_) {}
+
+subscribeState(({ changedKeys = [], state: snapshot } = {}) => {
+  if (!snapshot) return;
+  if (changedKeys.includes('cards')) {
+    cards = Array.isArray(snapshot.cards) ? snapshot.cards.slice() : [];
+    try { window.__gastos.cards = cards.slice(); } catch (_) {}
+  }
+  if (changedKeys.includes('transactions')) {
+    transactions = Array.isArray(snapshot.transactions) ? snapshot.transactions.slice() : [];
+    try { window.__gastos.transactions = transactions.slice(); } catch (_) {}
+  }
+});
 
 try {
   const offlineApi = initOfflineQueue({
@@ -699,6 +743,138 @@ installments.disabled = true;
 recurrence.onchange = () => {
   if (recurrence.value !== '') installments.value = '1';
 };
+
+function resetAppStateForProfileChange(reason = 'profile-change') {
+  try {
+    console.log('[profile-reset] resetting state for', reason);
+    isEditing = null;
+    pendingEditMode = null;
+    pendingEditTxId = null;
+    pendingEditTxIso = null;
+    isPayInvoiceMode = false;
+    pendingInvoiceCtx = null;
+
+    if (window.__gastos) {
+      window.__gastos.isEditing = null;
+      window.__gastos.pendingEditMode = null;
+      window.__gastos.pendingEditTxId = null;
+      window.__gastos.pendingEditTxIso = null;
+      window.__gastos.isPayInvoiceMode = false;
+      window.__gastos.pendingInvoiceCtx = null;
+    }
+
+    // Reset modal immediately so new profile starts fresh
+    try {
+      resetTxModal();
+    } catch (_) {}
+    // Ensure modal title/button reflect default state before closing
+    try {
+      if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
+      const modalEl = document.getElementById('txModal');
+      if (modalEl) {
+        const titleEl = modalEl.querySelector('h2');
+        if (titleEl) titleEl.textContent = 'Lançar operação';
+      }
+      if (addBtn) addBtn.textContent = 'Adicionar';
+      const addButtonEl = document.getElementById('addBtn');
+      if (addButtonEl) addButtonEl.textContent = 'Adicionar';
+    } catch (_) {}
+
+    const todayString = typeof todayISO === 'function' ? todayISO() : (new Date()).toISOString().slice(0, 10);
+    const dateInputEl = document.getElementById('opDate');
+    if (dateInputEl) dateInputEl.value = todayString;
+
+    if (addBtn) addBtn.textContent = 'Adicionar';
+    if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
+
+    if (txModal) {
+      txModal.classList.add('hidden');
+      if (txModal.dataset) delete txModal.dataset.mode;
+    }
+
+    const valueToggleButtons = document.querySelectorAll('.value-toggle button');
+    valueToggleButtons.forEach((btn) => btn.classList.remove('active'));
+    const defaultToggle = Array.from(valueToggleButtons).find((btn) => btn.dataset?.type === 'expense');
+    if (defaultToggle) defaultToggle.classList.add('active');
+
+    const methodButtonsEls = document.querySelectorAll('.method-switch .switch-option');
+    methodButtonsEls.forEach((btn) => btn.classList.remove('active'));
+    const cashBtn = Array.from(methodButtonsEls).find((btn) => btn.dataset?.method === 'Dinheiro');
+    if (cashBtn) cashBtn.classList.add('active');
+    const methodSwitchEl = document.querySelector('.method-switch');
+    if (methodSwitchEl) methodSwitchEl.dataset.selected = 'Dinheiro';
+    const hiddenMethodEl = document.getElementById('method');
+    if (hiddenMethodEl) hiddenMethodEl.value = 'Dinheiro';
+
+    const cardSelectorEl = document.getElementById('cardSelector');
+    if (cardSelectorEl) {
+      cardSelectorEl.innerHTML = '';
+      cardSelectorEl.hidden = true;
+    }
+    if (invoiceParcelRow) invoiceParcelRow.style.display = 'none';
+    if (invoiceParcelCheckbox) invoiceParcelCheckbox.checked = false;
+    if (parcelasBlock) parcelasBlock.classList.add('hidden');
+    if (installments) {
+      installments.value = '1';
+      installments.disabled = true;
+    }
+    if (recurrence) recurrence.value = '';
+
+    const defaultCards = [{ name: 'Dinheiro', close: 0, due: 0 }];
+    try {
+      if (typeof window.setTransactions === 'function') {
+        window.setTransactions([]);
+      } else {
+        setTransactions([]);
+      }
+    } catch (err) {
+      console.warn('[profile-reset] failed to reset transactions via global setter', err);
+      setTransactions([]);
+    }
+    try {
+      if (typeof window.setCards === 'function') {
+        window.setCards(defaultCards);
+      } else {
+        setCards(defaultCards);
+      }
+    } catch (err) {
+      console.warn('[profile-reset] failed to reset cards via global setter', err);
+      setCards(defaultCards);
+    }
+
+    cards = getCards ? getCards() : defaultCards.slice();
+    transactions = getTransactions ? getTransactions() : [];
+
+    if (window.__gastos) {
+      window.__gastos.cards = cards.slice();
+      window.__gastos.transactions = transactions.slice();
+    }
+
+    try {
+      cacheSet('cards', cards);
+      cacheSet('tx', transactions);
+    } catch (_) {}
+
+    try { refreshMethods(); } catch (_) {}
+    try { renderCardList(); } catch (_) {}
+    try { renderTable(); } catch (_) {}
+    updateModalOpenState();
+  } catch (err) {
+    console.warn('resetAppStateForProfileChange failed:', err);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const handleProfileReset = (evt) => {
+    const reason = evt && evt.type === 'profileChangeReset'
+      ? `profileChangeReset:${evt.detail?.profileId || 'unknown'}`
+      : 'currencyProfileChanged';
+    resetAppStateForProfileChange(reason);
+  };
+  window.addEventListener('currencyProfileChanged', handleProfileReset);
+  window.addEventListener('profileChangeReset', handleProfileReset);
+}
+
 const cardName=$('cardName'),cardClose=$('cardClose'),cardDue=$('cardDue'),addCardBtn=$('addCardBtn'),cardList=$('cardList');
 const startGroup=$('startGroup'),startInput=$('startInput'),setStartBtn=$('setStartBtn'),resetBtn=$('resetData');
 if (startInput) startInputRef = startInput;
@@ -854,6 +1030,7 @@ try {
   try { 
     window.__gastos.showCardModal = showCardModal;
     window.__gastos.hideCardModal = hideCardModal;
+    window.__gastos.setCards = window.setCards;  // Export setCards for Firebase sync
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
@@ -878,8 +1055,26 @@ try {
 function isDetachedOccurrence(tx){return !tx.recurrence&&!!tx.parentId;}
 
 
-function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();cardName.value='';cardClose.value='';cardDue.value='';}
+function addCard(){const n=cardName.value.trim(),cl=+cardClose.value,du=+cardDue.value;if(!n||cl<1||cl>31||du<1||du>31||cl>=du||cards.some(c=>c.name===n)){alert('Dados inválidos');return;}cards.push({name:n,close:cl,due:du});window.__gastos.cards = cards;cacheSet('cards', cards);save('cards',cards);refreshMethods();renderCardList();
+// Force update card selector in transaction modal if currently showing cards
+const cardSelectorEl = document.getElementById('cardSelector');
+const methodSwitch = document.querySelector('.method-switch');
+if (cardSelectorEl && methodSwitch && methodSwitch.dataset.selected === 'Cartão') {
+  try {
+    if (window.__gastos && window.__gastos.renderCardSelectorHelper) {
+      window.__gastos.renderCardSelectorHelper({ cards: window.__gastos.cards, hiddenSelect: document.getElementById('method') });
+      cardSelectorEl.hidden = false;
+    }
+  } catch (_) {}
+}
+cardName.value='';cardClose.value='';cardDue.value='';}
 
+// Bind addCard event directly (from historical fix)
+if (addCardBtn) {
+  addCardBtn.onclick = () => {
+    addCard();
+  };
+}
 
 function openPayInvoiceModal(cardName,dueISO,remaining,totalAbs,adjustedBefore){return openPayInvoiceModalMod(cardName,dueISO,remaining,totalAbs,adjustedBefore);}
 
@@ -904,12 +1099,39 @@ function closeEditModal(){editRecurrenceModal.classList.add('hidden');updateModa
 if(closeEditRecurrenceModal)closeEditRecurrenceModal.onclick=closeEditModal;
 if(cancelEditRecurrence)cancelEditRecurrence.onclick=closeEditModal;
 if(editRecurrenceModal)editRecurrenceModal.onclick=e=>{if(e.target===editRecurrenceModal)closeEditModal();};
-if(editSingleBtn)editSingleBtn.onclick=()=>{pendingEditMode='single';closeEditModal();editTx(pendingEditTxId);};
-if(editFutureBtn)editFutureBtn.onclick=()=>{pendingEditMode='future';closeEditModal();editTx(pendingEditTxId);};
-if(editAllBtn)editAllBtn.onclick=()=>{pendingEditMode='all';closeEditModal();editTx(pendingEditTxId);};
+if(editSingleBtn){
+  editSingleBtn.onclick=()=>{
+    pendingEditMode='single';
+    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos && window.__gastos.editTx){
+      window.__gastos.editTx(pendingEditTxId);
+    }
+    closeEditModal();
+  };
+}
+if(editFutureBtn){
+  editFutureBtn.onclick=()=>{
+    pendingEditMode='future';
+    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos && window.__gastos.editTx){
+      window.__gastos.editTx(pendingEditTxId);
+    }
+    closeEditModal();
+  };
+}
+if(editAllBtn){
+  editAllBtn.onclick=()=>{
+    pendingEditMode='all';
+    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos && window.__gastos.editTx){
+      window.__gastos.editTx(pendingEditTxId);
+    }
+    closeEditModal();
+  };
+}
 const editTx=id=>{const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')return g.editTx(id);};
 
-document.addEventListener('click',e=>{const editEl=e.target.closest('.icon-edit,[data-action="edit"]');if(!editEl)return;const container=editEl.closest('.op-item,.op-line,.swipe-wrapper')||document;const txEl=container.querySelector('[data-tx-id]');const id=txEl?Number(txEl.dataset.txId):null;if(!id)return;const txs=getTransactions?getTransactions():transactions;const t=txs.find(x=>x.id===id);if(!t)return;pendingEditTxId=id;pendingEditTxIso=t.opDate;if(t.recurrence||t.parentId){editRecurrenceModal.classList.remove('hidden');}else{editTx(id);}e.preventDefault();e.stopPropagation();});
+document.addEventListener('click',e=>{const editEl=e.target.closest('.icon-edit,[data-action=\"edit\"]');if(!editEl)return;const container=editEl.closest('.op-item,.op-line,.swipe-wrapper')||document;const txEl=container.querySelector('[data-tx-id]');const id=txEl?Number(txEl.dataset.txId):null;if(!id)return;const txs=getTransactions?getTransactions():transactions;const t=txs.find(x=>x&&x.id===id);if(!t)return;try{if(typeof openEditFlow==='function'){openEditFlow(t,t.opDate);}else{const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')g.editTx(id);}}catch(err){console.error('openEditFlow failed, falling back to direct edit:',err);const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')g.editTx(id);}e.preventDefault();e.stopPropagation();});
 
 function renderTable(){
   const hydrating=isHydrating();
@@ -967,6 +1189,7 @@ const accordionApi = initAccordion({
   getTransactions,
   transactions,
   cards,
+  getCards,
   state,
   calculateDateRange,
   VIEW_YEAR,

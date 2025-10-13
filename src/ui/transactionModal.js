@@ -160,6 +160,20 @@ export function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjus
   if (recurrence) recurrence.value = '';
   if (txModalTitle) txModalTitle.textContent = 'Pagar fatura';
   if (addBtn) addBtn.textContent = 'Pagar';
+  if (txModal) {
+    const titleEl = txModal.querySelector('h2');
+    if (titleEl) titleEl.textContent = 'Pagar fatura';
+  }
+  setTimeout(() => {
+    try {
+      const modalEl = document.getElementById('txModal');
+      const titleLate = modalEl ? modalEl.querySelector('h2') : null;
+      if (titleLate) titleLate.textContent = 'Pagar fatura';
+      const addLate = addBtn || document.getElementById('addBtn');
+      if (addLate) addLate.textContent = 'Pagar';
+    } catch (_) {}
+  }, 0);
+
 }
 
 /**
@@ -247,12 +261,59 @@ export async function addTx() {
   const showToastFn = typeof showToast === 'function' ? showToast : ((m,t) => { try { notify && notify(m, t); } catch(_) {} });
   // Helper: ensure todayISO is available
   const todayFn = typeof todayISO === 'function' ? todayISO : (() => (new Date()).toISOString().slice(0,10));
+  const norm = (s = '') => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const getAvailableCards = () => {
+    const local = Array.isArray(g.cards) ? g.cards : null;
+    if (local && local.length) return local;
+    const globalCards = window.__gastos && Array.isArray(window.__gastos.cards) ? window.__gastos.cards : [];
+    return globalCards;
+  };
+  const resolveSelectedMethod = (candidate, fallbackOriginal) => {
+    let method = candidate;
+    const methodNorm = norm(method);
+    const isCardToggleValue = methodNorm === 'cartao';
+    if (!method || method === 'undefined' || isCardToggleValue) {
+      const checked = typeof document !== 'undefined'
+        ? document.querySelector('#cardSelector input[name="cardChoice"]:checked')
+        : null;
+      if (checked && checked.value) {
+        method = checked.value;
+      }
+    }
+    if ((!method || method === 'undefined' || norm(method) === 'cartao') && fallbackOriginal) {
+      method = fallbackOriginal;
+    }
+    if (!method || method === 'undefined' || norm(method) === 'cartao') {
+      const cardsList = getAvailableCards().filter(c => c && c.name && c.name !== 'Dinheiro');
+      if (cardsList.length > 0) {
+        method = cardsList[0].name;
+      }
+    }
+    if (!method || method === 'undefined' || norm(method) === 'cartao') {
+      method = 'Dinheiro';
+    }
+    if (hiddenSelect && method && hiddenSelect.value !== method) {
+      hiddenSelect.value = method;
+    }
+    return method;
+  };
+  const computePostDate = (iso, method) => {
+    if (typeof post === 'function') {
+      try {
+        return post(iso, method);
+      } catch (err) {
+        console.warn('post() failed for method', method, err);
+      }
+    }
+    return iso;
+  };
   // Start of original addTx logic
   try {
     // Edit mode
     if (isEditing !== null && isEditing !== undefined) {
       // (mantém lógica de edição original)
-      const t = getTxs().find(x => x && x.id === isEditing);
+      const txList = getTxs();
+      const t = txList.find(x => x && x.id === isEditing);
       if (!t) {
         console.error('Transaction not found for editing:', isEditing);
         // reset edit state
@@ -271,18 +332,45 @@ export async function addTx() {
       const activeTypeEl = document.querySelector('.value-toggle button.active');
       const activeType = activeTypeEl && activeTypeEl.dataset ? activeTypeEl.dataset.type : 'expense';
       if (activeType === 'expense') newVal = -Math.abs(newVal);
-      const newMethod  = met && met.value;
+      // Get method from active button or hidden select
+      const fallbackOriginalMethod = t.method || 'Dinheiro';
+      let newMethod = met && met.value;
+      if (!newMethod || newMethod === 'undefined') {
+        const activeMethodBtn = document.querySelector('.switch-option.active');
+        newMethod = activeMethodBtn ? activeMethodBtn.dataset.method : fallbackOriginalMethod;
+      }
+      newMethod = resolveSelectedMethod(newMethod, fallbackOriginalMethod);
       const newOpDate  = date && date.value;
-      const newPostDate = typeof post === 'function' ? post(newOpDate, newMethod) : newOpDate;
-      const newRecurrence  = recurrence && recurrence.value;
+      const newPostDate = computePostDate(newOpDate, newMethod);
+      const newRecurrenceRaw  = recurrence && recurrence.value;
+      const newRecurrence = newRecurrenceRaw && typeof newRecurrenceRaw === 'string'
+        ? newRecurrenceRaw.trim()
+        : newRecurrenceRaw;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
+      const compareIds = typeof sameId === 'function'
+        ? (a, b) => {
+            try { return sameId(a, b); }
+            catch (_) { return String(a) === String(b); }
+          }
+        : (a, b) => String(a) === String(b);
+      const findMaster = (tx) => {
+        if (!tx) return null;
+        if (tx.recurrence && String(tx.recurrence).trim()) return tx;
+        if (!tx.parentId) return null;
+        return txList.find(candidate => candidate && compareIds(candidate.id, tx.parentId) && candidate.recurrence && String(candidate.recurrence).trim()) || null;
+      };
+      const masterForTx = findMaster(t);
 
       switch (pendingEditMode) {
         case 'single': {
           // Exception for this occurrence
-          t.exceptions = t.exceptions || [];
-          if (!t.exceptions.includes(pendingEditTxIso)) {
-            t.exceptions.push(pendingEditTxIso);
+          const targetMaster = masterForTx || t;
+          if (targetMaster) {
+            targetMaster.exceptions = Array.isArray(targetMaster.exceptions) ? targetMaster.exceptions : [];
+            if (!targetMaster.exceptions.includes(pendingEditTxIso)) {
+              targetMaster.exceptions.push(pendingEditTxIso);
+            }
+            targetMaster.modifiedAt = new Date().toISOString();
           }
           // Create standalone edited transaction
           const txObj = {
@@ -292,7 +380,7 @@ export async function addTx() {
             val: newVal,
             method: newMethod,
             opDate: newOpDate,
-            postDate: newPostDate,
+            postDate: computePostDate(newOpDate, newMethod),
             recurrence: '',
             installments: 1,
             planned: newOpDate > todayFn(),
@@ -304,8 +392,16 @@ export async function addTx() {
         }
         case 'future': {
           // End original series at this occurrence
-          t.recurrenceEnd = pendingEditTxIso;
+          const targetMaster = masterForTx || t;
+          if (targetMaster) {
+            targetMaster.recurrenceEnd = pendingEditTxIso;
+            targetMaster.modifiedAt = new Date().toISOString();
+          }
           // Create new series starting from this occurrence
+          const recurrenceValue = newRecurrence || (targetMaster && targetMaster.recurrence) || (t && t.recurrence) || '';
+          const installmentsValue = Number.isInteger(newInstallments) && newInstallments > 0
+            ? newInstallments
+            : ((targetMaster && targetMaster.installments) || (t && t.installments) || 1);
           const txObj = {
             id: Date.now(),
             parentId: null,
@@ -313,9 +409,9 @@ export async function addTx() {
             val: newVal,
             method: newMethod,
             opDate: pendingEditTxIso,
-            postDate: newPostDate,
-            recurrence: newRecurrence,
-            installments: newInstallments,
+            postDate: computePostDate(pendingEditTxIso, newMethod),
+            recurrence: recurrenceValue,
+            installments: installmentsValue,
             planned: pendingEditTxIso > todayFn(),
             ts: new Date().toISOString(),
             modifiedAt: new Date().toISOString()
@@ -333,7 +429,7 @@ export async function addTx() {
             master.val          = newVal;
             master.method       = newMethod;
             // Mantém opDate original; só recalculamos postDate conforme novo método
-            master.postDate     = typeof post === 'function' ? post(master.opDate, newMethod) : master.opDate;
+            master.postDate     = computePostDate(master.opDate, newMethod);
             master.recurrence   = recurrence ? recurrence.value : '';
             master.installments = parseInt(installments && installments.value, 10) || 1;
             master.modifiedAt   = new Date().toISOString();
@@ -346,7 +442,7 @@ export async function addTx() {
           t.val        = newVal;
           t.method     = newMethod;
           t.opDate     = newOpDate;
-          t.postDate   = newPostDate;
+          t.postDate   = computePostDate(newOpDate, newMethod);
           if (recurrence) t.recurrence   = newRecurrence;
           if (installments) t.installments = newInstallments;
           // Ajusta flag planned caso a data da operação ainda não tenha ocorrido
@@ -394,7 +490,7 @@ export async function addTx() {
       const rawVal = parseCurrency(val && val.value);
       const amount = Math.abs(rawVal);
       if (amount <= 0) { showToastFn('Informe um valor válido.'); return; }
-      const remaining = Number(ctx.remaining) || 0;
+      const remaining = Math.max(0, Number(ctx.remaining) || 0);
       const payDate = date && date.value ? date.value : todayFn();
       const nowIso = new Date().toISOString();
       // If parceling is enabled, the UI shows the per-installment value in the
@@ -404,7 +500,7 @@ export async function addTx() {
       if (invoiceParcelCheckbox && invoiceParcelCheckbox.checked && (parseInt(installments && installments.value,10) || 1) > 1) {
         // Parcelamento: criar ajuste no dueISO e parcelas futuras (recorrência mensal)
         const n = Math.min(24, Math.max(2, parseInt(installments && installments.value, 10) || 2));
-        const totalPayVal = Math.min(amount * (invoiceParcelCheckbox && invoiceParcelCheckbox.checked ? n : 1), remaining);
+        const totalPayVal = Math.min(amount * n, remaining || amount * n);
         const perParcel = +(totalPayVal / n).toFixed(2);
         // 1) Ajuste que neutraliza parte da fatura no vencimento (somente o valor pago)
         const adjustTx = {
@@ -479,6 +575,7 @@ export async function addTx() {
         }
       } else {
         // Pagamento sem parcelar
+        const payVal = Math.min(amount, remaining || amount);
         const totalAbs = Number(ctx.totalAbs) || 0;
         const adjustedBefore = Number(ctx.adjustedBefore) || 0;
         const adjustAmount = Math.max(0, totalAbs - adjustedBefore);
@@ -499,15 +596,41 @@ export async function addTx() {
         const paymentTx = {
           id: Date.now() + 1,
           desc: `Pagamento fatura – ${ctx.card}`,
-          val: -amount,
+          val: -payVal,
           method: 'Dinheiro',
           opDate: payDate,
           postDate: payDate,
-          planned: false,
+          planned: payDate > todayFn(),
+          invoicePayment: { card: ctx.card, dueISO: ctx.dueISO },
           ts: nowIso,
           modifiedAt: nowIso
         };
         try { addTxInternal(paymentTx); } catch (_) { setTxs(getTxs().concat([paymentTx])); }
+        const remainingAfter = Math.max(0, remaining - payVal);
+        if (remainingAfter > 0) {
+          const baseDue = new Date(ctx.dueISO + 'T00:00:00');
+          const prevMonthName = baseDue.toLocaleDateString('pt-BR', { month: 'long' });
+          const labelMonth = prevMonthName.charAt(0).toUpperCase() + prevMonthName.slice(1);
+          const currentDay = baseDue.getDate();
+          const nextDueCandidate = new Date(baseDue);
+          nextDueCandidate.setMonth(nextDueCandidate.getMonth() + 1);
+          const lastDayNextMonth = new Date(nextDueCandidate.getFullYear(), nextDueCandidate.getMonth() + 1, 0).getDate();
+          const nextDueDate = new Date(nextDueCandidate.getFullYear(), nextDueCandidate.getMonth(), Math.min(currentDay, lastDayNextMonth));
+          const nextDueISO = nextDueDate.toISOString().slice(0, 10);
+          const rolloverTx = {
+            id: Date.now() + 2,
+            desc: `Pendente da fatura de ${labelMonth}`,
+            val: -remainingAfter,
+            method: ctx.card,
+            opDate: ctx.dueISO,
+            postDate: nextDueISO,
+            planned: false,
+            invoiceRolloverOf: { card: ctx.card, fromDueISO: ctx.dueISO },
+            ts: nowIso,
+            modifiedAt: nowIso
+          };
+          try { addTxInternal(rolloverTx); } catch (_) { setTxs(getTxs().concat([rolloverTx])); }
+        }
       }
       // Exit invoice mode
       g.isPayInvoiceMode = false;
@@ -540,8 +663,9 @@ export async function addTx() {
         const activeMethodBtn = document.querySelector('.switch-option.active');
         newMethod = activeMethodBtn ? activeMethodBtn.dataset.method : 'Dinheiro';
       }
+      newMethod = resolveSelectedMethod(newMethod);
       const newOpDate  = date && date.value;
-      const newPostDate = typeof post === 'function' ? post(newOpDate, newMethod) : newOpDate;
+      const newPostDate = computePostDate(newOpDate, newMethod);
       const newRecurrence  = recurrence && recurrence.value;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
       const newTx = {

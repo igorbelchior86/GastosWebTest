@@ -91,11 +91,24 @@ export function buildSaveToast(tx, deps) {
       const iso = hasOpDate ? tx.opDate : (typeof todayISO === 'function' ? todayISO() : '');
       return `${formattedVal} salvo em ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
     }
-    // Recurring transactions get a descriptor based on the selected recurrence.
-    const recSel = documentRef.getElementById('recurrence');
-    const recText = recSel
-      ? ((recSel.options[recSel.selectedIndex]?.text || '').toLowerCase() || 'recorrente')
-      : 'recorrente';
+    // Recurring transactions get a descriptor based on their recurrence code.
+    const recurrenceLabels = {
+      D: 'diária',
+      W: 'semanal',
+      BW: 'quinzenal',
+      M: 'mensal',
+      Q: 'trimestral',
+      S: 'semestral',
+      Y: 'anual'
+    };
+    const recCode = String(tx.recurrence || '').trim().toUpperCase();
+    const fallbackLabel = (() => {
+      const recSel = documentRef?.getElementById?.('recurrence');
+      return recSel
+        ? (recSel.options[recSel.selectedIndex]?.text || '').toLowerCase()
+        : '';
+    })();
+    const recText = recurrenceLabels[recCode] || (fallbackLabel || 'recorrente');
     return `${formattedVal} salvo (${recText})`;
   } catch (_) {
     // As a last resort, fall back to a generic message to avoid throwing.
@@ -587,8 +600,10 @@ export function createRenderCardList(context) {
     post,
   } = context;
   function renderCardList() {
+    // Get current cards array dynamically from window.__gastos or global scope
+    const currentCards = (typeof window !== 'undefined' && window.__gastos && window.__gastos.cards) || cards;
     cardRenderList({
-      cards,
+      cards: currentCards,
       cardModal,
       cardListEl: cardList,
       initSwipe,

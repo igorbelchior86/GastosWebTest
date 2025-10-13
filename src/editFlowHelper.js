@@ -41,56 +41,91 @@ export function createOpenEditFlow(ctx) {
   } = ctx;
   return function openEditFlow(tx, iso) {
     if (!tx) return;
-    // Determine whether related recurrences exist by comparing
-    // description/method/value across transactions.
-    const txs = transactionsRef.get();
-    const hasRecurrence = (() => {
-      if (tx.recurrence && tx.recurrence.trim()) return true;
-      if (tx.parentId) {
-        const parent = txs.find(p => p.id === tx.parentId);
-        if (parent && parent.recurrence && parent.recurrence.trim()) return true;
+
+    const txsRaw = transactionsRef ? transactionsRef.get() : null;
+    const txs = Array.isArray(txsRaw) ? txsRaw : [];
+    const compareIds = typeof sameId === 'function'
+      ? (a, b) => {
+          try { return sameId(a, b); }
+          catch { return String(a) === String(b); }
+        }
+      : (a, b) => String(a) === String(b);
+    const targetIso = iso || tx.opDate || null;
+
+    const ensureModal = () =>
+      editRecurrenceModal ||
+      (typeof window !== 'undefined' && window.__gastos && window.__gastos.editRecurrenceModal) ||
+      document.getElementById('editRecurrenceModal');
+    const ensurePlannedModal = () =>
+      plannedModal ||
+      (typeof window !== 'undefined' && window.__gastos && window.__gastos.plannedModal) ||
+      document.getElementById('plannedModal');
+
+    const parent = tx.parentId
+      ? txs.find(item => item && compareIds(item.id, tx.parentId))
+      : null;
+
+    let heuristicMaster = null;
+    if (!tx.recurrence && !parent && targetIso) {
+      for (const candidate of txs) {
+        if (!candidate || !candidate.recurrence || !candidate.recurrence.trim()) continue;
+        const occurs = typeof occursOn === 'function' ? occursOn(candidate, targetIso) : false;
+        if (!occurs) continue;
+        const sameMethod = (candidate.method || '') === (tx.method || '');
+        const sameDesc   = (candidate.desc || '') === (tx.desc || '');
+        const sameVal    = Math.abs(Number(candidate.val || 0) - Number(tx.val || 0)) < 0.005;
+        if (sameMethod && (sameDesc || sameVal)) {
+          heuristicMaster = candidate;
+          break;
+        }
       }
-      for (const p of txs) {
-        if (!p.recurrence || !p.recurrence.trim()) continue;
-        if (!occursOn(p, iso)) continue;
-        const sameMethod = (p.method || '') === (tx.method || '');
-        const sameDesc   = (p.desc || '') === (tx.desc || '');
-        const sameVal    = Math.abs(Number(p.val || 0) - Number(tx.val || 0)) < 0.005;
-        if (sameMethod && (sameDesc || sameVal)) return true;
-      }
-      return false;
-    })();
+    }
+
+    const master = (tx.recurrence && String(tx.recurrence).trim())
+      ? tx
+      : (parent || heuristicMaster);
+
+    const parentForDetach = parent || (tx.parentId ? master : null);
+    const parentHasException = parentForDetach && targetIso && Array.isArray(parentForDetach.exceptions)
+      ? parentForDetach.exceptions.includes(targetIso)
+      : false;
+    const basicDetached = typeof isDetachedOccurrence === 'function'
+      ? isDetachedOccurrence(tx)
+      : (!!tx.parentId && !tx.recurrence);
+    const isDetached = !!tx.parentId && parentHasException && basicDetached;
+
+    const hasRecurrence = !!( (tx.recurrence && String(tx.recurrence).trim()) || tx.parentId || heuristicMaster );
+    const modalEl = ensureModal();
+    const plannedEl = ensurePlannedModal();
 
     const performEdit = (id) => {
-      const reopen = plannedModal && !plannedModal.classList.contains('hidden');
+      const reopen = plannedEl && !plannedEl.classList.contains('hidden');
       reopenPlannedAfterEditRef.set(!!reopen);
       if (reopen) {
-        plannedModal.classList.add('hidden');
+        plannedEl.classList.add('hidden');
         updateModalOpenState && updateModalOpenState();
       }
-      if (isDetachedOccurrence(tx)) pendingEditModeRef.set(null);
       editTx(id);
     };
 
-    const showRecurrenceModal = (id) => {
-      pendingEditTxIdRef.set(id);
-      pendingEditTxIsoRef.set(iso || tx.opDate);
-      const reopen = plannedModal && !plannedModal.classList.contains('hidden');
+    if (hasRecurrence && !isDetached && modalEl) {
+      const reopen = plannedEl && !plannedEl.classList.contains('hidden');
       reopenPlannedAfterEditRef.set(!!reopen);
       if (reopen) {
-        plannedModal.classList.add('hidden');
+        plannedEl.classList.add('hidden');
         updateModalOpenState && updateModalOpenState();
       }
-      if (editRecurrenceModal) {
-        editRecurrenceModal.classList.remove('hidden');
-      }
+      pendingEditModeRef.set(null);
+      pendingEditTxIdRef.set(master ? master.id : tx.id);
+      pendingEditTxIsoRef.set(targetIso || tx.opDate || null);
+      modalEl.classList.remove('hidden');
       updateModalOpenState && updateModalOpenState();
-    };
-
-    if (tx.recurrence || (hasRecurrence && !tx.recurrence && !tx.parentId)) {
-      showRecurrenceModal(tx.id);
       return;
     }
-    performEdit(tx.id);
+
+    pendingEditModeRef.set(null);
+    pendingEditTxIdRef.set(null);
+    pendingEditTxIsoRef.set(null);
+    performEdit(master ? master.id : tx.id);
   };
 }

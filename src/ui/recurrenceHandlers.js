@@ -88,8 +88,16 @@ export function setupRecurrenceHandlers() {
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
     const t = txs.find(x => sameId ? sameId(x.id, id) : (g.sameId && g.sameId(x.id, id)));
     if (!t) return;
-    // Non-recurring and not a detached occurrence: delete immediately
-    if (!t.recurrence && !t.parentId) {
+    const parent = t.parentId
+      ? txs.find(p => sameId ? sameId(p.id, t.parentId) : (g.sameId && g.sameId(p.id, t.parentId)))
+      : null;
+    const isoToCheck = iso || t.opDate || null;
+    const parentHasException = parent && Array.isArray(parent.exceptions) && isoToCheck
+      ? parent.exceptions.includes(isoToCheck)
+      : false;
+    const isDetachedOccurrence = !!t.parentId && parentHasException;
+    // Non-recurring or detached occurrence: delete immediately
+    if ((!t.recurrence && !t.parentId) || isDetachedOccurrence) {
       try { removeTransaction && removeTransaction(id); } catch (_) {
         if (typeof setTransactions === 'function') setTransactions((getTransactions() || []).filter(x => !(sameId ? sameId(x.id, id) : (g.sameId && g.sameId(x.id, id)))));
       }
