@@ -42,7 +42,19 @@ export function setupEditTransaction() {
     const txs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
     const t = txs.find(x => x && x.id === id);
     if (!t) return;
+    
+    // ALWAYS set the pending ID
+    g.pendingEditTxId = id;
+    
+    // Only set pendingEditTxIso if not already set by openEditFlow
+    // (openEditFlow sets the correct occurrence date, t.opDate is always the master's date)
+    if (!g.pendingEditTxIso) {
+      g.pendingEditTxIso = t.opDate;
+    }
+    
+    // Check if we already have a pendingEditMode set (user selected an option from the context modal)
     const alreadyScoped = !!g.pendingEditMode;
+    
     const recurrenceDetected = (() => {
       if (t.recurrence && String(t.recurrence).trim()) return true;
       if (t.parentId) {
@@ -52,11 +64,14 @@ export function setupEditTransaction() {
       return false;
     })();
     const detachedOccurrence = isDetachedOccurrence ? isDetachedOccurrence(t) : (!!t.parentId && !t.recurrence);
+    
+    // Only show the scope modal if:
+    // 1. We don't already have a scope selected (alreadyScoped is false)
+    // 2. There is a recurrence detected
+    // 3. It's not a detached occurrence
     if (!alreadyScoped && recurrenceDetected && !detachedOccurrence) {
       const scopeModal = g.editRecurrenceModal || document.getElementById('editRecurrenceModal');
       if (scopeModal) {
-        g.pendingEditTxId = id;
-        g.pendingEditTxIso = t.opDate;
         if (g.plannedModal && !g.plannedModal.classList.contains('hidden')) {
           g.reopenPlannedAfterEdit = true;
           g.plannedModal.classList.add('hidden');
@@ -67,6 +82,13 @@ export function setupEditTransaction() {
         return;
       }
     }
+    
+    // If we reach here, either:
+    // - User already selected a scope (single/future/all)
+    // - Or it's not a recurring transaction
+    // - Or it's a detached occurrence
+    // In all cases, proceed to open the transaction modal for editing
+    
     // Hard reset to avoid inheriting previous edit state
     if (typeof resetTxModal === 'function') resetTxModal();
     // 1) Description

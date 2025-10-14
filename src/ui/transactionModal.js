@@ -361,40 +361,83 @@ export async function addTx() {
       };
       const masterForTx = findMaster(t);
 
-      switch (pendingEditMode) {
+      // Read the current pendingEditMode from global state (not the local copy)
+      // because it may have been updated by the edit recurrence modal buttons
+      const currentEditMode = g.pendingEditMode;
+      const currentEditTxIso = g.pendingEditTxIso;
+      
+      // DEBUG: Log the edit mode being used
+      console.log('🔍 Edit mode:', currentEditMode, '| TxId:', isEditing, '| ISO:', currentEditTxIso);
+
+      switch (currentEditMode) {
         case 'single': {
-          // Exception for this occurrence
+          console.log('✅ Editing SINGLE occurrence for ISO:', currentEditTxIso);
+
+          // For 'single' mode, we:
+          // 1. Add this date to the master's exceptions list
+          // 2. Create a NEW standalone transaction for this specific date with the edited values
+          
           const targetMaster = masterForTx || t;
+          console.log('📝 Target master ID:', targetMaster?.id, 'Current tx ID:', t.id);
+          
+          // Add exception to master
           if (targetMaster) {
             targetMaster.exceptions = Array.isArray(targetMaster.exceptions) ? targetMaster.exceptions : [];
-            if (!targetMaster.exceptions.includes(pendingEditTxIso)) {
-              targetMaster.exceptions.push(pendingEditTxIso);
+            if (!targetMaster.exceptions.includes(currentEditTxIso)) {
+              targetMaster.exceptions.push(currentEditTxIso);
+              console.log('📝 Added exception:', currentEditTxIso);
+            } else {
+              console.log('📝 Exception already exists:', currentEditTxIso);
             }
             targetMaster.modifiedAt = new Date().toISOString();
+            console.log('📝 Master exceptions now:', targetMaster.exceptions);
           }
-          // Create standalone edited transaction
-          const txObj = {
-            id: Date.now(),
-            parentId: t.parentId || t.id,
-            desc: newDesc,
-            val: newVal,
-            method: newMethod,
-            opDate: newOpDate,
-            postDate: computePostDate(newOpDate, newMethod),
-            recurrence: '',
-            installments: 1,
-            planned: newOpDate > todayFn(),
-            ts: new Date().toISOString(),
-            modifiedAt: new Date().toISOString()
-          };
-          try { addTxInternal(txObj); } catch (_) { setTxs(getTxs().concat([txObj])); }
+          
+          // Check if a detached transaction already exists for this date
+          const existingDetached = txList.find(tx => 
+            tx && 
+            tx.parentId === targetMaster.id && 
+            tx.opDate === currentEditTxIso &&
+            !tx.recurrence
+          );
+          
+          if (existingDetached) {
+            // Update existing detached transaction
+            console.log('📝 Updating existing detached tx:', existingDetached.id);
+            existingDetached.desc = newDesc;
+            existingDetached.val = newVal;
+            existingDetached.method = newMethod;
+            existingDetached.opDate = newOpDate;
+            existingDetached.postDate = computePostDate(newOpDate, newMethod);
+            existingDetached.planned = newOpDate > todayFn();
+            existingDetached.modifiedAt = new Date().toISOString();
+          } else {
+            // Create new standalone edited transaction
+            const txObj = {
+              id: Date.now(),
+              parentId: targetMaster.id,
+              desc: newDesc,
+              val: newVal,
+              method: newMethod,
+              opDate: newOpDate,
+              postDate: computePostDate(newOpDate, newMethod),
+              recurrence: '',
+              installments: 1,
+              planned: newOpDate > todayFn(),
+              ts: new Date().toISOString(),
+              modifiedAt: new Date().toISOString()
+            };
+            console.log('📝 Creating new standalone tx with parentId:', txObj.parentId, 'for date:', newOpDate);
+            try { addTxInternal(txObj); } catch (_) { setTxs(getTxs().concat([txObj])); }
+          }
           break;
         }
         case 'future': {
+          console.log('✅ Editing FUTURE occurrences');
           // End original series at this occurrence
           const targetMaster = masterForTx || t;
           if (targetMaster) {
-            targetMaster.recurrenceEnd = pendingEditTxIso;
+            targetMaster.recurrenceEnd = currentEditTxIso;
             targetMaster.modifiedAt = new Date().toISOString();
           }
           // Create new series starting from this occurrence
@@ -408,11 +451,11 @@ export async function addTx() {
             desc: newDesc,
             val: newVal,
             method: newMethod,
-            opDate: pendingEditTxIso,
-            postDate: computePostDate(pendingEditTxIso, newMethod),
+            opDate: currentEditTxIso,
+            postDate: computePostDate(currentEditTxIso, newMethod),
             recurrence: recurrenceValue,
             installments: installmentsValue,
-            planned: pendingEditTxIso > todayFn(),
+            planned: currentEditTxIso > todayFn(),
             ts: new Date().toISOString(),
             modifiedAt: new Date().toISOString()
           };
@@ -420,6 +463,7 @@ export async function addTx() {
           break;
         }
         case 'all': {
+          console.log('✅ Editing ALL occurrences');
           // EDITAR TODAS — Apenas altera a REGRA‑MESTRE, preservando ocorrências
           const master = t.parentId
             ? getTxs().find(tx => tx && sameId && sameId(tx.id, t.parentId))
@@ -437,6 +481,7 @@ export async function addTx() {
           break;
         }
         default: {
+          console.warn('⚠️ NO edit mode specified - using DEFAULT (modifies single transaction)');
           // Fallback: modify just this entry
           t.desc       = newDesc;
           t.val        = newVal;
@@ -451,19 +496,20 @@ export async function addTx() {
           break;
         }
       }
-      // Reset editing state
+      // Reset editing state - update BOTH local variables AND global state
       pendingEditMode    = null;
       pendingEditTxId    = null;
       pendingEditTxIso   = null;
       isEditing          = null;
+      g.pendingEditMode  = null;
+      g.pendingEditTxId  = null;
+      g.pendingEditTxIso = null;
+      g.isEditing        = null;
       if (addBtn) addBtn.textContent = 'Adicionar';
       if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
       saveFn('tx', getTxs());
       toggleModalFn();
-      // Render after modal closes
-      setTimeout(() => {
-        renderFn();
-      }, 250);
+      // No need to manually render - Firebase listener will trigger renderTable automatically
       // Custom edit confirmation toast
       const formattedVal = fmtCurrency(parseCurrency(val && val.value));
       const recValue = recurrence ? recurrence.value : '';
@@ -638,10 +684,7 @@ export async function addTx() {
       // Persist and rerender
       saveFn('tx', getTxs());
       toggleModalFn();
-      // Render after modal closes
-      setTimeout(() => {
-        renderFn();
-      }, 250);
+      // No need to manually render - Firebase listener will trigger renderTable automatically
       showToastFn('Pagamento de fatura lançado', 'success');
       // Write back state
       g.isEditing = isEditing;
@@ -706,10 +749,7 @@ export async function addTx() {
       // Close modal
       toggleModalFn();
       
-      // Single render after modal animation completes
-      setTimeout(() => {
-        renderFn();
-      }, 250);
+      // No need to manually render - Firebase listener will trigger renderTable automatically
       
       showToastFn('Operação adicionada', 'success');
       // Write back state

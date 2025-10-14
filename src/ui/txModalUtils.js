@@ -85,14 +85,24 @@ export function resetTxModal() {
     clearFieldErrors();
 
     // Reset global flags for pay-invoice mode
+    // IMPORTANT: Only reset pendingEditMode if it's not currently set
+    // because it may have been set by the edit recurrence modal
     try {
       const g = window.__gastos || {};
       g.isPayInvoiceMode = false;
       g.pendingInvoiceCtx = null;
       g.isEditing = null;
-      g.pendingEditMode = null;
-      g.pendingEditTxId = null;
-      g.pendingEditTxIso = null;
+      
+      // Only clear pending edit state if:
+      // 1. pendingEditMode is not set, AND
+      // 2. pendingEditTxIso is not set (indicating we're NOT in the middle of an edit flow)
+      const shouldClearPendingEdit = !g.pendingEditMode && !g.pendingEditTxIso;
+      
+      if (shouldClearPendingEdit) {
+        g.pendingEditMode = null;
+        g.pendingEditTxId = null;
+        g.pendingEditTxIso = null;
+      }
     } catch (_) {}
 
   } catch (error) {
@@ -144,11 +154,21 @@ export function focusValueField() {
   try {
     const val = document.getElementById('value');
     if (val) {
-      // Small delay to ensure modal is fully visible
+      // Try immediate focus first (important for iOS)
+      val.focus();
+      val.select();
+      
+      // Then try again after modal animation
       setTimeout(() => {
         val.focus();
-        val.select(); // Select any existing text
-      }, 100);
+        val.select();
+      }, 150);
+      
+      // Final attempt to ensure focus
+      setTimeout(() => {
+        val.focus();
+        val.select();
+      }, 300);
     }
   } catch (error) {
     console.warn('Error focusing value field:', error);

@@ -81,6 +81,7 @@ export function initTransactionLine(deps) {
     const d = document.createElement('div');
     d.className = 'op-line';
     d.dataset.txId = tx.id;
+    d.dataset.date = tx.opDate; // Store the occurrence date for edit operations
 
     // Build content
     const topRow = document.createElement('div');

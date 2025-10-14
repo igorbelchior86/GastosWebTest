@@ -259,13 +259,10 @@ const CASA_EMAILS = ['icmbelchior@gmail.com','sarargjesus@gmail.com'];
 function resolvePathForUser(user){
   if (!user) return null;
   const email = (user.email || '').toLowerCase();
-  console.log('Resolving path for user:', email);
   if (CASA_EMAILS.includes(email)) {
-    console.log('User mapped to shared workspace:', WID_CASA);
     return WID_CASA;
   }
   const personalPath = `users/${user.uid}`;
-  console.log('User mapped to personal workspace:', personalPath);
   return personalPath;
 }
 
@@ -400,7 +397,6 @@ const groupTransactionsByMonth = () =>
 // Placeholder for animateWrapperScroll, initialised to a no‑op. It will be
 // rebound later with the proper scrolling context.
 let animateWrapperScroll = (targetTop) => {
-  console.log('PLACEHOLDER animateWrapperScroll called - NO ANIMATION!');
   if (!wrapperEl) return;
   if (wrapperScrollAnimation) return;
   wrapperEl.scrollTop = targetTop;
@@ -476,12 +472,11 @@ if (!USE_MOCK) {
       get: () => profileListeners,
       set: (val) => { profileListeners = val; }
     }
-  });
+});
   startRealtimeFn = startRealtime;
 
   const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
   if (readyUser) { 
-    console.log('User already ready:', readyUser.email);
     PATH = resolvePathForUser(readyUser); 
     try { FirebaseSvc.setPath(PATH); } catch(_) {}
     startRealtimeFn && startRealtimeFn(); 
@@ -491,16 +486,12 @@ if (!USE_MOCK) {
       } catch (_) {} 
     }, 100);
   } else {
-    console.log('Waiting for auth state...');
-    
     const h = (e) => {
       const u = e.detail && e.detail.user;
-      console.log('Auth state event received:', u ? u.email : 'signed out');
       if (u) { 
         document.removeEventListener('auth:state', h); 
         PATH = resolvePathForUser(u); 
         try { FirebaseSvc.setPath(PATH); } catch(_) {}
-        console.log('Starting realtime with PATH:', PATH);
         startRealtimeFn && startRealtimeFn(); 
         setTimeout(() => { 
           try { 
@@ -508,7 +499,6 @@ if (!USE_MOCK) {
           } catch (_) {} 
         }, 100);
       } else {
-        console.log('User signed out, clearing PATH');
         PATH = null;
         try { FirebaseSvc.setPath(null); } catch(_) {}
       }
@@ -624,7 +614,16 @@ if(openTxBtn)openTxBtn.onclick=()=>{
   isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;
   if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}
   toggleTxModal();
-  focusValueField();
+  // Focus immediately (for iOS) and also with delay (for animations)
+  const val = document.getElementById('value');
+  if (val) {
+    val.focus();
+    val.select();
+    setTimeout(() => {
+      val.focus();
+      val.select();
+    }, 150);
+  }
 };
 
 if(closeTxModal)closeTxModal.onclick=toggleTxModal;if(txModal)txModal.onclick=e=>{if(e.target===txModal)toggleTxModal();};
@@ -746,7 +745,6 @@ recurrence.onchange = () => {
 
 function resetAppStateForProfileChange(reason = 'profile-change') {
   try {
-    console.log('[profile-reset] resetting state for', reason);
     isEditing = null;
     pendingEditMode = null;
     pendingEditTxId = null;
@@ -917,11 +915,17 @@ try {
     },
     pendingEditTxIdRef: {
       get: () => pendingEditTxId,
-      set: (val) => { pendingEditTxId = val; }
+      set: (val) => { 
+        pendingEditTxId = val;
+        if (window.__gastos) window.__gastos.pendingEditTxId = val;
+      }
     },
     pendingEditTxIsoRef: {
       get: () => pendingEditTxIso,
-      set: (val) => { pendingEditTxIso = val; }
+      set: (val) => { 
+        pendingEditTxIso = val;
+        if (window.__gastos) window.__gastos.pendingEditTxIso = val;
+      }
     },
     isDetachedOccurrence,
     editTx: (id) => {
@@ -1034,7 +1038,6 @@ try {
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
-  console.log('Rebinding animateWrapperScroll function');
   animateWrapperScroll = createAnimateWrapperScroll({
     wrapperEl,
     get wrapperScrollAnimation() { return wrapperScrollAnimation; },
@@ -1042,11 +1045,9 @@ try {
     get wrapperTodayAnchor() { return wrapperTodayAnchor; },
     set wrapperTodayAnchor(val) { wrapperTodayAnchor = val; },
   });
-  console.log('animateWrapperScroll rebound:', typeof animateWrapperScroll);
   // CRITICAL: Update the global context to use the new animated function
   if (window.__gastos) {
     window.__gastos.animateWrapperScroll = animateWrapperScroll;
-    console.log('Updated window.__gastos.animateWrapperScroll to animated version');
   }
 } catch (err) {
   console.error('Helper binding failed:', err);
@@ -1102,9 +1103,11 @@ if(editRecurrenceModal)editRecurrenceModal.onclick=e=>{if(e.target===editRecurre
 if(editSingleBtn){
   editSingleBtn.onclick=()=>{
     pendingEditMode='single';
-    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos) {
+      window.__gastos.pendingEditMode = pendingEditMode;
+    }
     if(window.__gastos && window.__gastos.editTx){
-      window.__gastos.editTx(pendingEditTxId);
+      window.__gastos.editTx(window.__gastos.pendingEditTxId || pendingEditTxId);
     }
     closeEditModal();
   };
@@ -1112,9 +1115,11 @@ if(editSingleBtn){
 if(editFutureBtn){
   editFutureBtn.onclick=()=>{
     pendingEditMode='future';
-    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos) {
+      window.__gastos.pendingEditMode = pendingEditMode;
+    }
     if(window.__gastos && window.__gastos.editTx){
-      window.__gastos.editTx(pendingEditTxId);
+      window.__gastos.editTx(window.__gastos.pendingEditTxId || pendingEditTxId);
     }
     closeEditModal();
   };
@@ -1122,41 +1127,73 @@ if(editFutureBtn){
 if(editAllBtn){
   editAllBtn.onclick=()=>{
     pendingEditMode='all';
-    if(window.__gastos) window.__gastos.pendingEditMode = pendingEditMode;
+    if(window.__gastos) {
+      window.__gastos.pendingEditMode = pendingEditMode;
+    }
     if(window.__gastos && window.__gastos.editTx){
-      window.__gastos.editTx(pendingEditTxId);
+      window.__gastos.editTx(window.__gastos.pendingEditTxId || pendingEditTxId);
     }
     closeEditModal();
   };
 }
 const editTx=id=>{const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')return g.editTx(id);};
 
-document.addEventListener('click',e=>{const editEl=e.target.closest('.icon-edit,[data-action=\"edit\"]');if(!editEl)return;const container=editEl.closest('.op-item,.op-line,.swipe-wrapper')||document;const txEl=container.querySelector('[data-tx-id]');const id=txEl?Number(txEl.dataset.txId):null;if(!id)return;const txs=getTransactions?getTransactions():transactions;const t=txs.find(x=>x&&x.id===id);if(!t)return;try{if(typeof openEditFlow==='function'){openEditFlow(t,t.opDate);}else{const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')g.editTx(id);}}catch(err){console.error('openEditFlow failed, falling back to direct edit:',err);const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.editTx==='function')g.editTx(id);}e.preventDefault();e.stopPropagation();});
+document.addEventListener('click',e=>{
+  const editEl=e.target.closest('.icon-edit,[data-action=\"edit\"]');
+  if(!editEl)return;
+  const container=editEl.closest('.op-item,.op-line,.swipe-wrapper')||document;
+  const txEl=container.querySelector('[data-tx-id]');
+  const id=txEl?Number(txEl.dataset.txId):null;
+  if(!id)return;
+  
+  // Try to get the date from the DOM element
+  // The date should be stored somewhere in the parent structure
+  const dateEl = container.closest('[data-date]') || container.querySelector('[data-date]');
+  const dateFromDom = dateEl ? dateEl.dataset.date : null;
+  
+  console.log('🔍 Edit clicked - ID:', id, 'Date from DOM:', dateFromDom, 'Container:', container.className);
+  
+  const txs=getTransactions?getTransactions():transactions;
+  const t=txs.find(x=>x&&x.id===id);
+  if(!t)return;
+  
+  // Use the date from DOM if available, otherwise fallback to t.opDate
+  const targetDate = dateFromDom || t.opDate;
+  
+  console.log('🔍 Target date:', targetDate, 't.opDate:', t.opDate);
+  
+  try{
+    if(typeof openEditFlow==='function'){
+      openEditFlow(t, targetDate);
+    }else{
+      const g=typeof window!=='undefined'?window.__gastos:undefined;
+      if(g&&typeof g.editTx==='function')g.editTx(id);
+    }
+  }catch(err){
+    console.error('openEditFlow failed, falling back to direct edit:',err);
+    const g=typeof window!=='undefined'?window.__gastos:undefined;
+    if(g&&typeof g.editTx==='function')g.editTx(id);
+  }
+  e.preventDefault();
+  e.stopPropagation();
+});
 
 function renderTable(){
   const hydrating=isHydrating();
-  console.log('renderTable: starting, isHydrating =', hydrating);
   clearTableContent();
   const acc=document.getElementById('accordion');
   
   // Atualizar flag de skeleton antes de reconstruir o DOM para evitar inserir placeholders quando já temos dados reais.
   if(hydrating){
-    console.log('renderTable: hydrating, ensuring skeleton state');
     if(acc) acc.dataset.state='skeleton';
   } else {
-    console.log('renderTable: NOT hydrating, clearing skeleton state before render if needed');
     if(acc && acc.dataset.state){
-      console.log('renderTable: removing stale skeleton state before render, previous value:', acc.dataset.state);
       delete acc.dataset.state;
     }
   }
   
   const groups=groupTransactionsByMonth();
   renderTransactionGroups(groups);
-  
-  if(hydrating){
-    console.log('renderTable: still hydrating after render, skeleton state remains');
-  }
   
   setTimeout(()=>{
     try{

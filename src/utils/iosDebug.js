@@ -5,10 +5,18 @@
  * viewport metrics, safe area insets, viewport unit support, auth state
  * changes and network status. This helper is no‑op on non‑iOS devices.
  *
+ * Set DEBUG_IOS to true to enable debug logging.
+ *
  * @param {object} firebaseConfig Firebase configuration, used only to
  *   report whether the config loaded successfully.
  */
+
+// Enable/disable iOS debug logging
+const DEBUG_IOS = false;
+
 export function initIOSDebug(firebaseConfig) {
+  if (!DEBUG_IOS) return; // Skip debug logging when disabled
+  
   try {
     const ua = (navigator.userAgent || '').toLowerCase();
     const isIOSDebug = /iphone|ipad|ipod/.test(ua);

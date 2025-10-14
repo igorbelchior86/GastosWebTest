@@ -71,10 +71,6 @@ export function createStartRealtime(ctx) {
     // undefined, default to null to avoid exceptions.
     let PATH = typeof getPath === 'function' ? getPath() : null;
 
-    try {
-      console.log('Starting realtime listeners for PATH:', PATH);
-    } catch (_) {}
-
     // Clean up any existing listeners and reset the hydration state.
     try { cleanupProfileListeners && cleanupProfileListeners(); } catch (_) {}
     try { resetHydration && resetHydration(); } catch (_) {}

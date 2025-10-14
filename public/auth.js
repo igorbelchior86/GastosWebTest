@@ -62,13 +62,8 @@ const emit = (user) => { listeners.forEach(fn => { try { fn(user); } catch {} })
 
 // Enhanced auth state handling for iOS PWA
 onAuthStateChanged(auth, (user) => {
-  console.log('Auth state changed:', user ? user.email : 'signed out');
-  
   if (isIOS && standalone) {
-    console.log('iOS PWA: Auth state change -', user ? 'signed in' : 'signed out');
-    
     if (user) {
-      console.log('iOS PWA: User authenticated, ensuring persistence');
       try {
         // Force persistence to be set again for iOS PWA reliability
         setPersistence(auth, browserLocalPersistence).catch(err => {
@@ -92,31 +87,23 @@ function isStandalone() {
 }
 
 async function completeRedirectIfAny() {
-  try { 
-    console.log('Checking for redirect result...');
+  if (!auth) return null;
+  try {
     const result = await getRedirectResult(auth);
     if (result && result.user) {
-      console.log('Redirect auth successful for', result.user.email);
       return result;
-    } else {
-      console.log('No redirect result found');
     }
+    return null;
   } catch (err) {
-    console.error('Redirect result error:', err);
+    document.dispatchEvent(new CustomEvent('auth:error', { detail: { error: err } }));
+    return null;
   }
-  return null;
 }
 
 // Enhanced redirect handling for PWA resume
 const handleRedirectOnStartup = async () => {
   try {
-    console.log('Auth: Checking for redirect result on startup...');
     const result = await completeRedirectIfAny();
-    if (result && result.user) {
-      console.log('Auth: Startup redirect completed for', result.user.email);
-    } else {
-      console.log('Auth: No pending redirect found');
-    }
   } catch (err) {
     console.warn('Auth: Startup redirect check failed:', err);
   }
@@ -134,7 +121,6 @@ if (isIOS && standalone) {
 async function signInWithGoogle() {
   try {
     const useRedirect = isStandalone();
-    console.log('signInWithGoogle called, useRedirect:', useRedirect, 'isIOS:', isIOS, 'standalone:', standalone);
     
     const u = auth.currentUser;
     if (u && u.isAnonymous) {
@@ -144,13 +130,11 @@ async function signInWithGoogle() {
     
     // For iOS PWA, always try popup first (works reliably)
     if (isIOS && standalone) {
-      console.log('iOS PWA: Using popup for authentication');
       return await signInWithPopup(auth, provider);
     }
     
     // For other platforms, use original logic
     if (useRedirect) {
-      console.log('Using signInWithRedirect for platform');
       return await signInWithRedirect(auth, provider);
     }
     
@@ -159,7 +143,6 @@ async function signInWithGoogle() {
     } catch (err) {
       // Fallback to redirect for environments blocking popups
       if (err && (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/operation-not-supported-in-this-environment')) {
-        console.log('Popup blocked, falling back to redirect');
         return await signInWithRedirect(auth, provider);
       }
       throw err;
@@ -175,7 +158,6 @@ async function signInWithGoogle() {
 async function waitForRedirect() {
   // Since iOS PWA now uses popup, no need to wait for redirect
   if (isIOS && standalone) {
-    console.log('iOS PWA: Using popup, no redirect wait needed');
     return Promise.resolve();
   }
   
@@ -201,8 +183,6 @@ window.Auth = {
 };
 
 // Simplified iOS PWA startup - popup handles auth directly
-if (isIOS && standalone) {
-  console.log('iOS PWA: Enhanced popup-based auth ready');
-}
+// iOS PWA now uses popup-based auth for better reliability
 
 document.dispatchEvent(new CustomEvent('auth:init'));

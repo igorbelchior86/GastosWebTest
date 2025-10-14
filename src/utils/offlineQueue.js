@@ -136,7 +136,7 @@ export function initOfflineQueue(config) {
   if (typeof window !== 'undefined') {
     window.addEventListener('online', processQueue);
     window.addEventListener('offline', () => {
-      console.log('App went offline, operations will be queued');
+      // Operations will be queued when offline
     });
   }
 

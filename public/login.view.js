@@ -33,7 +33,6 @@ function ensureOverlay() {
     const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
     
     if (isIOS && standalone) {
-      console.log('iOS PWA: Starting Google sign-in...');
       btn.innerHTML = `
         <span class="g-badge" aria-hidden>⟳</span>
         <span>Autenticando...</span>
@@ -68,7 +67,6 @@ function show() {
   const el = ensureOverlay();
   el.classList.remove('hidden');
   requestAnimationFrame(() => el.classList.add('visible'));
-  console.log('LoginView: Login shown');
 }
 
 function hide() {
@@ -76,7 +74,6 @@ function hide() {
   if (!el) return;
   el.classList.remove('visible');
   setTimeout(() => el.classList.add('hidden'), 180);
-  console.log('LoginView: Login hidden');
 }
 
 // Check if user was previously authenticated
@@ -95,7 +92,6 @@ function hasPreviousAuth() {
       key.includes('firebase-heartbeat')
     );
     
-    console.log('LoginView: Previous auth check -', { hasFirebaseAuth, hasIndexedDBAuth });
     return hasFirebaseAuth || hasIndexedDBAuth;
   } catch (e) {
     console.warn('LoginView: Error checking previous auth:', e);
@@ -107,11 +103,8 @@ function hasPreviousAuth() {
 function hookAuth() {
   // Check for previous authentication before showing login
   const hadPreviousAuth = hasPreviousAuth();
-  console.log('LoginView: Had previous auth:', hadPreviousAuth);
   
   const update = (user) => {
-    console.log('LoginView: Auth state update -', user ? user.email : 'signed out');
-    
     if (!user || user.isAnonymous) {
       // Only show login immediately if this is truly the first time
       if (!hadPreviousAuth) {
@@ -119,7 +112,6 @@ function hookAuth() {
         hideMainApp();
       } else {
         // User had previous auth but state not ready yet - keep skeleton visible
-        console.log('LoginView: Previous auth detected, keeping skeleton visible during restoration...');
         // Don't hide app here - keep skeleton visible
         
         // Give Firebase time to restore auth state
@@ -127,7 +119,6 @@ function hookAuth() {
           // If still no user after waiting, then show login
           const currentUser = window.Auth ? window.Auth.currentUser : null;
           if (!currentUser || currentUser.isAnonymous) {
-            console.log('LoginView: Auth not restored after timeout, showing login');
             hideMainApp();
             show();
           }
@@ -176,8 +167,6 @@ function hideMainApp() {
   if (header) header.style.display = 'none';
   if (floatingPill) floatingPill.style.display = 'none';
   if (floatingAddButton) floatingAddButton.style.display = 'none';
-  
-  console.log('LoginView: Main app hidden');
 }
 
 function showMainApp() {
@@ -186,13 +175,6 @@ function showMainApp() {
   const floatingPill = document.querySelector('.floating-pill');
   const floatingAddButton = document.querySelector('.floating-add-button');
   
-  console.log('LoginView: showMainApp - elements found:', {
-    wrapper: !!wrapper,
-    header: !!header, 
-    floatingPill: !!floatingPill,
-    floatingAddButton: !!floatingAddButton
-  });
-  
   if (wrapper) {
     wrapper.style.display = '';
     wrapper.classList.remove('app-hidden');
@@ -200,8 +182,6 @@ function showMainApp() {
   if (header) header.style.display = '';
   if (floatingPill) floatingPill.style.display = '';
   if (floatingAddButton) floatingAddButton.style.display = '';
-  
-  console.log('LoginView: Main app shown');
 }
 
 // Offline hint: disable button when navigator.offLine
@@ -227,7 +207,6 @@ if (!hadPreviousAuth) {
   hideMainApp(); // Hide app only if this is the first time
   show(); // Show login immediately for first-time users
 } else {
-  console.log('LoginView: Previous auth detected, showing skeleton app during auth restoration');
   // Show skeleton app immediately when previous auth is detected
   showMainApp();
 }
@@ -240,8 +219,6 @@ const isIOS = /iphone|ipad|ipod/.test(ua);
 const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || ('standalone' in navigator && navigator.standalone);
 
 if (isIOS && standalone) {
-  console.log('LoginView: iOS PWA detected, setting up enhanced auth monitoring');
-  
   // Listen for auth errors specifically
   document.addEventListener('auth:error', (e) => {
     console.error('LoginView: Auth error received:', e.detail);

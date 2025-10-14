@@ -45,7 +45,6 @@ export function applyCurrencyProfile(profileId, options = {}) {
     });
     window.dispatchEvent(event);
 
-    console.log(`Applied currency profile: ${profile.name}`);
     return true;
 
   } catch (error) {

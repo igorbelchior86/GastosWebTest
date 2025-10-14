@@ -691,9 +691,7 @@ export function groupTransactionsByMonth(context) {
  */
 export function createAnimateWrapperScroll(context) {
   return function animateWrapperScroll(targetTop) {
-    console.log('animateWrapperScroll called with targetTop:', targetTop);
     const { wrapperEl } = context;
-    console.log('wrapperEl:', wrapperEl);
     if (!wrapperEl) return;
     if (context.wrapperScrollAnimation) return;
     const startTop = wrapperEl.scrollTop || 0;

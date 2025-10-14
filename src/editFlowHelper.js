@@ -117,9 +117,11 @@ export function createOpenEditFlow(ctx) {
       }
       pendingEditModeRef.set(null);
       pendingEditTxIdRef.set(master ? master.id : tx.id);
-      pendingEditTxIsoRef.set(targetIso || tx.opDate || null);
+      const isoToSet = targetIso || tx.opDate || null;
+      pendingEditTxIsoRef.set(isoToSet);
       modalEl.classList.remove('hidden');
       updateModalOpenState && updateModalOpenState();
+      
       return;
     }
 
