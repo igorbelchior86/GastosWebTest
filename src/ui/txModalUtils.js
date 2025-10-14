@@ -154,21 +154,11 @@ export function focusValueField() {
   try {
     const val = document.getElementById('value');
     if (val) {
-      // Try immediate focus first (important for iOS)
-      val.focus();
-      val.select();
-      
-      // Then try again after modal animation
+      // Small delay to ensure modal is fully visible
       setTimeout(() => {
         val.focus();
-        val.select();
-      }, 150);
-      
-      // Final attempt to ensure focus
-      setTimeout(() => {
-        val.focus();
-        val.select();
-      }, 300);
+        val.select(); // Select any existing text
+      }, 100);
     }
   } catch (error) {
     console.warn('Error focusing value field:', error);

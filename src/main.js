@@ -614,16 +614,7 @@ if(openTxBtn)openTxBtn.onclick=()=>{
   isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;
   if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}
   toggleTxModal();
-  // Focus immediately (for iOS) and also with delay (for animations)
-  const val = document.getElementById('value');
-  if (val) {
-    val.focus();
-    val.select();
-    setTimeout(() => {
-      val.focus();
-      val.select();
-    }, 150);
-  }
+  focusValueField();
 };
 
 if(closeTxModal)closeTxModal.onclick=toggleTxModal;if(txModal)txModal.onclick=e=>{if(e.target===txModal)toggleTxModal();};
