@@ -437,6 +437,19 @@ html[data-theme="light"] .month-header-title::after{
 }
 
 /* Executed block container and lines */
+html[data-theme="light"] .section-title {
+  color: var(--txt-main) !important;
+  font-weight: 700;
+}
+
+html[data-theme="light"] .executed-cash .section-title {
+  border-bottom-color: var(--green) !important;
+}
+
+html[data-theme="light"] .planned-cash .section-title {
+  border-bottom-color: var(--blue) !important;
+}
+
 html[data-theme="light"] .executed-cash{
   background: var(--bg-card) !important;
   -webkit-backdrop-filter: blur(20px) saturate(160%);
@@ -1996,6 +2009,25 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
 .sticky-month.visible{opacity:1;visibility:visible;pointer-events:auto;}
 
 /* ===================== EXECUTADOS / PLANEJADOS BLOCKS ===================== */
+.section-title {
+  font-weight: 600;
+  font-size: 11pt;
+  color: #fff;
+  margin: 0 0 8px 0;
+  padding: 0 4px;
+  font-family: 'SF Pro Display', system-ui, sans-serif;
+  letter-spacing: 0.3px;
+  padding-bottom: 6px;
+}
+
+.executed-cash .section-title {
+  border-bottom: 1px solid var(--green);
+}
+
+.planned-cash .section-title {
+  border-bottom: 1px solid var(--blue);
+}
+
 .executed-cash{
   padding:14px 10px;
   background:var(--glass-bg);

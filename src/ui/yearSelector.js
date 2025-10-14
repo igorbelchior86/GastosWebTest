@@ -176,6 +176,35 @@ export function createYearSelector(options = {}) {
     try {
       renderTable();
     } catch (_) {}
+    
+    const currentYear = new Date().getFullYear();
+    const isCurrentYear = year === currentYear;
+    
+    // Reset scroll to top when selecting a non-current year
+    if (!isCurrentYear) {
+      try {
+        const wrapperEl = document.querySelector('.wrapper');
+        if (wrapperEl) {
+          wrapperEl.scrollTop = 0;
+        }
+      } catch (err) {
+        console.warn('selectYear: Failed to reset scroll:', err);
+      }
+    }
+    
+    // Auto-scroll to today if selecting current year
+    try {
+      if (isCurrentYear) {
+        const g = window.__gastos || {};
+        if (typeof g.scrollTodayIntoView === 'function') {
+          setTimeout(() => {
+            g.scrollTodayIntoView();
+          }, 400);
+        }
+      }
+    } catch (err) {
+      console.warn('selectYear: auto-scroll failed:', err);
+    }
   }
 
   // Return the public API

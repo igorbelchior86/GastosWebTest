@@ -283,8 +283,17 @@ export function initAccordion(config) {
     // Build the running balance map once per render
     const balanceMap = buildRunningBalanceMap();
     const txs = getTransactions ? getTransactions() : transactions;
+    
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    
     // Preserve which <details> are open before re-render
-    const openKeys = Array.from(accEl.querySelectorAll('details[open]')).map(d => d.dataset.key || '');
+    // IMPORTANT: For non-current years, ignore openKeys (collapse all months)
+    const isCurrentYearView = viewYear === curYear;
+    const openKeys = isCurrentYearView 
+      ? Array.from(accEl.querySelectorAll('details[open]')).map(d => d.dataset.key || '')
+      : [];
     const openInvoices = Array.from(accEl.querySelectorAll('details.invoice[open]')).map(d => d.dataset.pd);
     
     // Performance optimization: use DocumentFragment to batch DOM operations
@@ -293,9 +302,6 @@ export function initAccordion(config) {
     
     // Função auxiliar para aplicar shimmer nos valores quando em modo skeleton
     const currency = v => isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 60px; height: 14px;"></span>' : safeFmtCurrency(v);
-    const now = new Date();
-    const curMonth = now.getMonth();
-    const curYear = now.getFullYear();
     const baselineBalance = Number.isFinite(state?.startBalance) ? Number(state.startBalance) : 0;
     const minDateObj = new Date(minDate);
 
@@ -320,7 +326,7 @@ export function initAccordion(config) {
     // viewYear already declared above
     
     // Progressive rendering strategy: prioritize current month
-    const isCurrentYearView = viewYear === curYear;
+    // isCurrentYearView already declared earlier
     const priorityMonth = isCurrentYearView ? curMonth : -1; // Current month gets priority
     
     for (let mIdx = 0; mIdx < 12; mIdx++) {
@@ -333,8 +339,10 @@ export function initAccordion(config) {
       const isPriorityMonth = mIdx === priorityMonth;
       
       // Open logic: current month + manually opened + future months in current year
-      const isOpen = openKeys.includes(mDet.dataset.key) || 
-                     (isCurrentYear ? (mIdx >= curMonth) : false);
+      // IMPORTANT: For non-current years, collapse all months (openKeys will be empty after year change)
+      const isOpen = isCurrentYear 
+        ? (openKeys.includes(mDet.dataset.key) || mIdx >= curMonth)
+        : openKeys.includes(mDet.dataset.key);
       mDet.open = isOpen;
       const monthTotal = (txs || [])
         .filter(t => new Date(t.postDate).getMonth() === mIdx)
@@ -600,6 +608,13 @@ export function initAccordion(config) {
         if (plannedOps.length > 0) {
           const plannedContainer = document.createElement('div');
           plannedContainer.className = 'planned-cash';
+          
+          // Add section title
+          const plannedTitle = document.createElement('div');
+          plannedTitle.className = 'section-title';
+          plannedTitle.textContent = 'Planejados:';
+          plannedContainer.appendChild(plannedTitle);
+          
           if (isSkeletonMode || typeof makeLine !== 'function') {
             plannedOps.forEach(tx => {
               const div = document.createElement('div');
@@ -632,6 +647,13 @@ export function initAccordion(config) {
         if (executedOps.length > 0) {
           const executedContainer = document.createElement('div');
           executedContainer.className = 'executed-cash';
+          
+          // Add section title
+          const executedTitle = document.createElement('div');
+          executedTitle.className = 'section-title';
+          executedTitle.textContent = 'Executados:';
+          executedContainer.appendChild(executedTitle);
+          
           if (isSkeletonMode || typeof makeLine !== 'function') {
             executedOps.forEach(tx => {
               const div = document.createElement('div');
@@ -678,10 +700,13 @@ export function initAccordion(config) {
   
   // Lazy loading setup - listens for month expansion
   function setupLazyLoading(accEl) {
-    if (setupLazyLoading._attached) return; // Prevent multiple listeners
-    setupLazyLoading._attached = true;
+    // Remove old listener if exists to prevent duplicates
+    if (setupLazyLoading._listener) {
+      accEl.removeEventListener('toggle', setupLazyLoading._listener, true);
+    }
     
-    accEl.addEventListener('toggle', (e) => {
+    // Create new listener
+    const listener = (e) => {
       const monthEl = e.target.closest('details.month');
       if (!monthEl || !monthEl.open) return;
       
@@ -695,7 +720,13 @@ export function initAccordion(config) {
       setTimeout(() => {
         loadFullMonthContent(monthEl, monthIndex, placeholder);
       }, 50); // Small delay for smooth UX
-    });
+    };
+    
+    // Store listener reference for cleanup
+    setupLazyLoading._listener = listener;
+    
+    // Attach listener with capture phase to ensure we catch it first
+    accEl.addEventListener('toggle', listener, true);
   }
   
   // Load full month content on demand
@@ -708,14 +739,52 @@ export function initAccordion(config) {
       const txs = getTransactions ? getTransactions() : transactions;
       const daysInMonth = new Date(viewYear, monthIndex + 1, 0).getDate();
       
-      // Render full month content
-      const content = renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs);
+      // Calculate balances for this specific month
+      // We need to compute from the start of the year to this month to get accurate balances
+      const monthBalanceMap = new Map();
+      const { minDate, maxDate } = calculateDateRange();
+      const minDateObj = new Date(minDate);
+      const startDate = state.startDate ? new Date(state.startDate) : new Date(minDate);
+      const baselineBalance = Number(state.startBalance) || 0;
+      
+      // Calculate running balance from start to end of this month
+      let runningBalance = baselineBalance;
+      const monthStart = new Date(viewYear, monthIndex, 1);
+      const monthEnd = new Date(viewYear, monthIndex + 1, 0);
+      
+      for (let d = new Date(startDate); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        const iso = d.toISOString().slice(0, 10);
+        
+        // Cash impact (same logic as main render)
+        const cashNonRecurring = (txs || [])
+          .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso && !t.invoiceAdjust)
+          .reduce((s, t) => s + (Number(t.val) || 0), 0);
+        const cashRecurring = (txs || [])
+          .filter(t => t.method === 'Dinheiro' && t.recurrence)
+          .filter(t => occursOn(t, iso))
+          .reduce((s, t) => s + (Number(t.val) || 0), 0);
+        const cashImpact = cashNonRecurring + cashRecurring;
+        
+        runningBalance += cashImpact;
+        monthBalanceMap.set(iso, runningBalance);
+      }
+      
+      const simpleGetBalanceBefore = (iso) => {
+        if (!iso) return baselineBalance;
+        const target = new Date(iso);
+        target.setDate(target.getDate() - 1);
+        const key = target.toISOString().slice(0, 10);
+        return monthBalanceMap.has(key) ? monthBalanceMap.get(key) : baselineBalance;
+      };
+      
+      // Render full month content with calculated balances
+      const content = renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs, monthBalanceMap, simpleGetBalanceBefore);
       
       // Replace placeholder with real content
       placeholder.replaceWith(...content);
       
     } catch (error) {
-      console.error('Failed to load month content:', error);
+      console.error('❌ Failed to load month content:', error);
       placeholder.innerHTML = '<div class="lazy-error">Erro ao carregar</div>';
     }
   }
@@ -777,7 +846,7 @@ export function initAccordion(config) {
       });
       
     } catch (error) {
-      console.warn('Background sync failed:', error);
+      // Silent fail for background sync
     }
   }
   
@@ -846,13 +915,176 @@ export function initAccordion(config) {
   }
   
   // Extract full month content rendering
-  function renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs) {
+  function renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs, balanceMap, getBalanceBefore) {
     const elements = [];
-    // Implementation would go here - extracted from the main loop
-    // For now, return a simple placeholder
-    const div = document.createElement('div');
-    div.innerHTML = '<div class="month-content">Conteúdo carregado!</div>';
-    return [div];
+    
+    // Get all required helpers from already resolved context variables
+    // These are already defined in the outer scope from ctx
+    // const occursOn, post, makeLine, todayISO, etc. are all already available
+    
+    // Balance map is passed as parameter (may be empty for lazy loaded months)
+    // const balanceMap - passed as parameter
+    
+    // Get transactions for this month
+    const txByDate = (iso) => {
+      const direct = (txs || []).filter(t => !t.recurrence && (t.opDate === iso || t.postDate === iso));
+      const recurring = (txs || []).filter(t => t.recurrence && occursOn(t, iso));
+      return [...direct, ...recurring];
+    };
+    
+    const openKeys = []; // No preserved open state for lazy loaded content
+    const isSkeletonMode = false;
+    
+    // Render each day of the month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(viewYear, monthIndex, d);
+      const iso = formatToISO(dateObj);
+      const dayTx = txByDate(iso);
+      
+      // Daily cash impact calculation (same as main loop)
+      const cashNonRecurring = (txs || [])
+        .filter(t => t.method === 'Dinheiro' && !t.recurrence && t.opDate === iso && !t.invoiceAdjust)
+        .reduce((s, t) => s + (Number(t.val) || 0), 0);
+      const cashRecurring = (txs || [])
+        .filter(t => t.method === 'Dinheiro' && t.recurrence)
+        .filter(t => occursOn(t, iso))
+        .reduce((s, t) => s + (Number(t.val) || 0), 0);
+      const cashImpact = cashNonRecurring + cashRecurring;
+      
+      // Build invoice groups
+      const invoicesByCard = {};
+      const currentCards = resolveCards();
+      const addToGroup = (cardName, tx) => {
+        if (!invoicesByCard[cardName]) invoicesByCard[cardName] = [];
+        invoicesByCard[cardName].push(tx);
+      };
+      
+      // Non-recurring card transactions
+      (txs || []).forEach(t => {
+        if (t.method !== 'Dinheiro' && !t.recurrence && t.postDate === iso) {
+          const validCard = currentCards.some(c => c && c.name === t.method && c.name !== 'Dinheiro');
+          if (!validCard) return;
+          addToGroup(t.method, t);
+        }
+      });
+      
+      // Recurring card transactions
+      const scanStart = new Date(iso);
+      scanStart.setDate(scanStart.getDate() - 60);
+      for (const master of (txs || []).filter(t => t.recurrence && t.method !== 'Dinheiro')) {
+        const validCard = currentCards.some(c => c && c.name === master.method && c.name !== 'Dinheiro');
+        if (!validCard) continue;
+        for (let d2 = new Date(scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
+          const occIso = d2.toISOString().slice(0, 10);
+          if (!occursOn(master, occIso)) continue;
+          const pd = post(occIso, master.method);
+          if (pd === iso) {
+            addToGroup(master.method, { ...master, opDate: occIso, postDate: iso, planned: false, recurrence: '' });
+          }
+        }
+      }
+      
+      // Invoice totals
+      const invoiceTotals = {};
+      Object.keys(invoicesByCard).forEach(cardName => {
+        invoiceTotals[cardName] = invoicesByCard[cardName].reduce((s, t) => s + t.val, 0);
+      });
+      
+      const sumAdjustFor = (cardName, dueISO) => (txs || [])
+        .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
+        .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
+      
+      let cardImpact = 0;
+      Object.keys(invoiceTotals).forEach(cardName => {
+        const adj = sumAdjustFor(cardName, iso);
+        cardImpact += (invoiceTotals[cardName] + adj);
+      });
+      
+      const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : 0;
+      const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
+      
+      // Create day details element
+      const dDet = document.createElement('details');
+      dDet.className = 'day';
+      dDet.dataset.key = `d-${iso}`;
+      dDet.dataset.has = String(dayTx.length > 0);
+      if (iso === todayISO()) dDet.classList.add('today');
+      
+      const dSum = document.createElement('summary');
+      dSum.className = 'day-summary';
+      const saldoFormatado = safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
+      const hasCardDue = currentCards.some(card => card.due === d);
+      const hasSalary = dayTx.some(t => SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w)));
+      const labelParts = [baseLabel];
+      if (hasCardDue) labelParts.push('<span class="icon-invoice"></span>');
+      if (hasSalary) labelParts.push('<span class="icon-salary"></span>');
+      const labelWithDue = labelParts.join('');
+      dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
+      if (dayBalance < 0) dDet.classList.add('negative');
+      dDet.appendChild(dSum);
+      
+      // Add invoice details (simplified - just the list, no swipe actions for lazy loaded content)
+      Object.keys(invoicesByCard).forEach(cardName => {
+        const det = document.createElement('details');
+        det.className = 'invoice';
+        det.dataset.pd = iso;
+        
+        const invHeader = createCardInvoiceHeader(cardName, invoiceTotals[cardName] || 0, iso, txs, false);
+        det.appendChild(invHeader);
+        
+        if (typeof makeLine === 'function') {
+          const invList = document.createElement('ul');
+          invList.className = 'executed-list';
+          (invoicesByCard[cardName] || []).forEach(tx => {
+            const li = document.createElement('li');
+            const line = makeLine(tx, false, true);
+            if (line) li.appendChild(line);
+            invList.appendChild(li);
+          });
+          det.appendChild(invList);
+        }
+        dDet.appendChild(det);
+      });
+      
+      // Planned operations
+      const plannedOps = dayTx.filter(t => t.planned);
+      if (plannedOps.length > 0 && typeof makeLine === 'function') {
+        const plannedContainer = document.createElement('div');
+        plannedContainer.className = 'planned-cash';
+        const list = document.createElement('ul');
+        list.className = 'planned-list';
+        plannedOps.forEach(tx => {
+          const li = document.createElement('li');
+          const line = makeLine(tx);
+          if (line) li.appendChild(line);
+          list.appendChild(li);
+        });
+        plannedContainer.appendChild(list);
+        dDet.appendChild(plannedContainer);
+      }
+      
+      // Executed operations
+      const executedOps = dayTx.filter(t => !t.planned);
+      if (executedOps.length > 0 && typeof makeLine === 'function') {
+        const executedContainer = document.createElement('div');
+        executedContainer.className = 'executed-cash';
+        const list = document.createElement('ul');
+        list.className = 'executed-list';
+        executedOps.forEach(tx => {
+          const li = document.createElement('li');
+          const line = makeLine(tx);
+          if (line) li.appendChild(line);
+          list.appendChild(li);
+        });
+        executedContainer.appendChild(list);
+        dDet.appendChild(executedContainer);
+      }
+      
+      elements.push(dDet);
+    }
+    
+    return elements;
   }
   
   return { renderAccordion };

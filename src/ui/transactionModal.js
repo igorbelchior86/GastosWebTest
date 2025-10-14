@@ -365,32 +365,22 @@ export async function addTx() {
       // because it may have been updated by the edit recurrence modal buttons
       const currentEditMode = g.pendingEditMode;
       const currentEditTxIso = g.pendingEditTxIso;
-      
-      // DEBUG: Log the edit mode being used
-      console.log('🔍 Edit mode:', currentEditMode, '| TxId:', isEditing, '| ISO:', currentEditTxIso);
 
       switch (currentEditMode) {
         case 'single': {
-          console.log('✅ Editing SINGLE occurrence for ISO:', currentEditTxIso);
-
           // For 'single' mode, we:
           // 1. Add this date to the master's exceptions list
           // 2. Create a NEW standalone transaction for this specific date with the edited values
           
           const targetMaster = masterForTx || t;
-          console.log('📝 Target master ID:', targetMaster?.id, 'Current tx ID:', t.id);
           
           // Add exception to master
           if (targetMaster) {
             targetMaster.exceptions = Array.isArray(targetMaster.exceptions) ? targetMaster.exceptions : [];
             if (!targetMaster.exceptions.includes(currentEditTxIso)) {
               targetMaster.exceptions.push(currentEditTxIso);
-              console.log('📝 Added exception:', currentEditTxIso);
-            } else {
-              console.log('📝 Exception already exists:', currentEditTxIso);
             }
             targetMaster.modifiedAt = new Date().toISOString();
-            console.log('📝 Master exceptions now:', targetMaster.exceptions);
           }
           
           // Check if a detached transaction already exists for this date
@@ -403,7 +393,6 @@ export async function addTx() {
           
           if (existingDetached) {
             // Update existing detached transaction
-            console.log('📝 Updating existing detached tx:', existingDetached.id);
             existingDetached.desc = newDesc;
             existingDetached.val = newVal;
             existingDetached.method = newMethod;
@@ -427,13 +416,11 @@ export async function addTx() {
               ts: new Date().toISOString(),
               modifiedAt: new Date().toISOString()
             };
-            console.log('📝 Creating new standalone tx with parentId:', txObj.parentId, 'for date:', newOpDate);
             try { addTxInternal(txObj); } catch (_) { setTxs(getTxs().concat([txObj])); }
           }
           break;
         }
         case 'future': {
-          console.log('✅ Editing FUTURE occurrences');
           // End original series at this occurrence
           const targetMaster = masterForTx || t;
           if (targetMaster) {
@@ -463,7 +450,6 @@ export async function addTx() {
           break;
         }
         case 'all': {
-          console.log('✅ Editing ALL occurrences');
           // EDITAR TODAS — Apenas altera a REGRA‑MESTRE, preservando ocorrências
           const master = t.parentId
             ? getTxs().find(tx => tx && sameId && sameId(tx.id, t.parentId))
@@ -481,7 +467,6 @@ export async function addTx() {
           break;
         }
         default: {
-          console.warn('⚠️ NO edit mode specified - using DEFAULT (modifies single transaction)');
           // Fallback: modify just this entry
           t.desc       = newDesc;
           t.val        = newVal;

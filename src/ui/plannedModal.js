@@ -69,6 +69,7 @@ export function setupPlannedModal() {
     const today = typeof todayISO === 'function' ? todayISO() : new Date().toISOString().slice(0, 10);
     const todayDate = new Date(today + 'T00:00');
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+    
     const matchesActual = (candidate) => {
       return txs.some((other) => {
         if (!other || other === candidate) return false;
@@ -81,12 +82,25 @@ export function setupPlannedModal() {
       });
     };
     for (const tx of txs) {
-      if (!tx || !tx.planned || !tx.opDate) continue;
-      const txDate = new Date(tx.opDate + 'T00:00');
-      const isFuture = tx.opDate >= today;
-      const isToday = tx.opDate === today;
-      const pendingPast = txDate < todayDate && !matchesActual(tx);
-      if (isFuture || isToday || pendingPast) add(tx);
+      if (!tx || !tx.opDate) continue;
+      
+      // Include explicitly planned transactions (planned: true)
+      if (tx.planned) {
+        const txDate = new Date(tx.opDate + 'T00:00');
+        const isFuture = tx.opDate >= today;
+        const isToday = tx.opDate === today;
+        const pendingPast = txDate < todayDate && !matchesActual(tx);
+        if (isFuture || isToday || pendingPast) {
+          add(tx);
+        }
+        continue;
+      }
+      
+      // Include child transactions of recurring series that are in the future
+      // (but NOT the master transaction itself, even if it's in the future)
+      if (tx.parentId && tx.opDate >= today) {
+        add(tx);
+      }
     }
     // Project recurring master transactions for the next 90 days
     const DAYS_AHEAD = 90;
@@ -100,15 +114,21 @@ export function setupPlannedModal() {
         const occurs = typeof occursOn === 'function' ? occursOn(master, iso)
           : (typeof g.occursOn === 'function' ? g.occursOn(master, iso) : false);
         if (!occurs) continue;
-        if (master.exceptions && Array.isArray(master.exceptions) && master.exceptions.includes(iso)) continue;
-        if (master.recurrenceEnd && iso >= master.recurrenceEnd) continue;
+        if (master.exceptions && Array.isArray(master.exceptions) && master.exceptions.includes(iso)) {
+          continue;
+        }
+        if (master.recurrenceEnd && iso >= master.recurrenceEnd) {
+          continue;
+        }
         // Avoid duplicate planned occurrences for the same day
         const dup = (plannedByDate[iso] || []).some(t =>
           (t.parentId && (sameId ? sameId(t.parentId, master.id) : (g.sameId && g.sameId(t.parentId, master.id)))) ||
           ((t.desc || '') === (master.desc || '') && (t.method || '') === (master.method || '') &&
             Math.abs(Number(t.val || 0)) === Math.abs(Number(master.val || 0)))
         );
-        if (dup) continue;
+        if (dup) {
+          continue;
+        }
         // Skip if an actual transaction exists for this date that matches the master
         const exists = txs.some(t =>
           t && t.opDate === iso && (
@@ -117,7 +137,9 @@ export function setupPlannedModal() {
               Math.abs(Number(t.val || 0)) === Math.abs(Number(master.val || 0)))
           )
         );
-        if (exists) continue;
+        if (exists) {
+          continue;
+        }
         add({
           ...master,
           id: `${master.id || 'r'}_${iso}`,

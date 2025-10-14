@@ -106,6 +106,7 @@ const yearSelectorApi = createYearSelector({
   getViewYear: () => VIEW_YEAR,
   setViewYear: (year) => {
     VIEW_YEAR = year;
+    if (window.__gastos) window.__gastos.VIEW_YEAR = year;
   },
   getTransactions: () => {
     try { return getTransactions ? getTransactions() : transactions; }
@@ -579,7 +580,8 @@ function toggleTxModal(){
   txModal.classList.toggle('hidden');
   if(openTxBtn)openTxBtn.style.transform=isOpening?'rotate(45deg)':'rotate(0deg)';
   const g = window.__gastos;
-  if(isOpening && !isEditing && !g?.isEditing)focusValueField();
+  // Removed automatic focus to prevent viewport/keyboard issues on mobile
+  // if(isOpening && !isEditing && !g?.isEditing)focusValueField();
   
   // Update modal state with iOS scroll fix
   if(!isOpening){
@@ -614,7 +616,7 @@ if(openTxBtn)openTxBtn.onclick=()=>{
   isEditing=null;pendingEditMode=null;pendingEditTxId=null;pendingEditTxIso=null;
   if(txModal&&txModal.classList.contains('hidden')){resetTxModal();}
   toggleTxModal();
-  focusValueField();
+  // Removed automatic focus - user will tap the field when ready
 };
 
 if(closeTxModal)closeTxModal.onclick=toggleTxModal;if(txModal)txModal.onclick=e=>{if(e.target===txModal)toggleTxModal();};
@@ -647,7 +649,7 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,cards,openPayInvoiceModal,resetTxModal,resetAppStateForProfileChange,addTx:null};
+window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,occursOn,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,VIEW_YEAR,cards,openPayInvoiceModal,resetTxModal,resetAppStateForProfileChange,addTx:null};
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -1039,6 +1041,7 @@ try {
   // CRITICAL: Update the global context to use the new animated function
   if (window.__gastos) {
     window.__gastos.animateWrapperScroll = animateWrapperScroll;
+    window.__gastos.scrollTodayIntoView = scrollTodayIntoView;
   }
 } catch (err) {
   console.error('Helper binding failed:', err);
@@ -1142,16 +1145,12 @@ document.addEventListener('click',e=>{
   const dateEl = container.closest('[data-date]') || container.querySelector('[data-date]');
   const dateFromDom = dateEl ? dateEl.dataset.date : null;
   
-  console.log('🔍 Edit clicked - ID:', id, 'Date from DOM:', dateFromDom, 'Container:', container.className);
-  
   const txs=getTransactions?getTransactions():transactions;
   const t=txs.find(x=>x&&x.id===id);
   if(!t)return;
   
   // Use the date from DOM if available, otherwise fallback to t.opDate
   const targetDate = dateFromDom || t.opDate;
-  
-  console.log('🔍 Target date:', targetDate, 't.opDate:', t.opDate);
   
   try{
     if(typeof openEditFlow==='function'){

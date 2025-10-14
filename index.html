@@ -279,6 +279,20 @@
     </div>
   </div>
 
+  <!-- Modal Confirmar excluir transação -->
+  <div id="confirmDeleteModal" class="bottom-modal backdrop-blur hidden" role="dialog" aria-modal="true" aria-labelledby="confirmDeleteTitle">
+    <div class="bottom-modal-box">
+      <div class="modal-drag"></div>
+      <h2 id="confirmDeleteTitle">Excluir Transação</h2>
+      <button id="closeConfirmDelete" class="modal-close-btn" aria-label="Fechar">✕</button>
+      <div class="form-grid">
+        <p id="deleteMessage" style="margin: 6px 0 4px; color: var(--txt-main); text-align:center;">Deseja realmente excluir esta transação?</p>
+        <button id="confirmDeleteYes" class="action-btn danger-btn">Excluir</button>
+        <button id="confirmDeleteNo" class="action-btn cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal País / Moeda (profiles) -->
   <div id="currencyProfileModal" class="bottom-modal backdrop-blur hidden sheet-modal" role="dialog" aria-modal="true" aria-labelledby="currencyProfileTitle">
     <div class="bottom-modal-box">

@@ -69,7 +69,55 @@ export function askMoveToToday() {
     confirmMoveNo.onclick  = () => { cleanup(); resolve(false); };
     if (closeConfirmMove) closeConfirmMove.onclick = () => { cleanup(); resolve(false); };
     confirmMoveModal.onclick = (e) => { if (e.target === confirmMoveModal) { cleanup(); resolve(false); } };
-    confirmMoveModal.classList.remove('hidden');
+    confirmResetModal.classList.remove('hidden');
+    updateModalOpenState();
+  });
+}
+
+/**
+ * Prompts the user to confirm deleting a transaction. Uses a custom modal when 
+ * available or falls back to window.confirm. Returns a promise that resolves 
+ * with the user's choice.
+ * @param {string} transactionDesc Optional description of the transaction being deleted
+ * @returns {Promise<boolean>} Resolves with true if the user confirms deletion.
+ */
+export function askConfirmDelete(transactionDesc = '') {
+  const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+  const confirmDeleteYes   = document.getElementById('confirmDeleteYes');
+  const confirmDeleteNo    = document.getElementById('confirmDeleteNo');
+  const closeConfirmDelete = document.getElementById('closeConfirmDelete');
+  const deleteMessage      = document.getElementById('deleteMessage');
+
+  if (!confirmDeleteModal || !confirmDeleteYes || !confirmDeleteNo) {
+    const msg = transactionDesc 
+      ? `Deseja realmente excluir "${transactionDesc}"?`
+      : 'Deseja realmente excluir esta transação?';
+    return Promise.resolve(window.confirm(msg));
+  }
+  
+  return new Promise(resolve => {
+    // Update message if element exists
+    if (deleteMessage && transactionDesc) {
+      deleteMessage.textContent = `Deseja realmente excluir "${transactionDesc}"?`;
+    } else if (deleteMessage) {
+      deleteMessage.textContent = 'Deseja realmente excluir esta transação?';
+    }
+    
+    const cleanup = () => {
+      confirmDeleteModal.classList.add('hidden');
+      updateModalOpenState();
+      confirmDeleteYes.onclick = null;
+      confirmDeleteNo.onclick = null;
+      if (closeConfirmDelete) closeConfirmDelete.onclick = null;
+      confirmDeleteModal.onclick = null;
+    };
+    
+    confirmDeleteYes.onclick = () => { cleanup(); resolve(true); };
+    confirmDeleteNo.onclick = () => { cleanup(); resolve(false); };
+    if (closeConfirmDelete) closeConfirmDelete.onclick = () => { cleanup(); resolve(false); };
+    confirmDeleteModal.onclick = (e) => { if (e.target === confirmDeleteModal) { cleanup(); resolve(false); } };
+    
+    confirmDeleteModal.classList.remove('hidden');
     updateModalOpenState();
   });
 }

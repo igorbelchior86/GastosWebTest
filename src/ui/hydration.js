@@ -52,11 +52,7 @@ export function resetHydration() {
  * @param {boolean} enabled whether to track this target
  */
 export function registerHydrationTarget(key, enabled) {
-  if (!enabled || !key) {
-    console.log('registerHydrationTarget: skipping', key, 'enabled:', enabled);
-    return;
-  }
-  // Registering hydration target
+  if (!enabled || !key) return;
   hydrationTargets.set(key, false);
 }
 
@@ -67,11 +63,7 @@ export function registerHydrationTarget(key, enabled) {
  * @param {string} key identifier previously passed to registerHydrationTarget
  */
 export function markHydrationTargetReady(key) {
-  if (!key || !hydrationTargets.has(key)) {
-    // Hydration target not found or invalid
-    return;
-  }
-  // Marking hydration target as ready
+  if (!key || !hydrationTargets.has(key)) return;
   hydrationTargets.set(key, true);
   maybeCompleteHydration();
 }
@@ -81,22 +73,12 @@ export function markHydrationTargetReady(key) {
  * completion. Exposed only for the fallback timer.
  */
 function maybeCompleteHydration() {
-  if (!hydrationInProgress) {
-    console.log('maybeCompleteHydration: hydration not in progress');
-    return;
-  }
-  
-  const targets = Array.from(hydrationTargets.entries());
-  // Checking hydration targets
+  if (!hydrationInProgress) return;
   
   for (const status of hydrationTargets.values()) {
-    if (status === false) {
-      // Not all targets ready, continuing hydration
-      return;
-    }
+    if (status === false) return;
   }
   
-  // All targets ready, completing hydration
   completeHydration();
 }
 
@@ -106,13 +88,11 @@ function maybeCompleteHydration() {
  * attach their own hooks to run after hydration completes.
  */
 export function completeHydration() {
-  if (!hydrationInProgress) {
-    console.log('completeHydration: hydration not in progress, skipping');
-    return;
-  }
-  // Starting hydration completion
+  if (!hydrationInProgress) return;
+  
   hydrationInProgress = false;
   hydrationTargets.clear();
+  
   try {
     if (_hydrationFallbackTimer) {
       clearTimeout(_hydrationFallbackTimer);
@@ -121,48 +101,45 @@ export function completeHydration() {
   } catch {
     /* ignore */
   }
-  // Delegate to hooks on window if present. These mirror the original
-  // calls in main.js and keep the hydration behaviour consistent.
+  
+  // Delegate to hooks on window if present
   try {
-    console.log('completeHydration: calling ensureStartSetFromBalance');
     if (typeof window.ensureStartSetFromBalance === 'function') {
       window.ensureStartSetFromBalance({ persist: true });
     }
-  } catch (err) {
-    console.warn('completeHydration: ensureStartSetFromBalance failed:', err);
-  }
+  } catch (err) { /* ignore */ }
+  
   try {
-    console.log('completeHydration: calling refreshMethods');
     if (typeof window.refreshMethods === 'function') window.refreshMethods();
-  } catch (err) {
-    console.warn('completeHydration: refreshMethods failed:', err);
-  }
+  } catch (err) { /* ignore */ }
+  
   try {
-    console.log('completeHydration: calling renderCardList');
     if (typeof window.renderCardList === 'function') window.renderCardList();
-  } catch (err) {
-    console.warn('completeHydration: renderCardList failed:', err);
-    /* ignore */
-  }
+  } catch (err) { /* ignore */ }
+  
   try {
-    console.log('completeHydration: calling initStart');
     if (typeof window.initStart === 'function') window.initStart();
-  } catch (err) {
-    console.warn('completeHydration: initStart failed:', err);
-  }
+  } catch (err) { /* ignore */ }
+  
   try {
-    console.log('completeHydration: calling safeRenderTable - THIS SHOULD REMOVE SKELETON');
     if (typeof window.safeRenderTable === 'function') window.safeRenderTable();
-  } catch (err) {
-    console.warn('completeHydration: safeRenderTable failed:', err);
-  }
+  } catch (err) { /* ignore */ }
+  
   try {
-    console.log('completeHydration: removing skeleton-boot class');
     document.documentElement.classList.remove('skeleton-boot');
-  } catch (err) {
-    console.warn('completeHydration: skeleton-boot removal failed:', err);
-  }
-  console.log('completeHydration: hydration completion process finished');
+  } catch (err) { /* ignore */ }
+  
+  // Auto-scroll to today if displaying current year
+  try {
+    const g = window.__gastos || {};
+    const currentYear = new Date().getFullYear();
+    const viewYear = g.VIEW_YEAR || (g.yearSelectorApi && typeof g.yearSelectorApi.getViewYear === 'function' ? g.yearSelectorApi.getViewYear() : null);
+    if (viewYear === currentYear && typeof g.scrollTodayIntoView === 'function') {
+      setTimeout(() => {
+        g.scrollTodayIntoView();
+      }, 400);
+    }
+  } catch (err) { /* ignore */ }
 }
 
 /**

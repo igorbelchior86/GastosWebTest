@@ -8,6 +8,9 @@
  * requiring long parameter lists.
  */
 
+import { askConfirmDelete } from './modalHelpers.js';
+import { updateModalOpenState } from '../utils/dom.js';
+
 export function setupRecurrenceHandlers() {
   const g = (window.__gastos = window.__gastos || {});
   if (g.__recurrenceHandlersInit) return;
@@ -40,6 +43,7 @@ export function setupRecurrenceHandlers() {
     if (deleteRecurrenceModal) deleteRecurrenceModal.classList.add('hidden');
     g.pendingDeleteTxId = null;
     g.pendingDeleteTxIso = null;
+    updateModalOpenState();
   }
 
   /**
@@ -76,18 +80,18 @@ export function setupRecurrenceHandlers() {
   }
 
   /**
-   * Deletes a transaction or opens the recurrence scope modal. If the
-   * transaction is neither recurring nor a child occurrence it is
-   * removed immediately. Otherwise, deletion options (single/future/all)
-   * are presented in the delete modal.
+   * Deletes a transaction by ID. If the transaction is recurring, opens
+   * a modal to choose the deletion scope. Otherwise asks for confirmation
+   * and deletes immediately.
    *
-   * @param {number} id The transaction id
+   * @param {string} id The transaction ID
    * @param {string} iso Optional date for the occurrence
    */
-  function delTx(id, iso) {
+  async function delTx(id, iso) {
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
     const t = txs.find(x => sameId ? sameId(x.id, id) : (g.sameId && g.sameId(x.id, id)));
     if (!t) return;
+    
     const parent = t.parentId
       ? txs.find(p => sameId ? sameId(p.id, t.parentId) : (g.sameId && g.sameId(p.id, t.parentId)))
       : null;
@@ -96,8 +100,12 @@ export function setupRecurrenceHandlers() {
       ? parent.exceptions.includes(isoToCheck)
       : false;
     const isDetachedOccurrence = !!t.parentId && parentHasException;
-    // Non-recurring or detached occurrence: delete immediately
+    
+    // Non-recurring or detached occurrence: ask confirmation then delete immediately
     if ((!t.recurrence && !t.parentId) || isDetachedOccurrence) {
+      const shouldDelete = await askConfirmDelete(t.desc);
+      if (!shouldDelete) return;
+      
       try { removeTransaction && removeTransaction(id); } catch (_) {
         if (typeof setTransactions === 'function') setTransactions((getTransactions() || []).filter(x => !(sameId ? sameId(x.id, id) : (g.sameId && g.sameId(x.id, id)))));
       }
@@ -109,13 +117,12 @@ export function setupRecurrenceHandlers() {
       if (typeof showToast === 'function') showToast('Operação excluída.', 'success');
       return;
     }
-    // Recurring: store context and show modal
+    
+    // Recurring: store context and show scope modal (confirmation will happen after scope selection)
     g.pendingDeleteTxId = id;
     g.pendingDeleteTxIso = iso || t.opDate;
     if (deleteRecurrenceModal) deleteRecurrenceModal.classList.remove('hidden');
-  }
-
-  // Assign modal-level close handlers
+  }  // Assign modal-level close handlers
   if (closeDeleteRecurrenceModal) closeDeleteRecurrenceModal.onclick = closeDeleteModal;
   if (cancelDeleteRecurrence) cancelDeleteRecurrence.onclick = closeDeleteModal;
   if (deleteRecurrenceModal) {
@@ -126,12 +133,17 @@ export function setupRecurrenceHandlers() {
 
   // Handler for deleting a single occurrence
   if (deleteSingleBtn) {
-    deleteSingleBtn.onclick = () => {
+    deleteSingleBtn.onclick = async () => {
       const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
       const tx = txs.find(t => sameId ? sameId(t.id, g.pendingDeleteTxId) : (g.sameId && g.sameId(t.id, g.pendingDeleteTxId)));
       const iso = g.pendingDeleteTxIso;
-      const refreshPlanned = plannedModal && !plannedModal.classList.contains('hidden');
       if (!tx) { closeDeleteModal(); return; }
+      
+      // Ask for confirmation before deleting
+      const shouldDelete = await askConfirmDelete(tx.desc);
+      if (!shouldDelete) { closeDeleteModal(); return; }
+      
+      const refreshPlanned = plannedModal && !plannedModal.classList.contains('hidden');
       const master = findMasterRuleFor(tx, iso);
       if (master) {
         master.exceptions = master.exceptions || [];
@@ -164,12 +176,17 @@ export function setupRecurrenceHandlers() {
 
   // Handler for deleting this and future occurrences
   if (deleteFutureBtn) {
-    deleteFutureBtn.onclick = () => {
+    deleteFutureBtn.onclick = async () => {
       const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
       const tx = txs.find(t => sameId ? sameId(t.id, g.pendingDeleteTxId) : (g.sameId && g.sameId(t.id, g.pendingDeleteTxId)));
       const iso = g.pendingDeleteTxIso;
-      const refreshPlanned = plannedModal && !plannedModal.classList.contains('hidden');
       if (!tx) { closeDeleteModal(); return; }
+      
+      // Ask for confirmation before deleting
+      const shouldDelete = await askConfirmDelete(tx.desc);
+      if (!shouldDelete) { closeDeleteModal(); return; }
+      
+      const refreshPlanned = plannedModal && !plannedModal.classList.contains('hidden');
       const master = findMasterRuleFor(tx, iso);
       if (master) {
         master.recurrenceEnd = iso;
@@ -192,10 +209,15 @@ export function setupRecurrenceHandlers() {
 
   // Handler for deleting all occurrences (master rule and children)
   if (deleteAllBtn) {
-    deleteAllBtn.onclick = () => {
+    deleteAllBtn.onclick = async () => {
       const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
       const tx = txs.find(t => sameId ? sameId(t.id, g.pendingDeleteTxId) : (g.sameId && g.sameId(t.id, g.pendingDeleteTxId)));
       if (!tx) { closeDeleteModal(); return; }
+      
+      // Ask for confirmation before deleting
+      const shouldDelete = await askConfirmDelete(tx.desc);
+      if (!shouldDelete) { closeDeleteModal(); return; }
+      
       const master = findMasterRuleFor(tx, g.pendingDeleteTxIso) || tx;
       const refreshPlanned = plannedModal && !plannedModal.classList.contains('hidden');
       try {
