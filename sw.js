@@ -9,7 +9,7 @@ const ASSETS = [
   './public/style.css',
   './public/icons/icon-192x192.png',
   './public/icons/icon-180x180.png',
-  './public/site.webmanifest'
+  '/site.webmanifest'
 ];
 
 // Helper: convert base64url VAPID key to Uint8Array
