@@ -267,7 +267,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b60)';
+const APP_VERSION = 'v1.4.9(b61)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -782,6 +782,7 @@ function resetAppStateForProfileChange(reason = 'profile-change') {
       txModal.classList.add('hidden');
       if (txModal.dataset) delete txModal.dataset.mode;
     }
+    updateModalOpenState();
 
     const valueToggleButtons = document.querySelectorAll('.value-toggle button');
     valueToggleButtons.forEach((btn) => btn.classList.remove('active'));
