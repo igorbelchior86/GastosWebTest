@@ -91,57 +91,51 @@ export function scrollTodayIntoView() {
           getComputedStyle(document.documentElement).getPropertyValue('--floating-footer-height') || '0',
           10
         );
-        // Simple fixed offset approach - no complex calculations
-        const isIOSSafari = /iPhone|iPad|iPod/i.test(navigator.userAgent) && /Safari/i.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent);
         
-        let gap;
+        // Small gap below sticky header (just visual breathing room)
+        const gap = 8;
         
-        if (isIOSSafari) {
-          // Fixed pixel distance from sticky header for iOS Safari
-          // Adjust this value to get perfect positioning:
-          // - Increase = further from header (more gap)  
-          // - Decrease = closer to header (less gap)
-          gap = 20; // Current: 20px from sticky header
-          console.log('iOS Safari: Using fixed offset -', gap + 'px from sticky header');
-        } else {
-          // Standard gap for other browsers  
-          gap = 16;
-        }
+        // Target position: header + sticky + small gap
+        const targetFromTop = headerHeight + stickyHeight + gap;
         
-        const targetOffset = headerHeight + stickyHeight + gap;
-        const wrapRect = wrap.getBoundingClientRect();
+        // Calculate scroll needed: where is day now vs where it should be
         const dayRect = dayEl.getBoundingClientRect();
-        const currentRelativeTop = dayRect.top - wrapRect.top;
+        const currentFromTop = dayRect.top;
         
-        // More lenient tolerance for iOS Safari due to sub-pixel positioning differences
-        const tolerance = isIOSSafari ? 5 : 2;
+        // How much to scroll to move day to target position
+        const scrollDelta = currentFromTop - targetFromTop;
+        let targetScrollTop = wrap.scrollTop + scrollDelta;
         
-        if (Math.abs(currentRelativeTop - targetOffset) < tolerance && wrapperScrollAnimation === null) {
+        // Clamp to valid scroll range
+        const maxScroll = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+        targetScrollTop = Math.max(0, Math.min(targetScrollTop, maxScroll - footerReserve));
+        
+        // Check if already in position
+        if (Math.abs(scrollDelta) < 3 && wrapperScrollAnimation === null) {
           return;
         }
-        const delta = currentRelativeTop - targetOffset;
-        const maxScroll = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
-        let targetTop = (wrap.scrollTop || 0) + delta;
-        targetTop = Math.max(0, Math.min(targetTop, Math.max(0, maxScroll - footerReserve)));
+        
+        // Check if same target as last time
         if (
           wrapperTodayAnchor != null &&
-          Math.abs(wrapperTodayAnchor - targetTop) < 2 &&
+          Math.abs(wrapperTodayAnchor - targetScrollTop) < 2 &&
           !wrapperScrollAnimation
         ) {
           return;
         }
-        // Debug logging for position analysis
+        
         console.log('Scroll positioning:', {
-          browser: isIOSSafari ? 'iOS Safari' : 'Other',
           headerHeight,
           stickyHeight, 
           gap,
-          targetOffset,
-          finalPosition: `${gap}px from sticky header`
+          targetFromTop,
+          currentFromTop,
+          scrollDelta,
+          targetScrollTop
         });
         
-        console.log('About to call animateWrapperScroll with targetTop:', targetTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
-        animateWrapperScroll(targetTop);
+        console.log('About to call animateWrapperScroll with targetTop:', targetScrollTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
+        animateWrapperScroll(targetScrollTop);
       } catch (err) {
         console.error('scrollTodayIntoView compute failed', err);
       }

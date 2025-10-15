@@ -11,6 +11,7 @@
  */
 
 import { normalizeStartBalance } from '../utils/startBalance.js';
+import * as appState from '../state/appState.js';
 
 export function runBootstrap() {
   const g = (window.__gastos = window.__gastos || {});
@@ -72,15 +73,22 @@ export function runBootstrap() {
   // initial balance input based on whether a start date/balance has
   // already been configured. Originally defined in main.js.
   function initStart() {
-    // Read the most up-to-date app state from the shared bridge so
-    // bootstrap remains resilient during early startup ordering.
-    const s = (g && g.state) || state || {};
-    // Avoid showing start UI until cached state is loaded to prevent flashes
-    if (!s.bootHydrated) return;
-    // Show start balance input whenever there's no anchored start date.
-    // If the persisted startSet flag exists, user already completed
-    // the start flow. Otherwise, fall back to presence of startDate/startBalance.
-    const showStart = !(s.startSet === true || (s.startDate != null && s.startBalance != null));
+    // Don't run during skeleton boot to prevent flash
+    if (typeof document !== 'undefined' && document.documentElement.classList.contains('skeleton-boot')) {
+      console.log('[initStart] Skipping - skeleton-boot active');
+      return;
+    }
+    
+    // SIMPLE LOGIC: Read state directly from appState module
+    const startSet = appState.getStartSet();
+    const startDate = appState.getStartDate();
+    const startBalance = appState.getStartBalance();
+    
+    // Show start balance if not configured yet. Period.
+    const showStart = !(startSet === true || (startDate != null && startBalance != null));
+    
+    console.log('[initStart] Check:', { startSet, startDate, startBalance, showStart });
+    
     // exibe ou oculta todo o container de saldo inicial
     startContainer.style.display = showStart ? 'block' : 'none';
     dividerSaldo.style.display = showStart ? 'block' : 'none';

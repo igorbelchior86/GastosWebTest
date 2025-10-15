@@ -267,7 +267,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b61)';
+const APP_VERSION = 'v1.4.9(b72)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -568,8 +568,19 @@ const closeTxModal = document.getElementById('closeTxModal');
  * Toggle the visibility of the transaction modal.
  */
 function toggleTxModal(){
+  // Block opening transaction modal if start balance not set
   const isOpening=txModal.classList.contains('hidden');
   if(isOpening){
+    const startSet = appState.getStartSet ? appState.getStartSet() : state.startSet;
+    const startDate = appState.getStartDate ? appState.getStartDate() : state.startDate;
+    const startBalance = appState.getStartBalance ? appState.getStartBalance() : state.startBalance;
+    const needsStartBalance = !(startSet === true || (startDate != null && startBalance != null));
+    
+    if(needsStartBalance){
+      showToast('Configure o Saldo Inicial primeiro', 'warning');
+      return;
+    }
+    
     if(typeof window!=='undefined'&&typeof window.__unlockKeyboardGap==='function'){
       try{window.__unlockKeyboardGap();}catch(_){}
     }
@@ -847,9 +858,29 @@ function resetAppStateForProfileChange(reason = 'profile-change') {
       cacheSet('tx', transactions);
     } catch (_) {}
 
+    // Reset start balance properties so user can configure them again
+    try {
+      setStartBalance(null, { emit: false });
+      setStartDate(null, { emit: false });
+      state.startSet = false;
+      cacheSet('startBal', null);
+      cacheSet('startDate', null);
+      cacheSet('startSet', false);
+      
+      // Persist reset to Firebase if connected
+      if (typeof save === 'function' && PATH) {
+        Promise.all([
+          save('startBal', null).catch(() => {}),
+          save('startDate', null).catch(() => {}),
+          save('startSet', false).catch(() => {})
+        ]).catch(() => {});
+      }
+    } catch (_) {}
+
     try { refreshMethods(); } catch (_) {}
     try { renderCardList(); } catch (_) {}
     try { renderTable(); } catch (_) {}
+    try { initStart(); } catch (_) {}
     updateModalOpenState();
   } catch (err) {
     console.warn('resetAppStateForProfileChange failed:', err);
