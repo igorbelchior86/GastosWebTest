@@ -33,7 +33,11 @@ export function applyCurrencyProfile(profileId, options = {}) {
     // Persist the choice if requested
     if (persist) {
       try {
+        // Save to BOTH localStorage keys for compatibility:
+        // - ui:profile: used by main.js boot sequence
         localStorage.setItem('ui:profile', profileId);
+        // Note: ui:preferences:v2 should be saved by preferenceService.set()
+        console.log('[currencyProfile] Saved profile to localStorage ui:profile:', profileId);
       } catch (error) {
         console.warn('Failed to save currency profile to localStorage:', error);
       }

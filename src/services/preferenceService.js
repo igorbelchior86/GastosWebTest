@@ -26,6 +26,7 @@ const DEFAULT_PREFERENCES = {
 let initialized = false;
 let currentPreferences = { ...DEFAULT_PREFERENCES };
 const subscribers = new Set();
+let skipFirebaseLoad = true; // Start with true - only load from localStorage during initial hydration
 
 // Path constants
 const PREFS_STORAGE_KEY = 'user:preferences';
@@ -51,6 +52,17 @@ export async function init(config = {}) {
 }
 
 /**
+ * Enable Firebase loading (called after initial hydration completes)
+ * During the initial hydration phase, we only load from localStorage to avoid
+ * overwriting fresh preferences with stale Firebase data
+ * @internal
+ */
+export function enableFirebaseLoad() {
+  skipFirebaseLoad = false;
+  console.log('[PreferenceService] Firebase load enabled');
+}
+
+/**
  * Load user preferences from Firebase (if authenticated) or localStorage
  * @param {Object} options - Loading options
  * @param {boolean} options.useCache - Whether to return cached preferences (default: false)
@@ -64,15 +76,21 @@ export async function load(options = {}) {
   }
 
   try {
-    // Try loading from Firebase ONLY if we have a valid context
-    // (PATH is set, indicating user is authenticated)
-    // We check this indirectly by attempting load and catching permission errors
-    const fromFirebase = await firebaseService.load(PREFS_STORAGE_KEY, null);
-    
-    if (fromFirebase && typeof fromFirebase === 'object') {
-      currentPreferences = { ...DEFAULT_PREFERENCES, ...fromFirebase };
-      console.log('[PreferenceService] Loaded from Firebase:', currentPreferences);
-      return { ...currentPreferences };
+    // During initial hydration, skip Firebase to avoid overwriting fresh local preferences
+    // with stale Firebase data from previous sessions
+    if (!skipFirebaseLoad) {
+      // Try loading from Firebase ONLY if we have a valid context
+      // (PATH is set, indicating user is authenticated)
+      // We check this indirectly by attempting load and catching permission errors
+      const fromFirebase = await firebaseService.load(PREFS_STORAGE_KEY, null);
+      
+      if (fromFirebase && typeof fromFirebase === 'object') {
+        currentPreferences = { ...DEFAULT_PREFERENCES, ...fromFirebase };
+        console.log('[PreferenceService] Loaded from Firebase:', currentPreferences);
+        return { ...currentPreferences };
+      }
+    } else {
+      console.log('[PreferenceService] Firebase load skipped during hydration phase');
     }
   } catch (err) {
     // Permission denied typically means PATH is null (not authenticated)
@@ -87,6 +105,7 @@ export async function load(options = {}) {
   // Fallback to localStorage for offline/anonymous users
   try {
     const fromStorage = localStorage.getItem(PREFS_FALLBACK_KEY);
+    console.log('[PreferenceService] Checking localStorage key:', PREFS_FALLBACK_KEY, '-> value:', fromStorage);
     if (fromStorage) {
       const parsed = JSON.parse(fromStorage);
       currentPreferences = { ...DEFAULT_PREFERENCES, ...parsed };
@@ -98,6 +117,7 @@ export async function load(options = {}) {
   }
 
   // Return defaults if nothing was found
+  console.log('[PreferenceService] No stored preferences found, using defaults:', DEFAULT_PREFERENCES);
   currentPreferences = { ...DEFAULT_PREFERENCES };
   return { ...currentPreferences };
 }

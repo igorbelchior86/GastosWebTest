@@ -25,7 +25,6 @@ export function initTransactionLine(deps) {
   const {
     getTransactions,
     transactions,
-    togglePlanned,
     openEditFlow,
     delTx,
     sameId,
@@ -34,15 +33,18 @@ export function initTransactionLine(deps) {
     safeFmtCurrency
   } = deps;
 
-  /**
-   * Build the DOM structure for an individual transaction line.
-   *
-   * @param {Object} tx The transaction record.
-   * @param {boolean} disableSwipe When true, disables swipe actions (planned modal).
-   * @param {boolean} isInvoiceContext When true, uses invoice formatting for timestamps.
-   * @returns {HTMLElement} A DOM element representing the transaction row.
-   */
-  function makeLine(tx, disableSwipe = false, isInvoiceContext = false) {
+  // Note: togglePlanned is NOT destructured here because it may be reassigned
+  // after initialization. Instead, we'll access it via deps or window.__gastos
+  // to ensure we always use the latest version.
+  const getTogglePlanned = () => {
+    // First try deps if it was passed and has togglePlanned
+    if (deps?.togglePlanned) return deps.togglePlanned;
+    // Fall back to window.__gastos
+    return window.__gastos?.togglePlanned;
+  };
+
+  // Store reference to deps on the makeLine function so it can be updated externally
+  const makeLine = function(tx, disableSwipe = false, isInvoiceContext = false) {
     // Access the latest transaction list on demand
     const txs = getTransactions ? getTransactions() : transactions;
     const wrap = document.createElement('div');
@@ -134,7 +136,11 @@ export function initTransactionLine(deps) {
         checkbox.name = 'planned';
         checkbox.onchange = (ev) => {
           ev.stopPropagation();
-          togglePlanned(actionTargetId, tx.opDate);
+          // Get togglePlanned dynamically to ensure latest version
+          const togglePlannedFn = getTogglePlanned();
+          if (typeof togglePlannedFn === 'function') {
+            togglePlannedFn(actionTargetId, tx.opDate);
+          }
         };
         const labelWrapper = document.createElement('span');
         labelWrapper.textContent = tx.desc;
@@ -206,7 +212,11 @@ export function initTransactionLine(deps) {
         chk.name = 'planned';
         chk.onchange = (ev) => {
           ev.stopPropagation();
-          togglePlanned(actionTargetId, tx.opDate);
+          // Get togglePlanned dynamically to ensure latest version
+          const togglePlannedFn = getTogglePlanned();
+          if (typeof togglePlannedFn === 'function') {
+            togglePlannedFn(actionTargetId, tx.opDate);
+          }
         };
         left.appendChild(chk);
       }
@@ -275,7 +285,10 @@ export function initTransactionLine(deps) {
     wrap.appendChild(actions);
     wrap.appendChild(d);
     return wrap;
-  }
+  };
+
+  // Attach deps reference to makeLine so external code can update it
+  makeLine.__deps__ = deps;
 
   return makeLine;
 }

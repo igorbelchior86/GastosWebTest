@@ -199,8 +199,10 @@ function applyCurrencyProfile(profileId, options = {}) {
 
 try{
   const savedProfile = localStorage.getItem('ui:profile') || (window.CURRENCY_PROFILES ? Object.keys(window.CURRENCY_PROFILES)[0] : null);
+  console.log('[main] Initial currency profile from localStorage ui:profile:', savedProfile);
   if (savedProfile) applyCurrencyProfile(savedProfile);
 }catch(e){}
+
 
 
 //
@@ -223,9 +225,17 @@ try {
 
 // Initialize user preferences early (with Firebase config)
 // This applies theme and currency profile from storage, preventing UI flashes
-hydratePreferences(firebaseConfig).catch(err => {
-  console.warn('Preference hydration failed:', err);
-});
+// NOTE: Must be called AFTER Firebase initialization but we defer the actual sync
+// The hydration will override the default profile if a preference was saved
+async function initPreferencesAfterFirebase() {
+  try {
+    await hydratePreferences(firebaseConfig);
+  } catch (err) {
+    console.warn('Preference hydration failed:', err);
+  }
+}
+// Call immediately without await - let it run async
+initPreferencesAfterFirebase();
 
 // AuthService is now initialized in globals.js to ensure it's ready before login.view.js loads
 try {
@@ -277,7 +287,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b76)';
+const APP_VERSION = 'v1.4.9(b86)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -975,13 +985,13 @@ try {
 makeLine = initTransactionLine({
   getTransactions,
   transactions,
-  togglePlanned,
   openEditFlow,
   delTx,
   sameId,
   occursOn,
   todayISO,
   safeFmtCurrency,
+  togglePlanned: null, // Will be set after createTogglePlanned
 });
 window.__gastos.makeLine = makeLine;
 
@@ -1041,6 +1051,19 @@ try {
     renderPlannedModal,
     notify
   });
+  // Update the deps object passed to makeLine so it can access togglePlanned
+  // This is safe because getTogglePlanned() reads from deps dynamically
+  if (makeLine.__deps__) {
+    makeLine.__deps__.togglePlanned = togglePlanned;
+    console.log('[main] Updated makeLine.__deps__.togglePlanned', typeof togglePlanned);
+  }
+  
+  // Ensure togglePlanned is available to transactionLine event handlers
+  if (window.__gastos) {
+    window.__gastos.togglePlanned = togglePlanned;
+    console.log('[main] togglePlanned assigned to window.__gastos', typeof togglePlanned);
+  }
+  
   performResetAllData = createPerformResetAllData({
     setTransactions,
     setCards,

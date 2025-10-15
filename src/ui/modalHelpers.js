@@ -69,7 +69,7 @@ export function askMoveToToday() {
     confirmMoveNo.onclick  = () => { cleanup(); resolve(false); };
     if (closeConfirmMove) closeConfirmMove.onclick = () => { cleanup(); resolve(false); };
     confirmMoveModal.onclick = (e) => { if (e.target === confirmMoveModal) { cleanup(); resolve(false); } };
-    confirmResetModal.classList.remove('hidden');
+    confirmMoveModal.classList.remove('hidden');
     updateModalOpenState();
   });
 }

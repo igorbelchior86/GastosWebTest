@@ -2545,7 +2545,7 @@ details.invoice[open] > summary::after{
   flex-direction: column;
   gap: 2px;
   height: auto;
-  padding: 0 12px 12px 12px;          /* small horizontal indent + slightly larger spacing below each item */
+  padding: 0 12px 12px 24px;          /* 24px left indent to align with icon */
   background: transparent !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -2586,15 +2586,23 @@ details.invoice[open] > summary::after{
 }
 
 /* Group date heading inside invoice */
+.invoice-day-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
 .invoice .invoice-group-date{
   margin: 16px 0 4px 0; /* slightly more space after the header divider */
   font-weight: 700;
   font-size: .95rem;
   color: var(--txt-main);
+  padding-left: 18px; /* align with the card icon (24px) + gap (8px) */
+  align-self: flex-start;
 }
-.invoice .invoice-divider{ height:1px; background: rgba(255,255,255,.12); margin: 6px 0 0 0; }
-.invoice .invoice-divider.thin{ opacity:.9; }
-.invoice .invoice-divider.bold{ height:2px; opacity:.9; }
+.invoice .invoice-divider{ border: none; border-top: 1px solid rgba(255,255,255,.12); padding: 0; height: 0; }
+.invoice .invoice-divider.thin{ opacity:.9; width: 90%; margin: 6px 0 0 0; }
+.invoice .invoice-divider.bold{ border-top: 2px solid rgba(255,255,255,.12); opacity:.9; margin: 6px 0 0 0; width: 90%; }
 
 /* Light theme adjustments for new flat invoice list */
 /* Ensure invoice list items stay flat on light backgrounds */

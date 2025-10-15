@@ -15,13 +15,55 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat&display=swap" rel="stylesheet">
   <!-- Stylesheets live in the public folder now that index.html is at the root -->
-  <link rel="stylesheet" href="public/style.css?v=b72">
-  <link rel="stylesheet" href="public/login.css?v=1.4.9(b72)">
+  <link rel="stylesheet" href="public/style.css?v=b86">
+  <link rel="stylesheet" href="public/login.css?v=1.4.9(b86)">
 
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="public/icons/icon-192x192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="public/icons/icon-180x180.png">
   <link rel="manifest" href="/site.webmanifest">
+
+  <!-- Apply theme immediately to prevent FOUC (Flash of Unstyled Content) -->
+  <!-- This runs BEFORE any other scripts, ensuring theme is set before render -->
+  <script>
+    (function() {
+      // Inline theme applier to prevent flash on page load
+      function getSystemPref() {
+        try {
+          return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+            ? 'light'
+            : 'dark';
+        } catch (_) {
+          return 'dark';
+        }
+      }
+      
+      function applyTheme(pref) {
+        let resolved = pref === 'system' ? getSystemPref() : pref;
+        const root = document.documentElement;
+        if (resolved === 'light') {
+          root.classList.add('light');
+          root.setAttribute('data-theme', 'light');
+        } else {
+          root.classList.remove('light');
+          root.setAttribute('data-theme', 'dark');
+        }
+      }
+      
+      // Read saved preference from localStorage and apply immediately
+      const saved = localStorage.getItem('ui:theme') || localStorage.getItem('ui:preferences:v2');
+      if (saved) {
+        try {
+          const prefs = JSON.parse(saved);
+          applyTheme(prefs.theme || 'system');
+        } catch (e) {
+          applyTheme(saved);
+        }
+      } else {
+        applyTheme('system');
+      }
+    })();
+  </script>
 </head>
 <body>
   <div id="backdrop-base"></div>

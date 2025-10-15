@@ -198,8 +198,10 @@ export function setupSettings(settingsModalEl) {
           </div>
         </div>
       </div>`;
-    // Get current theme preference
-    const savedTheme = localStorage.getItem('ui:theme') || 'system';
+    // Get current theme and currency preferences from app state
+    const currentPrefs = appState.getPreferences();
+    const savedTheme = currentPrefs.theme || 'system';
+    const currentCurrencyProfile = currentPrefs.currencyProfile || 'BR';
     
     const listHTML = `
       <h3 class="settings-section-title">Personalização</h3>
@@ -226,7 +228,7 @@ export function setupSettings(settingsModalEl) {
       <h3 class="settings-section-title">Sobre</h3>
       <div class="settings-list">
         <div class="settings-item">
-          <div class="version-number">v1.4.9(b76)</div>
+          <div class="version-number">v1.4.9(b85)</div>
         </div>
         <div class="settings-item danger">
           <button id="resetDataBtn" class="settings-cta">
@@ -330,7 +332,9 @@ export function setupSettings(settingsModalEl) {
           try {
             const profiles = getAvailableProfiles();
             console.log('[settings] currency profiles:', profiles);
-            const currentId = (getCurrentProfile() && getCurrentProfile().id) || localStorage.getItem('ui:profile') || Object.keys(profiles)[0];
+            // Use preferenceService to get the saved preference, fallback to appState, then localStorage fallback
+            const currentId = currentCurrencyProfile || (getCurrentProfile() && getCurrentProfile().id) || localStorage.getItem('ui:profile') || Object.keys(profiles)[0];
+            console.log('[settings] current currency profile from preferences:', currentId);
             list.innerHTML = '';
             Object.keys(profiles || {}).forEach(pid => {
               const p = profiles[pid];

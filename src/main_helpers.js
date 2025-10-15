@@ -339,13 +339,19 @@ export function createTogglePlanned(context) {
       renderPlannedModal,
       notify,
     } = context;
+    
+    // Get current transactions list
+    const txList = typeof getTransactions === 'function' ? getTransactions() : transactions;
+    
     // Find the master record for the given id.
-    const master = (transactions || []).find((x) => sameId(String(x.id), String(id)));
+    const master = (txList || []).find((x) => sameId(String(x.id), String(id)));
+    
     const shouldRefreshPlannedModal = plannedModal && !plannedModal.classList.contains('hidden');
     // Capture which invoice panels were open so they can be reopened later.
     const openInvoices = Array.from(document.querySelectorAll('details.invoice[open]')).map(el => el.dataset.pd);
     let toastMsg = null;
     if (!master) return;
+    
     if (master.recurrence) {
       master.exceptions = master.exceptions || [];
       if (!master.exceptions.includes(iso)) {
@@ -383,7 +389,7 @@ export function createTogglePlanned(context) {
           }
         }
         if (!added) {
-          const current = typeof getTransactions === 'function' ? getTransactions() : (transactions || []);
+          const current = typeof getTransactions === 'function' ? getTransactions() : (txList || []);
           setTransactions && setTransactions((current || []).concat([execTx]));
         }
         if (execTx.method !== 'Dinheiro' && execTx.postDate) {
