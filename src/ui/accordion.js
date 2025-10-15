@@ -105,20 +105,38 @@ export function initAccordion(config) {
     const anchorISO = hasAnchor ? String(state.startDate) : null;
     const startDateObj = new Date(minDate);
     const endDateObj = new Date(maxDate);
+    
+    console.log('[accordion] buildRunningBalanceMap:', {
+      'state.startDate': state.startDate,
+      'state.startBalance': state.startBalance,
+      hasAnchor,
+      anchorISO,
+      minDate,
+      maxDate
+    });
+    
     // If the anchor occurs before the current range, seed the running balance at the anchor.
     if (hasAnchor && anchorISO && anchorISO < minDate && anchorISO <= maxDate) {
       runningBalance = (state.startBalance != null) ? state.startBalance : 0;
+      console.log('[accordion] Anchor before range - seeding balance:', runningBalance);
     }
     const txs = getTransactions ? getTransactions() : transactions;
     for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
       const iso = current.toISOString().slice(0, 10);
+      
+      // Days BEFORE startDate should show zero balance
       if (hasAnchor && iso < anchorISO) {
         balanceMap.set(iso, 0);
         continue;
       }
+      
+      // ON the startDate, initialize with startBalance
       if (hasAnchor && iso === anchorISO) {
         runningBalance = (state.startBalance != null) ? state.startBalance : 0;
+        console.log(`[accordion] ON startDate ${iso} - setting balance to:`, runningBalance);
       }
+      
+      // If no anchor is set, use startBalance on the first date (legacy behavior)
       if (!hasAnchor && iso === minDate) {
         runningBalance = (state.startBalance != null) ? state.startBalance : 0;
       }
@@ -456,6 +474,18 @@ export function initAccordion(config) {
         const dayTotal = cashImpact + cardImpact;
         // Retrieve the running balance for this day
         const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : getBalanceBefore(iso);
+        
+        // DEBUG: Log balance for days around startDate
+        if (state.startDate && (iso === state.startDate || 
+            (iso >= '2025-09-20' && iso <= '2025-09-24'))) {
+          console.log(`[accordion] Day ${iso} balance:`, {
+            hasInMap: balanceMap.has(iso),
+            mapValue: balanceMap.get(iso),
+            finalBalance: dayBalance,
+            isStartDate: iso === state.startDate
+          });
+        }
+        
         const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
         const dDet = document.createElement('details');
         dDet.className = 'day';

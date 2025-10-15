@@ -79,6 +79,14 @@ export function runBootstrap() {
       return;
     }
     
+    // CRITICAL: Don't check state during partial hydration!
+    // Wait until bootHydrated flag is set, which means ALL data loaded from Firebase
+    const isHydrated = appState.isBootHydrated();
+    if (!isHydrated) {
+      console.log('[initStart] Skipping - data not fully hydrated yet');
+      return;
+    }
+    
     // SIMPLE LOGIC: Read state directly from appState module
     const startSet = appState.getStartSet();
     const startDate = appState.getStartDate();
@@ -87,7 +95,7 @@ export function runBootstrap() {
     // Show start balance if not configured yet. Period.
     const showStart = !(startSet === true || (startDate != null && startBalance != null));
     
-    console.log('[initStart] Check:', { startSet, startDate, startBalance, showStart });
+    console.log('[initStart] Check:', { isHydrated, startSet, startDate, startBalance, showStart });
     
     // exibe ou oculta todo o container de saldo inicial
     startContainer.style.display = showStart ? 'block' : 'none';

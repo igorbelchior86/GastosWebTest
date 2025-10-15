@@ -858,7 +858,9 @@ function resetAppStateForProfileChange(reason = 'profile-change') {
       cacheSet('tx', transactions);
     } catch (_) {}
 
-    // Reset start balance properties so user can configure them again
+    // Reset start balance properties IN MEMORY so new profile data can load from Firebase
+    // IMPORTANT: Do NOT persist null values to Firebase! That would delete existing data.
+    // Just clear local state and let Firebase listeners repopulate with the correct values.
     try {
       setStartBalance(null, { emit: false });
       setStartDate(null, { emit: false });
@@ -867,14 +869,8 @@ function resetAppStateForProfileChange(reason = 'profile-change') {
       cacheSet('startDate', null);
       cacheSet('startSet', false);
       
-      // Persist reset to Firebase if connected
-      if (typeof save === 'function' && PATH) {
-        Promise.all([
-          save('startBal', null).catch(() => {}),
-          save('startDate', null).catch(() => {}),
-          save('startSet', false).catch(() => {})
-        ]).catch(() => {});
-      }
+      // NOTE: We do NOT call save() here because that would delete Firebase data.
+      // The Firebase listeners will automatically load the correct values for the new profile.
     } catch (_) {}
 
     try { refreshMethods(); } catch (_) {}
