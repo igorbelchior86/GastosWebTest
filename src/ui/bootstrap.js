@@ -112,6 +112,31 @@ export function runBootstrap() {
   }
   // Expose initStart on global state so existing calls still work
   g.initStart = initStart;
+  
+  // Update start input placeholder based on currency profile
+  function updateStartInputPlaceholder() {
+    if (!startInput) return;
+    try {
+      const profile = window.APP_PROFILE || window.CURRENT_PROFILE;
+      if (profile && window.APP_FMT) {
+        // Format zero using the current currency formatter
+        const placeholder = window.APP_FMT.format(0);
+        startInput.placeholder = placeholder;
+      }
+    } catch (err) {
+      console.warn('[bootstrap] Failed to update start input placeholder:', err);
+    }
+  }
+  
+  // Update placeholder on initial load
+  updateStartInputPlaceholder();
+  
+  // Update placeholder when currency profile changes
+  try {
+    window.addEventListener('currencyProfileChanged', () => {
+      updateStartInputPlaceholder();
+    });
+  } catch (_) {}
 
   // Handle start-balance confirmation
   if (setStartBtn) {

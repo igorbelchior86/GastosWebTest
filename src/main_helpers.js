@@ -7,7 +7,11 @@
  * point while preserving behaviour. Each helper either accepts a
  * context object containing any dynamic state it needs or exposes a
  * factory function which returns a closure bound to that context.
- *
+ */
+
+import { setStartBalance, setStartDate, setStartSet } from './state/appState.js';
+
+/**
  * None of these helpers rely on variables defined in the original
  * module’s lexical scope. Instead, all required dependencies must be
  * provided by the caller when initialising the helper. This design
@@ -202,18 +206,12 @@ export function createPerformResetAllData(context) {
       // Reset start balance properties via appState module
       // CRITICAL: Use setStartBalance/setStartSet from appState to ensure proper state management
       try {
-        const appStateModule = await import('../state/appState.js');
-        if (appStateModule.setStartBalance) {
-          appStateModule.setStartBalance(null, { emit: false });
-        }
-        if (appStateModule.setStartDate) {
-          appStateModule.setStartDate(null, { emit: false });
-        }
-        if (appStateModule.setStartSet) {
-          appStateModule.setStartSet(false, { emit: false });
-        }
-      } catch (_) {
-        // Fallback to direct state mutation if module import fails
+        setStartBalance(null, { emit: false });
+        setStartDate(null, { emit: false });
+        setStartSet(false, { emit: false });
+      } catch (err) {
+        // Fallback to direct state mutation if functions not available
+        console.warn('Failed to use appState setters, falling back to direct mutation:', err);
         if (state) {
           state.startBalance = null;
           state.startDate = null;

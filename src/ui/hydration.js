@@ -102,6 +102,15 @@ export function completeHydration() {
     /* ignore */
   }
   
+  // CRITICAL: Mark hydration as complete in appState to unblock initStart
+  try {
+    if (typeof window.setBootHydrated === 'function') {
+      window.setBootHydrated(true);
+    }
+  } catch (err) { 
+    console.warn('[hydration] Failed to set bootHydrated:', err);
+  }
+  
   // Delegate to hooks on window if present
   try {
     if (typeof window.ensureStartSetFromBalance === 'function') {
