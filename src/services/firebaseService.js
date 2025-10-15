@@ -92,7 +92,7 @@ export function setMockMode(enabled = true) {
  * @returns {Promise<any>}
  */
 export async function load(key, defaultValue = null) {
-  if (useMock || !firebaseDb) return mockLoad(key, defaultValue);
+  if (useMock || !firebaseDb || !PATH) return mockLoad(key, defaultValue);
   try {
     const remoteKey = scopedDbSegment(key);
     const snapshot = await get(ref(firebaseDb, `${PATH}/${remoteKey}`));
@@ -113,7 +113,7 @@ export async function load(key, defaultValue = null) {
  * @returns {Promise<void>}
  */
 export async function save(key, value) {
-  if (useMock || !firebaseDb) return mockSave(key, value);
+  if (useMock || !firebaseDb || !PATH) return mockSave(key, value);
   try {
     const remoteKey = scopedDbSegment(key);
     return set(ref(firebaseDb, `${PATH}/${remoteKey}`), value);

@@ -64,7 +64,9 @@ export async function load(options = {}) {
   }
 
   try {
-    // Try loading from Firebase (if auth path is set)
+    // Try loading from Firebase ONLY if we have a valid context
+    // (PATH is set, indicating user is authenticated)
+    // We check this indirectly by attempting load and catching permission errors
     const fromFirebase = await firebaseService.load(PREFS_STORAGE_KEY, null);
     
     if (fromFirebase && typeof fromFirebase === 'object') {
@@ -73,7 +75,13 @@ export async function load(options = {}) {
       return { ...currentPreferences };
     }
   } catch (err) {
-    console.warn('[PreferenceService] Firebase load failed, trying localStorage:', err);
+    // Permission denied typically means PATH is null (not authenticated)
+    // This is expected during initial hydration, so log at debug level
+    if (err && err.message && err.message.includes('Permission denied')) {
+      console.debug('[PreferenceService] Firebase load skipped (not authenticated yet)');
+    } else {
+      console.warn('[PreferenceService] Firebase load failed:', err);
+    }
   }
 
   // Fallback to localStorage for offline/anonymous users
@@ -99,10 +107,11 @@ export async function load(options = {}) {
  * @param {Object} partialPrefs - Partial preferences to merge
  * @param {Object} options - Save options
  * @param {boolean} options.emit - Whether to notify subscribers (default: true)
+ * @param {boolean} options.skipFirebase - Skip Firebase save (default: false)
  * @returns {Promise<Object>} Updated preferences
  */
 export async function save(partialPrefs = {}, options = {}) {
-  const { emit: shouldEmit = true } = options;
+  const { emit: shouldEmit = true, skipFirebase = false } = options;
 
   // Merge with current preferences
   const updatedPrefs = { ...currentPreferences, ...partialPrefs };
@@ -111,9 +120,18 @@ export async function save(partialPrefs = {}, options = {}) {
   currentPreferences = updatedPrefs;
 
   // Save to Firebase (async, don't block)
-  firebaseService.save(PREFS_STORAGE_KEY, updatedPrefs).catch(err => {
-    console.warn('[PreferenceService] Firebase save failed:', err);
-  });
+  // Skip if explicitly told to or if Firebase service indicates we're in mock mode
+  if (!skipFirebase) {
+    firebaseService.save(PREFS_STORAGE_KEY, updatedPrefs).catch(err => {
+      // Silently fail for PERMISSION_DENIED during initial hydration
+      // (user not yet authenticated)
+      if (err && err.message && err.message.includes('PERMISSION_DENIED')) {
+        console.debug('[PreferenceService] Firebase save skipped (not authenticated yet)');
+      } else {
+        console.warn('[PreferenceService] Firebase save failed:', err);
+      }
+    });
+  }
 
   // Always save to localStorage as fallback
   try {
@@ -205,6 +223,7 @@ export async function reset() {
 /**
  * Migrate legacy preferences from localStorage keys to new service
  * This helps transition from old localStorage keys (ui:theme, ui:profile) to new system
+ * Only saves to localStorage initially; Firebase sync will happen when user is authenticated
  * @returns {Promise<void>}
  */
 export async function migrateLegacyPreferences() {
@@ -224,8 +243,10 @@ export async function migrateLegacyPreferences() {
   }
 
   if (Object.keys(toMigrate).length > 0) {
-    await save(toMigrate, { emit: false });
-    console.log('[PreferenceService] Legacy preferences migrated');
+    // Save ONLY to localStorage during initial hydration (user not authenticated yet)
+    // Firebase sync will happen later when user authenticates
+    await save(toMigrate, { emit: false, skipFirebase: true });
+    console.log('[PreferenceService] Legacy preferences migrated to localStorage');
   }
 }
 

@@ -64,6 +64,23 @@ export async function hydratePreferences(config = {}) {
         });
       }
     });
+
+    // Set up auth listener to sync preferences with Firebase when user authenticates
+    if (typeof document !== 'undefined') {
+      document.addEventListener('auth:state', async (e) => {
+        const user = e.detail && e.detail.user;
+        if (user) {
+          // User just authenticated - sync preferences to Firebase
+          console.log('[PreferenceHydration] User authenticated, syncing preferences to Firebase');
+          const currentPrefs = appState.getPreferences();
+          try {
+            await preferenceService.save(currentPrefs, { emit: false });
+          } catch (err) {
+            console.warn('[PreferenceHydration] Failed to sync preferences on auth:', err);
+          }
+        }
+      });
+    }
     
     return prefs;
     

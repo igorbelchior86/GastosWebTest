@@ -226,7 +226,7 @@ export function setupSettings(settingsModalEl) {
       <h3 class="settings-section-title">Sobre</h3>
       <div class="settings-list">
         <div class="settings-item">
-          <div class="version-number">v1.4.9(b74)</div>
+          <div class="version-number">v1.4.9(b76)</div>
         </div>
         <div class="settings-item danger">
           <button id="resetDataBtn" class="settings-cta">
