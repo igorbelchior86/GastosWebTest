@@ -31,6 +31,11 @@ const DEFAULT_STATE = {
    */
   bootHydrated: false,
   /**
+   * Indicates whether user preferences have been loaded into memory.
+   * @type {boolean}
+   */
+  preferencesHydrated: false,
+  /**
    * List of transactions in memory. Each entry should conform to the
    * transaction model defined elsewhere in the application.
    * @type {Array<object>}
@@ -41,7 +46,15 @@ const DEFAULT_STATE = {
    * cash entry (`{ name: 'Dinheiro', close: 0, due: 0 }`).
    * @type {Array<object>}
    */
-  cards: []
+  cards: [],
+  /**
+   * User preferences object (theme, currencyProfile, etc.)
+   * @type {Object}
+   */
+  preferences: {
+    theme: 'system',           // 'light' | 'dark' | 'system'
+    currencyProfile: 'BR',     // Profile ID (BR, PT, US, etc)
+  }
 };
 
 // Internal state object. This should never be mutated directly outside of
@@ -285,6 +298,44 @@ export function removeCard(nameOrIndex, options = {}) {
   return changed;
 }
 
+// Preference helpers
+
+export function isPreferencesHydrated() {
+  return state.preferencesHydrated;
+}
+
+export function setPreferencesHydrated(value, options = {}) {
+  if (state.preferencesHydrated === value) return state.preferencesHydrated;
+  state.preferencesHydrated = value;
+  if (options.emit !== false) emit(['preferencesHydrated']);
+  return state.preferencesHydrated;
+}
+
+export function getPreferences() {
+  return { ...state.preferences };
+}
+
+export function setPreferences(prefs = {}, options = {}) {
+  const normalized = typeof prefs === 'object' ? { ...DEFAULT_STATE.preferences, ...prefs } : { ...DEFAULT_STATE.preferences };
+  if (JSON.stringify(state.preferences) === JSON.stringify(normalized)) return state.preferences;
+  state.preferences = normalized;
+  if (options.emit !== false) emit(['preferences']);
+  return state.preferences;
+}
+
+export function getPreference(key, defaultValue = undefined) {
+  return state.preferences.hasOwnProperty(key) ? state.preferences[key] : defaultValue;
+}
+
+export function setPreference(key, value, options = {}) {
+  if (!(key in state.preferences)) return null;
+  const current = state.preferences[key];
+  if (current === value) return current;
+  state.preferences = { ...state.preferences, [key]: value };
+  if (options.emit !== false) emit(['preferences']);
+  return value;
+}
+
 /**
  * Reset the application state back to default values. Optionally suppress
  * emitting change notifications. Useful when logging out or switching
@@ -296,8 +347,18 @@ export function removeCard(nameOrIndex, options = {}) {
 export function resetState(options = {}) {
   const changed = [];
   Object.keys(state).forEach((key) => {
-    if (state[key] === DEFAULT_STATE[key]) return;
-    state[key] = Array.isArray(DEFAULT_STATE[key]) ? [] : DEFAULT_STATE[key];
+    if (key === 'preferences') {
+      // For preferences object, compare deep equality
+      if (JSON.stringify(state[key]) === JSON.stringify(DEFAULT_STATE[key])) return;
+    } else if (state[key] === DEFAULT_STATE[key]) {
+      return;
+    }
+    
+    if (key === 'preferences') {
+      state[key] = { ...DEFAULT_STATE[key] };
+    } else {
+      state[key] = Array.isArray(DEFAULT_STATE[key]) ? [] : DEFAULT_STATE[key];
+    }
     changed.push(key);
   });
   if (changed.length && options.emit !== false) {

@@ -34,6 +34,7 @@ import { initTransactionSanitize } from './utils/transactionSanitize.js';
 import { resetTxModal as resetTxModalMod,updateModalOpenState as updateModalOpenStateMod,focusValueField as focusValueFieldMod } from './ui/txModalUtils.js';
 import { applyCurrencyProfile as applyCurrencyProfileMod } from './utils/currencyProfile.js';
 import { initThemeFromStorage } from './utils/theme.js';
+import { hydratePreferences } from './utils/preferenceHydration.js';
 import { initIOSDebug } from './utils/iosDebug.js';
 
 //
@@ -180,7 +181,10 @@ function fixPlannedAlignment(){} const WDAY_LONG={}; function expandPlannedDayLa
 
 const plannedBox = plannedModal ? plannedModal.querySelector('.bottom-modal-box') : null;
 
-initThemeFromStorage();
+// Initialize user preferences (theme, currency profile) early to avoid flashing
+// This synchronously applies preferences from storage, preventing UI flicker
+initThemeFromStorage(); // Legacy init for immediate theme (no await)
+// hydratePreferences will be called later with Firebase config when available
 
 /**
  * Apply a currency/profile by id.
@@ -216,6 +220,12 @@ try {
     FirebaseSvc.init(firebaseConfig).catch(err => { console.warn('FirebaseSvc.init failed', err); });
   }
 } catch (e) { /* ignore init errors for now */ }
+
+// Initialize user preferences early (with Firebase config)
+// This applies theme and currency profile from storage, preventing UI flashes
+hydratePreferences(firebaseConfig).catch(err => {
+  console.warn('Preference hydration failed:', err);
+});
 
 // AuthService is now initialized in globals.js to ensure it's ready before login.view.js loads
 try {
@@ -267,7 +277,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.9(b72)';
+const APP_VERSION = 'v1.4.9(b74)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();

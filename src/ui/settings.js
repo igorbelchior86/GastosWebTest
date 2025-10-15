@@ -13,6 +13,8 @@ import { applyCurrencyProfile, getAvailableProfiles, getCurrentProfile } from '.
 import { getRuntimeProfile } from '../utils/profile.js';
 import { showModal, updateModalOpenState } from '../utils/dom.js';
 import { askConfirmLogout, askConfirmReset } from './modalHelpers.js';
+import * as preferenceService from '../services/preferenceService.js';
+import * as appState from '../state/appState.js';
 
 /**
  * Apply theme preference to the document
@@ -224,7 +226,7 @@ export function setupSettings(settingsModalEl) {
       <h3 class="settings-section-title">Sobre</h3>
       <div class="settings-list">
         <div class="settings-item">
-          <div class="version-number">v1.4.9(b72)</div>
+          <div class="version-number">v1.4.9(b74)</div>
         </div>
         <div class="settings-item danger">
           <button id="resetDataBtn" class="settings-cta">
@@ -247,9 +249,14 @@ export function setupSettings(settingsModalEl) {
     
     // Theme selector event listeners
     box.querySelectorAll('.theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const theme = btn.dataset.theme;
-        localStorage.setItem('ui:theme', theme);
+        
+        // Save preference through preferenceService (persists to Firebase + localStorage)
+        await preferenceService.set('theme', theme);
+        
+        // Also update appState
+        appState.setPreference('theme', theme);
         
         // Apply theme immediately
         applyThemePreference(theme);
@@ -339,10 +346,16 @@ export function setupSettings(settingsModalEl) {
                 <div class="currency-profile-icon">${isSelected ? '✓' : '›'}</div>
               `;
               
-              li.onclick = () => {
+              li.onclick = async () => {
                 try {
                   console.log('[settings] applying currency profile:', pid);
                   applyCurrencyProfile(pid);
+                  
+                  // Save preference through preferenceService (persists to Firebase + localStorage)
+                  await preferenceService.set('currencyProfile', pid);
+                  
+                  // Also update appState
+                  appState.setPreference('currencyProfile', pid);
                   
                   // Update the selector label
                   const left = currencyLink.querySelector('.left');

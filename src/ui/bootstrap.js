@@ -12,6 +12,7 @@
 
 import { normalizeStartBalance } from '../utils/startBalance.js';
 import * as appState from '../state/appState.js';
+import { hydratePreferences } from '../utils/preferenceHydration.js';
 
 export function runBootstrap() {
   const g = (window.__gastos = window.__gastos || {});
