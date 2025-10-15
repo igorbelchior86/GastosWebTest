@@ -117,9 +117,7 @@ export function completeHydration() {
     if (typeof window.renderCardList === 'function') window.renderCardList();
   } catch (err) { /* ignore */ }
   
-  try {
-    if (typeof window.initStart === 'function') window.initStart();
-  } catch (err) { /* ignore */ }
+  // NÃO chama initStart aqui - espera remover skeleton-boot primeiro
   
   try {
     if (typeof window.safeRenderTable === 'function') window.safeRenderTable();
@@ -129,12 +127,22 @@ export function completeHydration() {
     document.documentElement.classList.remove('skeleton-boot');
   } catch (err) { /* ignore */ }
   
+  // AGORA chama initStart DEPOIS de remover skeleton-boot
+  try {
+    if (typeof window.initStart === 'function') window.initStart();
+  } catch (err) { /* ignore */ }
+  
   // Auto-scroll to today if displaying current year
   try {
     const g = window.__gastos || {};
     const currentYear = new Date().getFullYear();
     const viewYear = g.VIEW_YEAR || (g.yearSelectorApi && typeof g.yearSelectorApi.getViewYear === 'function' ? g.yearSelectorApi.getViewYear() : null);
-    if (viewYear === currentYear && typeof g.scrollTodayIntoView === 'function') {
+    
+    // LÓGICA BINÁRIA: Se config saldo inicial visível = desabilitar auto scroll
+    const startContainer = document.getElementById('startGroup') || document.querySelector('.start-container');
+    const isStartVisible = startContainer && startContainer.style.display !== 'none';
+    
+    if (!isStartVisible && viewYear === currentYear && typeof g.scrollTodayIntoView === 'function') {
       setTimeout(() => {
         g.scrollTodayIntoView();
       }, 400);

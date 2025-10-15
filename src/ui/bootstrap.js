@@ -79,31 +79,36 @@ export function runBootstrap() {
       return;
     }
     
-    // CRITICAL: Don't check state during partial hydration!
-    // Wait until bootHydrated flag is set, which means ALL data loaded from Firebase
-    const isHydrated = appState.isBootHydrated();
-    if (!isHydrated) {
-      console.log('[initStart] Skipping - data not fully hydrated yet');
-      return;
-    }
-    
-    // SIMPLE LOGIC: Read state directly from appState module
+    // Read state directly from appState module
     const startSet = appState.getStartSet();
-    const startDate = appState.getStartDate();
     const startBalance = appState.getStartBalance();
     
-    // Show start balance if not configured yet. Period.
-    const showStart = !(startSet === true || (startDate != null && startBalance != null));
-    
-    console.log('[initStart] Check:', { isHydrated, startSet, startDate, startBalance, showStart });
-    
+    // Durante hidratação inicial, se startBalance ainda for null mas não sabemos
+    // se é primeiro uso ou se os dados ainda não carregaram, NÃO mostra a caixa
+    // para evitar flash. Só mostra quando temos certeza (após hidratação).
+    const isHydrated = appState.isBootHydrated();
+    if (!isHydrated && startBalance === null) {
+      console.log('[initStart] Waiting for hydration before showing start box');
+      return;
+    }
+
+    // LÓGICA BINÁRIA SIMPLES:
+    // Não configurou saldo? Mostra
+    // Configurou saldo? Esconde
+    const showStart = (startBalance === null || startBalance === undefined);
+
+    console.log('[initStart] SIMPLE CHECK:', { startBalance, isHydrated, showStart });
+
     // exibe ou oculta todo o container de saldo inicial
     startContainer.style.display = showStart ? 'block' : 'none';
     dividerSaldo.style.display = showStart ? 'block' : 'none';
     // (mantém linha antiga para compatibilidade)
     startGroup.style.display = showStart ? 'flex' : 'none';
     // mantém o botão habilitado; a função addTx impede lançamentos
-    addBtn.classList.toggle('disabled', showStart);
+    try { addBtn.classList.toggle('disabled', showStart); } catch (_) {}
+
+    // marca visibilidade para checagens externas
+    try { startContainer.setAttribute('data-start-visible', String(showStart)); } catch (_) {}
   }
   // Expose initStart on global state so existing calls still work
   g.initStart = initStart;
@@ -154,6 +159,16 @@ export function runBootstrap() {
   if (typeof addCardBtn !== 'undefined' && addCardBtn) addCardBtn.onclick = addCard;
   if (typeof addBtn !== 'undefined' && addBtn) {
     addBtn.onclick = async () => {
+      // If start balance input is visible, block opening add modal
+      try {
+        const ds = startContainer && startContainer.getAttribute && startContainer.getAttribute('data-start-visible');
+        const visible = ds === 'true' ? true : (startContainer && startContainer.style && startContainer.style.display && startContainer.style.display !== 'none');
+        if (visible) {
+          // give a gentle feedback (no modal)
+          try { startInput && startInput.focus(); } catch (_) {}
+          return;
+        }
+      } catch (_) {}
       // Get addTx from global context when clicked, not when bootstrap runs
       const g = window.__gastos;
       if (g && typeof g.addTx === 'function') {
@@ -192,7 +207,7 @@ export function runBootstrap() {
     // Renderiza imediatamente com dados em cache
     refreshMethods();
     renderCardList();
-    initStart();
+    // NÃO chama initStart aqui - espera remover skeleton-boot primeiro
     try { console.debug('bootstrap: about to call safeRenderTable, type =', typeof safeRenderTable); } catch(_) {}
     safeRenderTable();
     // exibe conteúdo após carregar dados localmente
@@ -200,6 +215,8 @@ export function runBootstrap() {
     wrap.classList.remove('app-hidden');
     // Remove skeleton flag so start-balance obeys real logic
     try { document.documentElement.classList.remove('skeleton-boot'); } catch (_) {}
+    // AGORA chama initStart DEPOIS de remover skeleton-boot
+    initStart();
     // iOS/Safari: force layout settle so bottom extent is correct
     // tiny scroll nudge prevents initial underflow that hides last days
     try {
@@ -293,4 +310,15 @@ export function runBootstrap() {
     // se online, tenta esvaziar fila pendente
     if (navigator.onLine) flushQueue();
   })();
+
+  // Re-run initStart when relevant parts of app state change (e.g., after reset)
+  try {
+    appState.subscribeState(({ changedKeys }) => {
+      if (!changedKeys || !Array.isArray(changedKeys)) return;
+      const interesting = ['startSet', 'startBalance', 'bootHydrated'];
+      if (changedKeys.some(k => interesting.includes(k))) {
+        try { initStart(); } catch (_) {}
+      }
+    });
+  } catch (_) {}
 }

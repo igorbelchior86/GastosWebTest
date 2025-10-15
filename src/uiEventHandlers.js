@@ -138,7 +138,13 @@ export function setupMainEventHandlers(ctx) {
         setSelected(action);
         updateHighlight();
         if (action === 'home') {
-          scrollTodayIntoView && scrollTodayIntoView();
+          // LÓGICA BINÁRIA: Se config saldo inicial visível = desabilitar auto scroll
+          const startContainer = document.getElementById('startGroup') || document.querySelector('.start-container');
+          const isStartVisible = startContainer && startContainer.style.display !== 'none';
+          
+          if (!isStartVisible && scrollTodayIntoView) {
+            scrollTodayIntoView();
+          }
           closeSettings && closeSettings();
         } else if (action === 'settings') {
           openSettings && openSettings();
@@ -194,7 +200,13 @@ export function setupMainEventHandlers(ctx) {
   // Scroll to today shortcut.
   if (homeBtn && scrollTodayIntoView) {
     homeBtn.addEventListener('click', () => {
-      scrollTodayIntoView();
+      // LÓGICA BINÁRIA: Se config saldo inicial visível = desabilitar auto scroll
+      const startContainer = document.getElementById('startGroup') || document.querySelector('.start-container');
+      const isStartVisible = startContainer && startContainer.style.display !== 'none';
+      
+      if (!isStartVisible) {
+        scrollTodayIntoView();
+      }
     });
   }
 

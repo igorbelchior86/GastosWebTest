@@ -1,4 +1,5 @@
 import { normalizeStartBalance } from './startBalance.js';
+import { setBootHydrated } from '../state/appState.js';
 
 /**
  * Provides a helper to hydrate the application state from cached storage. The
@@ -71,9 +72,20 @@ export function hydrateCache(options = {}) {
   }
   // Keep input in sync
   if (syncStartInputFromState) syncStartInputFromState();
-  if (state) {
-    state.bootHydrated = true;
+  
+  // CRITICAL: Use setBootHydrated to trigger subscribers that monitor bootHydrated changes
+  try {
+    if (typeof setBootHydrated === 'function') {
+      setBootHydrated(true);
+    } else if (state) {
+      state.bootHydrated = true;
+    }
+  } catch (_) {
+    if (state) {
+      state.bootHydrated = true;
+    }
   }
+  
   if (ensureStartSetFromBalance) ensureStartSetFromBalance();
   if (render && !isHydrating) {
     // Render UI after hydration if allowed

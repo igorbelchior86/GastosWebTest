@@ -571,13 +571,13 @@ function toggleTxModal(){
   // Block opening transaction modal if start balance not set
   const isOpening=txModal.classList.contains('hidden');
   if(isOpening){
-    const startSet = appState.getStartSet ? appState.getStartSet() : state.startSet;
-    const startDate = appState.getStartDate ? appState.getStartDate() : state.startDate;
-    const startBalance = appState.getStartBalance ? appState.getStartBalance() : state.startBalance;
-    const needsStartBalance = !(startSet === true || (startDate != null && startBalance != null));
+    // LÓGICA SIMPLES: Se saldo inicial visível, modal lançar operação OFF
+    // Verifica se a caixa de saldo inicial está visível
+    const startContainer = document.getElementById('startGroup') || document.querySelector('.start-container');
+    const isStartVisible = startContainer && startContainer.style.display !== 'none';
     
-    if(needsStartBalance){
-      showToast('Configure o Saldo Inicial primeiro', 'warning');
+    if(isStartVisible){
+      showToast('Configure o Saldo inicial primeiro', 'warning');
       return;
     }
     

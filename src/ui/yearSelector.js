@@ -195,11 +195,17 @@ export function createYearSelector(options = {}) {
     // Auto-scroll to today if selecting current year
     try {
       if (isCurrentYear) {
-        const g = window.__gastos || {};
-        if (typeof g.scrollTodayIntoView === 'function') {
-          setTimeout(() => {
-            g.scrollTodayIntoView();
-          }, 400);
+        // LÓGICA BINÁRIA: Se config saldo inicial visível = desabilitar auto scroll
+        const startContainer = document.getElementById('startGroup') || document.querySelector('.start-container');
+        const isStartVisible = startContainer && startContainer.style.display !== 'none';
+        
+        if (!isStartVisible) {
+          const g = window.__gastos || {};
+          if (typeof g.scrollTodayIntoView === 'function') {
+            setTimeout(() => {
+              g.scrollTodayIntoView();
+            }, 400);
+          }
         }
       }
     } catch (err) {

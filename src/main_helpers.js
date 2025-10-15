@@ -198,25 +198,43 @@ export function createPerformResetAllData(context) {
       // Clear in‑memory state.
       setTransactions([]);
       setCards([{ name: 'Dinheiro', close: 0, due: 0 }]);
-      if (state) {
-        state.startBalance = null;
-        state.startDate = null;
-        state.startSet = false;
+      
+      // Reset start balance properties via appState module
+      // CRITICAL: Use setStartBalance/setStartSet from appState to ensure proper state management
+      try {
+        const appStateModule = await import('../state/appState.js');
+        if (appStateModule.setStartBalance) {
+          appStateModule.setStartBalance(null, { emit: false });
+        }
+        if (appStateModule.setStartDate) {
+          appStateModule.setStartDate(null, { emit: false });
+        }
+        if (appStateModule.setStartSet) {
+          appStateModule.setStartSet(false, { emit: false });
+        }
+      } catch (_) {
+        // Fallback to direct state mutation if module import fails
+        if (state) {
+          state.startBalance = null;
+          state.startDate = null;
+          state.startSet = false;
+        }
       }
+      
       // Update the UI input reflecting the start balance.
       try { syncStart && syncStart(); } catch (_) {}
       // Persist cleared values to the local cache.
       try { cacheSet && cacheSet('tx', getTransactions()); } catch (_) {}
       try { cacheSet && cacheSet('cards', getCards()); } catch (_) {}
-      try { cacheSet && cacheSet('startBal', state?.startBalance); } catch (_) {}
-      try { cacheSet && cacheSet('startDate', state?.startDate); } catch (_) {}
+      try { cacheSet && cacheSet('startBal', null); } catch (_) {}
+      try { cacheSet && cacheSet('startDate', null); } catch (_) {}
+      try { cacheSet && cacheSet('startSet', false); } catch (_) {}
       try { cacheSet && cacheSet('dirtyQueue', []); } catch (_) {}
       // Persist cleared values to the remote database.
       try { await (save && save('tx', getTransactions())); } catch (_) {}
       try { await (save && save('cards', getCards())); } catch (_) {}
-      try { await (save && save('startBal', state?.startBalance)); } catch (_) {}
-      try { await (save && save('startDate', state?.startDate)); } catch (_) {}
-      try { cacheSet && cacheSet('startSet', false); } catch (_) {}
+      try { await (save && save('startBal', null)); } catch (_) {}
+      try { await (save && save('startDate', null)); } catch (_) {}
       try { await (save && save('startSet', false)); } catch (_) {}
       // Refresh derived views.
       try { refreshMethods && refreshMethods(); } catch (_) {}
