@@ -5,7 +5,7 @@ import { initTxUtils } from './ui/transactionUtils.js';
 import { setupInvoiceHandlers,openPayInvoiceModal as openPayInvoiceModalMod,addTx as addTxMod } from './ui/transactionModal.js';
 import { DEFAULT_PROFILE,LEGACY_PROFILE_ID,PROFILE_DATA_KEYS,PROFILE_CACHE_KEYS,getRuntimeProfile,getCurrencyName,getCurrentProfileId,scopedCacheKey,scopedDbSegment } from './utils/profile.js';
 import { cacheGet, cacheSet, cacheRemove, cacheClearProfile } from './utils/cache.js';
-import { appState,setStartBalance,setStartDate,setStartSet,setBootHydrated,setTransactions,getTransactions,setCards,getCards,subscribeState } from './state/appState.js';
+import { appState,setStartBalance,setStartDate,setStartSet,setBootHydrated,setTransactions,getTransactions,setCards,getCards,subscribeState,setMonthlyTotals,setBudgetsByTag } from './state/appState.js';
 
 import { resetHydration as hydrationReset,registerHydrationTarget as hydrationRegisterTarget,markHydrationTargetReady as hydrationTargetReady,completeHydration as hydrationComplete,isHydrating as hydrationIsInProgress,maybeCompleteHydration as hydrationMaybeComplete } from './ui/hydration.js';
 
@@ -29,6 +29,9 @@ import { setupEditTransaction } from './ui/editTransaction.js';
 import { setupTransactionForm } from './ui/transactionForm.js';
 import { renderCardSelectorHelper } from './ui/transactionForm.js';
 import { initAccordion } from './ui/accordion.js';
+import { setupBudgetAutocomplete } from './ui/budgetAutocomplete.js';
+import { setupBudgetHistory } from './ui/budgetHistory.js';
+import { setupBudgetPanorama } from './ui/budgetPanorama.js';
 import { initOfflineQueue } from './utils/offlineQueue.js';
 import { initTransactionSanitize } from './utils/transactionSanitize.js';
 import { resetTxModal as resetTxModalMod,updateModalOpenState as updateModalOpenStateMod,focusValueField as focusValueFieldMod } from './ui/txModalUtils.js';
@@ -36,6 +39,12 @@ import { applyCurrencyProfile as applyCurrencyProfileMod } from './utils/currenc
 import { initThemeFromStorage } from './utils/theme.js';
 import { hydratePreferences } from './utils/preferenceHydration.js';
 import { initIOSDebug } from './utils/iosDebug.js';
+import { loadBudgets, saveBudgets, findActiveByTag, resetBudgetCache, getBudgetStorageKey } from './services/budgetStorage.js';
+import { upsertBudgetFromTransaction } from './services/budgetManager.js';
+import { getReservedTotalForDate as calculateReservedTotal, spentNoPeriodo as calculateSpentNoPeriodo, refreshBudgetCache, recomputeBudget } from './services/budgetCalculations.js';
+import { closeExpiredBudgets, initDayChangeWatcher, ensureRecurringBudgets } from './services/budgetLifecycle.js';
+import { extractFirstHashtag } from './utils/tag.js';
+import { isBudgetsEnabled, isPanoramaEnabled, getFeatureFlagsApi } from './config/features.js';
 
 //
 import { setupMainEventHandlers } from './uiEventHandlers.js';
@@ -51,8 +60,15 @@ import { createStartRealtime } from './startRealtimeHelper.js';
 import { askMoveToToday as askMoveToTodayMod,askConfirmLogout as askConfirmLogoutMod,askConfirmReset as askConfirmResetMod,scheduleAfterKeyboard as scheduleAfterKeyboardMod,flushKeyboardDeferredTasks as flushKeyboardDeferredTasksMod } from './ui/modalHelpers.js';
 
 const state = appState;
+const featureFlags = getFeatureFlagsApi();
 
-try { (window.__gastos = window.__gastos || {}).state = state; } catch (_) {}
+try {
+  const globalApi = (window.__gastos = window.__gastos || {});
+  globalApi.state = state;
+  if (!globalApi.featureFlags) {
+    globalApi.featureFlags = featureFlags;
+  }
+} catch (_) {}
 
 let startInputRef=null,reopenPlannedAfterEdit=false;
 const sameId = (a, b) => String(a ?? '') === String(b ?? '');
@@ -67,6 +83,8 @@ const flushKeyboardDeferredTasks = flushKeyboardDeferredTasksMod;
 const askMoveToToday    = askMoveToTodayMod;
 const askConfirmLogout  = askConfirmLogoutMod;
 const askConfirmReset   = askConfirmResetMod;
+let budgetHistory = null;
+let panorama = null;
 
 const resetTxModal       = resetTxModalMod;
 const updateModalOpenState = updateModalOpenStateMod;
@@ -76,6 +94,90 @@ let updatePendingBadge,markDirty,scheduleBgSync,tryFlushWithBackoff,queueTx,flus
 
 const initSwipe = initSwipeMod;
 const scrollTodayIntoView = scrollTodayIntoViewMod;
+
+function emitTelemetry(eventName, payload = {}) {
+  try {
+    window.__gastos?.telemetry?.emit?.(eventName, payload);
+  } catch (_) {}
+}
+
+function getReservedTotalForDateStub(dateISO) {
+  const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+  try {
+    return calculateReservedTotal(dateISO || todayISO(), txs);
+  } catch (_) {
+    return 0;
+  }
+}
+
+function computeMonthlyTotals(transactionsList = (typeof getTransactions === 'function' ? getTransactions() : transactions) || []) {
+  const map = {};
+  (transactionsList || []).forEach((tx) => {
+    if (!tx || tx.planned) return;
+    const key = (tx.opDate || '').slice(0, 7);
+    if (!key) return;
+    if (!map[key]) map[key] = { income: 0, expense: 0 };
+    const val = Number(tx.val) || 0;
+    if (val > 0) map[key].income += val;
+    else map[key].expense += Math.abs(val);
+  });
+  try { setMonthlyTotals(map, { emit: true }); } catch (err) { console.warn('setMonthlyTotals failed', err); }
+  return map;
+}
+
+function rebuildBudgetsByTag(transactionsList = (typeof getTransactions === 'function' ? getTransactions() : transactions) || []) {
+  try {
+    const budgets = (loadBudgets() || []).filter((b) => b && b.status === 'active');
+    const index = {};
+    budgets.forEach((budget) => {
+      if (!budget || !budget.tag) return;
+      const normalized = recomputeBudget ? (recomputeBudget({ ...budget }, transactionsList) || budget) : budget;
+      index[budget.tag] = normalized;
+    });
+    setBudgetsByTag(index, { emit: true });
+    return index;
+  } catch (err) {
+    console.warn('rebuildBudgetsByTag failed', err);
+    return {};
+  }
+}
+
+function maybeRefreshBudgetsCache(candidateTxs) {
+  if (!isBudgetsEnabled()) return;
+  const list = Array.isArray(candidateTxs)
+    ? candidateTxs
+    : (typeof getTransactions === 'function' ? getTransactions() : transactions || []);
+  try {
+    refreshBudgetCache(list);
+  } catch (err) {
+    console.warn('refreshBudgetCache failed', err);
+  }
+  try { rebuildBudgetsByTag(list); } catch (_) {}
+}
+
+function runDailyBudgetMaintenance() {
+  if (!isBudgetsEnabled()) return;
+  const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+  try { refreshBudgetCache(txs); } catch (_) {}
+  try { rebuildBudgetsByTag(txs); } catch (_) {}
+  // Materialize today's recurring cycle budgets so reservations work off persisted data
+  try {
+    const { created } = ensureRecurringBudgets(txs, todayISO());
+    if (created > 0) {
+      try { refreshBudgetCache(txs); } catch (_) {}
+      try { rebuildBudgetsByTag(txs); } catch (_) {}
+    }
+  } catch (err) { console.warn('ensureRecurringBudgets failed', err); }
+  try {
+    const { closed } = closeExpiredBudgets(txs, todayISO());
+    if (closed > 0) {
+      try { renderTable(); } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('closeExpiredBudgets failed', err);
+  }
+  try { computeMonthlyTotals(txs); } catch (_) {}
+}
 
 function normalizeISODate(input){if(!input)return null;if(input instanceof Date)return input.toISOString().slice(0,10);const str=String(input).trim();if(!str)return null;const match=str.match(/^(\d{4}-\d{2}-\d{2})/);return match?match[1]:null;}
 
@@ -573,6 +675,7 @@ if (!USE_MOCK) {
     cacheSet('startBal', state.startBalance);
     initStart(); renderTable();
   }
+  try { computeMonthlyTotals(transactions); rebuildBudgetsByTag(transactions); } catch (_) {}
 
   completeHydration();
 }
@@ -672,6 +775,8 @@ try {
     safeFmtNumber,
     safeFmtCurrency,
   });
+  setupBudgetAutocomplete({ txModal, descInput: desc, getTransactions, isBudgetsEnabled });
+  budgetHistory = setupBudgetHistory({ txModal, getTransactions, isBudgetsEnabled, findActiveBudgetByTag });
 } catch (_) {}
 
 const recurrence=$('recurrence'),parcelasBlock=$('parcelasBlock'),installments=$('installments'),invoiceParcelCheckbox=document.getElementById('invoiceParcel'),invoiceParcelRow=document.getElementById('invoiceParcelRow');let isEditing=null;
@@ -680,7 +785,155 @@ const notify=(msg,type='error')=>{const t=document.getElementById('toast');if(!t
 
 let makeLine=null,addTx=null;if(typeof window!=='undefined')window.addTx=addTx;
 
-window.__gastos={txModal,toggleTxModal,desc,val,safeFmtNumber,safeFmtCurrency,safeParseCurrency,date,hiddenSelect:document.getElementById('method'),methodButtons:document.querySelectorAll('.switch-option'),invoiceParcelRow:document.getElementById('invoiceParcel'),invoiceParcelCheckbox:document.getElementById('invoiceParcel'),installments,parcelasBlock,recurrence,txModalTitle,addBtn,todayISO,isEditing,pendingEditMode,pendingEditTxIso,pendingEditTxId,isPayInvoiceMode,pendingInvoiceCtx,transactions,getTransactions,setTransactions,addTransaction,sameId,post,occursOn,save,load,renderTable,safeRenderTable,showToast,notify,askMoveToToday,askConfirmLogout,askConfirmReset,plannedModal,openPlannedBtn,closePlannedModal,plannedList,updateModalOpenState,makeLine,initSwipe,deleteRecurrenceModal,closeDeleteRecurrenceModal,deleteSingleBtn,deleteFutureBtn,deleteAllBtn,cancelDeleteRecurrence,editRecurrenceModal,closeEditRecurrenceModal,cancelEditRecurrence,editSingleBtn,editFutureBtn,editAllBtn,pendingDeleteTxId,pendingDeleteTxIso,pendingEditTxId,pendingEditTxIso,pendingEditMode,reopenPlannedAfterEdit,removeTransaction,renderPlannedModal,renderCardSelectorHelper,wrapperEl,stickyHeightGuess,animateWrapperScroll,hydrateStateFromCache,performResetAllData,yearSelectorApi,getViewYear:()=>VIEW_YEAR,VIEW_YEAR,cards,openPayInvoiceModal,resetTxModal,resetAppStateForProfileChange,addTx:null};
+const globalGastos = typeof window !== 'undefined'
+  ? (window.__gastos = window.__gastos || {})
+  : {};
+
+Object.assign(globalGastos, {
+  txModal,
+  toggleTxModal,
+  desc,
+  val,
+  safeFmtNumber,
+  safeFmtCurrency,
+  safeParseCurrency,
+  date,
+  hiddenSelect: document.getElementById('method'),
+  methodButtons: document.querySelectorAll('.switch-option'),
+  invoiceParcelRow: document.getElementById('invoiceParcel'),
+  invoiceParcelCheckbox: document.getElementById('invoiceParcel'),
+  installments,
+  parcelasBlock,
+  recurrence,
+  txModalTitle,
+  addBtn,
+  todayISO,
+  budgetHistory,
+  isEditing,
+  pendingEditMode,
+  pendingEditTxIso,
+  pendingEditTxId,
+  isPayInvoiceMode,
+  pendingInvoiceCtx,
+  transactions,
+  getTransactions,
+  setTransactions,
+  addTransaction,
+  sameId,
+  post,
+  occursOn,
+  save,
+  load,
+  renderTable,
+  safeRenderTable,
+  showToast,
+  notify,
+  extractFirstHashtag,
+  askMoveToToday,
+  askConfirmLogout,
+  askConfirmReset,
+  plannedModal,
+  openPlannedBtn,
+  closePlannedModal,
+  plannedList,
+  updateModalOpenState,
+  makeLine,
+  initSwipe,
+  deleteRecurrenceModal,
+  closeDeleteRecurrenceModal,
+  deleteSingleBtn,
+  deleteFutureBtn,
+  deleteAllBtn,
+  cancelDeleteRecurrence,
+  editRecurrenceModal,
+  closeEditRecurrenceModal,
+  cancelEditRecurrence,
+  editSingleBtn,
+  editFutureBtn,
+  editAllBtn,
+  pendingDeleteTxId,
+  pendingDeleteTxIso,
+  pendingEditTxId,
+  pendingEditTxIso,
+  pendingEditMode,
+  reopenPlannedAfterEdit,
+  removeTransaction,
+  renderPlannedModal,
+  renderCardSelectorHelper,
+  wrapperEl,
+  stickyHeightGuess,
+  animateWrapperScroll,
+  hydrateStateFromCache,
+  performResetAllData,
+  maybeRefreshBudgetsCache,
+  loadBudgets,
+  saveBudgets,
+  findActiveByTag,
+  resetBudgetCache,
+  getBudgetStorageKey,
+  upsertBudgetFromTransaction,
+  refreshBudgetCache,
+  yearSelectorApi,
+  getViewYear: () => VIEW_YEAR,
+  VIEW_YEAR,
+  cards,
+  openPayInvoiceModal,
+  resetTxModal,
+  resetAppStateForProfileChange,
+  addTx: null,
+});
+
+if (!globalGastos.featureFlags) {
+  globalGastos.featureFlags = featureFlags;
+}
+if (!globalGastos.getFeatureFlags) {
+  globalGastos.getFeatureFlags = featureFlags.getAll;
+}
+if (!globalGastos.setFeatureFlag) {
+  globalGastos.setFeatureFlag = () => true;
+}
+if (!globalGastos.clearFeatureFlags) {
+  globalGastos.clearFeatureFlags = featureFlags.clearOverrides;
+}
+globalGastos.isBudgetsFeatureEnabled = isBudgetsEnabled;
+globalGastos.isPanoramaFeatureEnabled = isPanoramaEnabled;
+globalGastos.getReservedTotalForDate = getReservedTotalForDateStub;
+globalGastos.loadBudgets = loadBudgets;
+globalGastos.saveBudgets = saveBudgets;
+globalGastos.findActiveBudgetByTag = findActiveByTag;
+globalGastos.resetBudgetCache = resetBudgetCache;
+globalGastos.getBudgetStorageKey = getBudgetStorageKey;
+globalGastos.upsertBudgetFromTransaction = upsertBudgetFromTransaction;
+globalGastos.spentNoPeriodo = calculateSpentNoPeriodo;
+globalGastos.refreshBudgetCache = () => {
+  const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+  try { refreshBudgetCache(txs); } catch (_) {}
+};
+globalGastos.maybeRefreshBudgetsCache = maybeRefreshBudgetsCache;
+
+// Expor utilidades para outros módulos e garantir telemetria
+if (!globalGastos.computeMonthlyTotals) {
+  globalGastos.computeMonthlyTotals = (list) => {
+    try { return computeMonthlyTotals(list); } catch (_) { return {}; }
+  };
+}
+if (!globalGastos.rebuildBudgetsByTag) {
+  globalGastos.rebuildBudgetsByTag = (list) => {
+    try { return rebuildBudgetsByTag(list); } catch (_) { return {}; }
+  };
+}
+if (!globalGastos.emitTelemetry) {
+  globalGastos.emitTelemetry = (name, payload = {}) => {
+    try { emitTelemetry(name, payload); } catch (_) {}
+  };
+}
+if (!globalGastos.telemetry || typeof globalGastos.telemetry.emit !== 'function') {
+  globalGastos.telemetry = {
+    emit: (name, payload = {}) => {
+      try { console.info('[telemetry]', name, payload); } catch (_) {}
+    }
+  };
+}
 
 window.performResetAllData = performResetAllData;
 window.safeRenderTable = safeRenderTable;
@@ -709,6 +962,7 @@ window.setTransactions = (list) => {
     transactions = Array.isArray(next) ? next.slice() : [];
     if (window.__gastos) window.__gastos.transactions = transactions.slice();
     try { renderTable(); } catch (_) {}
+    maybeRefreshBudgetsCache(transactions);
   } catch (_) {}
   return next;
 };
@@ -729,6 +983,7 @@ subscribeState(({ changedKeys = [], state: snapshot } = {}) => {
   if (changedKeys.includes('transactions')) {
     transactions = Array.isArray(snapshot.transactions) ? snapshot.transactions.slice() : [];
     try { window.__gastos.transactions = transactions.slice(); } catch (_) {}
+    maybeRefreshBudgetsCache(transactions);
   }
 });
 
@@ -1045,12 +1300,47 @@ try {
     getTransactions,
     setTransactions,
     post: (iso, method) => post(iso, method),
+  todayISO,
+  save,
+  renderTable,
+  renderPlannedModal,
+  notify,
+  refreshBudgetsCache: maybeRefreshBudgetsCache
+});
+  panorama = setupBudgetPanorama({
+    button: openCardBtn,
+    isPanoramaEnabled,
+    getTransactions,
+    safeFmtCurrency,
     todayISO,
-    save,
-    renderTable,
-    renderPlannedModal,
-    notify
+    showBudgetHistory: (tag) => budgetHistory?.showHistory?.(tag)
   });
+
+  if (openCardBtn) {
+    console.info('[panorama] attaching handler to header button');
+    openCardBtn.dataset.panoramaHook = '1';
+    openCardBtn.addEventListener('click', (event) => {
+      console.info('[panorama] header button click', { hasPanorama: !!panorama, hasHandle: panorama && typeof panorama.handleOpen === 'function' });
+      if (panorama && typeof panorama.handleOpen === 'function') {
+        try {
+          const opened = panorama.handleOpen();
+          if (opened) {
+            console.info('[panorama] opened sheet');
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        } catch (err) {
+          console.error('[panorama] handleOpen failed', err);
+        }
+      }
+      console.info('[panorama] falling back to cards modal');
+      showCardModal();
+    });
+  } else {
+    console.warn('[panorama] header button not found');
+  }
+
   // Update the deps object passed to makeLine so it can access togglePlanned
   // This is safe because getTogglePlanned() reads from deps dynamically
   if (makeLine.__deps__) {
@@ -1077,7 +1367,10 @@ try {
     initStart,
     renderTable,
     showToast,
-    syncStartInputFromState
+    syncStartInputFromState,
+    saveBudgets,
+    resetBudgetCache,
+    maybeRefreshBudgetsCache,
   });
   // Expose the new reset routine globally so existing code can invoke it.
   try { window.performResetAllData = performResetAllData; } catch (_) {}
@@ -1089,6 +1382,9 @@ try {
     window.__gastos.showCardModal = showCardModal;
     window.__gastos.hideCardModal = hideCardModal;
     window.__gastos.setCards = window.setCards;  // Export setCards for Firebase sync
+    window.__gastos.openPanorama = () => {
+      try { return panorama && typeof panorama.handleOpen === 'function' ? panorama.handleOpen() : false; } catch (_) { return false; }
+    };
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
@@ -1286,10 +1582,14 @@ const accordionApi = initAccordion({
   safeFmtCurrency,
   SALARY_WORDS,
   makeLine,
+  getReservedTotalForDate: getReservedTotalForDateStub,
+  isBudgetsFeatureEnabled: isBudgetsEnabled,
 });
 
 // Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
 renderTable();
+// Close past-due budgets on app open
+try { runDailyBudgetMaintenance(); } catch (_) {}
 
 
 
@@ -1309,6 +1609,13 @@ initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.invoice-header-li
 
 yearSelectorApi.updateYearTitle();
 initKeyboardAndScrollHandlers();
+
+// Watch for day change to close expired budgets automatically
+try {
+  initDayChangeWatcher(() => {
+    try { runDailyBudgetMaintenance(); } catch (_) {}
+  });
+} catch (_) {}
 
 // Wire up UI event handlers using the extracted module. Only pass
 // references that should be managed by the helper; omit others

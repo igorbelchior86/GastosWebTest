@@ -9,6 +9,9 @@
  * main.js for the assignment of these properties.
  */
 
+import { extractFirstHashtag } from '../utils/tag.js';
+import { upsertBudgetFromTransaction } from '../services/budgetManager.js';
+
 /**
  * Attaches listeners for invoice parcel and installment controls.
  * This function should be called once after `window.__gastos` has been
@@ -307,6 +310,67 @@ export async function addTx() {
     }
     return iso;
   };
+  const budgetsEnabled = typeof g.isBudgetsFeatureEnabled === 'function' ? !!g.isBudgetsFeatureEnabled() : false;
+  const refreshBudgetsCache = budgetsEnabled && typeof g.maybeRefreshBudgetsCache === 'function'
+    ? (list) => {
+        try { g.maybeRefreshBudgetsCache(list); } catch (err) { console.warn('maybeRefreshBudgetsCache failed', err); }
+      }
+    : () => {};
+  const tryUpsertBudget = (tx, extraContext = {}) => {
+    if (!budgetsEnabled || !tx || !tx.budgetTag || typeof upsertBudgetFromTransaction !== 'function') return;
+    try {
+      upsertBudgetFromTransaction(tx, {
+        transactions: (typeof getTransactions === 'function' ? getTransactions() : transactions) || [],
+        recurrenceId: extraContext.recurrenceId || tx.recurrenceId || tx.parentId || null,
+        occurrenceISO: extraContext.occurrenceISO || tx.opDate,
+        nextOccurrenceISO: extraContext.nextOccurrenceISO || null,
+        creationDate: extraContext.creationDate || todayFn(),
+      });
+    } catch (err) {
+      console.warn('Budget upsert failed', err);
+    }
+  };
+  const findActiveBudgetFn = budgetsEnabled && typeof g.findActiveBudgetByTag === 'function'
+    ? g.findActiveBudgetByTag
+    : null;
+  const hasActiveRecurringBudgetForTag = (tag) => {
+    if (!budgetsEnabled || !tag || !findActiveBudgetFn) return false;
+    try {
+      const record = findActiveBudgetFn(tag);
+      return !!(record && record.status === 'active' && record.budgetType === 'recurring');
+    } catch (_) {
+      return false;
+    }
+  };
+  const isFutureDate = (iso) => iso && iso > todayFn();
+  const isRecurrenceActive = (value) => !!(value && String(value).trim());
+  const blockMessage = (msg) => {
+    if (msg) {
+      showToastFn(msg, 'error');
+    }
+    return Boolean(msg);
+  };
+  const isWithinCycle = (budget, iso) => {
+    if (!budget || !iso) return false;
+    const s = (budget.startDate || '').slice(0,10);
+    const e = (budget.endDate || '').slice(0,10);
+    if (s && iso < s) return false;
+    if (e && iso > e) return false;
+    return true;
+  };
+  const validateOccurrenceDateChange = ({ mode, originalTx, newISO, occurrenceISO }) => {
+    if (!newISO) return null;
+    if ((mode === 'single' || mode === 'future') && occurrenceISO && newISO !== occurrenceISO) {
+      return 'A data é controlada pela recorrência e não pode ser alterada.';
+    }
+    const originalISO = originalTx && originalTx.opDate;
+    const isMaster = !!(originalTx && originalTx.recurrence && String(originalTx.recurrence).trim());
+    const isChild = !!(originalTx && originalTx.parentId);
+    if ((isMaster || isChild) && originalISO && newISO !== originalISO) {
+      return 'A data é controlada pela recorrência e não pode ser alterada.';
+    }
+    return null;
+  };
   // Start of original addTx logic
   try {
     // Edit mode
@@ -328,6 +392,7 @@ export async function addTx() {
         return;
       }
       const newDesc    = desc && desc.value ? desc.value.trim() : '';
+      const newBudgetTag = extractFirstHashtag(newDesc);
       let newVal = parseCurrency(val && val.value);
       const activeTypeEl = document.querySelector('.value-toggle button.active');
       const activeType = activeTypeEl && activeTypeEl.dataset ? activeTypeEl.dataset.type : 'expense';
@@ -347,12 +412,22 @@ export async function addTx() {
         ? newRecurrenceRaw.trim()
         : newRecurrenceRaw;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
+      const originalPlanned = Boolean(t.planned);
       const compareIds = typeof sameId === 'function'
         ? (a, b) => {
             try { return sameId(a, b); }
             catch (_) { return String(a) === String(b); }
           }
         : (a, b) => String(a) === String(b);
+      const recurrenceActive = isRecurrenceActive(newRecurrence);
+      if (recurrenceActive && isFutureDate(newOpDate)) {
+        const msg = !isRecurrenceActive(t.recurrence)
+          ? 'Um orçamento com data futura não pode ser recorrente. Escolha apenas uma das opções.'
+          : 'A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.';
+        if (blockMessage(msg)) {
+          return;
+        }
+      }
       const findMaster = (tx) => {
         if (!tx) return null;
         if (tx.recurrence && String(tx.recurrence).trim()) return tx;
@@ -365,6 +440,17 @@ export async function addTx() {
       // because it may have been updated by the edit recurrence modal buttons
       const currentEditMode = g.pendingEditMode;
       const currentEditTxIso = g.pendingEditTxIso;
+
+      if (!isRecurrenceActive(t.recurrence) && recurrenceActive && newBudgetTag && hasActiveRecurringBudgetForTag(newBudgetTag)) {
+        if (blockMessage(`Já existe um orçamento recorrente ativo para ${newBudgetTag}.`)) {
+          return;
+        }
+      }
+
+      const dateBlockMsg = validateOccurrenceDateChange({ mode: currentEditMode, originalTx: t, newISO: newOpDate, occurrenceISO: currentEditTxIso || t.opDate });
+      if (blockMessage(dateBlockMsg)) {
+        return;
+      }
 
       switch (currentEditMode) {
         case 'single': {
@@ -400,6 +486,12 @@ export async function addTx() {
             existingDetached.postDate = computePostDate(newOpDate, newMethod);
             existingDetached.planned = newOpDate > todayFn();
             existingDetached.modifiedAt = new Date().toISOString();
+            existingDetached.budgetTag = newBudgetTag;
+            tryUpsertBudget(existingDetached, {
+              occurrenceISO: existingDetached.opDate,
+              nextOccurrenceISO: existingDetached.postDate,
+              recurrenceId: existingDetached.recurrenceId || existingDetached.parentId || null,
+            });
           } else {
             // Create new standalone edited transaction
             const txObj = {
@@ -414,9 +506,15 @@ export async function addTx() {
               installments: 1,
               planned: newOpDate > todayFn(),
               ts: new Date().toISOString(),
-              modifiedAt: new Date().toISOString()
+              modifiedAt: new Date().toISOString(),
+              budgetTag: newBudgetTag
             };
             try { addTxInternal(txObj); } catch (_) { setTxs(getTxs().concat([txObj])); }
+            tryUpsertBudget(txObj, {
+              occurrenceISO: txObj.opDate,
+              nextOccurrenceISO: txObj.postDate,
+              recurrenceId: txObj.recurrenceId || txObj.parentId || null,
+            });
           }
           break;
         }
@@ -444,9 +542,15 @@ export async function addTx() {
             installments: installmentsValue,
             planned: currentEditTxIso > todayFn(),
             ts: new Date().toISOString(),
-            modifiedAt: new Date().toISOString()
+            modifiedAt: new Date().toISOString(),
+            budgetTag: newBudgetTag
           };
           try { addTxInternal(txObj); } catch (_) { setTxs(getTxs().concat([txObj])); }
+          tryUpsertBudget(txObj, {
+            occurrenceISO: txObj.opDate,
+            nextOccurrenceISO: txObj.postDate,
+            recurrenceId: txObj.recurrence ? (txObj.recurrenceId || txObj.id) : null,
+          });
           break;
         }
         case 'all': {
@@ -463,6 +567,12 @@ export async function addTx() {
             master.recurrence   = recurrence ? recurrence.value : '';
             master.installments = parseInt(installments && installments.value, 10) || 1;
             master.modifiedAt   = new Date().toISOString();
+            master.budgetTag    = newBudgetTag;
+            tryUpsertBudget(master, {
+              occurrenceISO: master.opDate,
+              nextOccurrenceISO: master.postDate,
+              recurrenceId: master.recurrenceId || master.id || null,
+            });
           }
           break;
         }
@@ -476,12 +586,20 @@ export async function addTx() {
           if (recurrence) t.recurrence   = newRecurrence;
           if (installments) t.installments = newInstallments;
           // Ajusta flag planned caso a data da operação ainda não tenha ocorrido
-          t.planned      = t.opDate > todayFn();
+          const autoPlanned = t.opDate > todayFn();
+          t.planned      = originalPlanned ? autoPlanned : false;
           t.modifiedAt   = new Date().toISOString();
+          t.budgetTag    = newBudgetTag;
+          tryUpsertBudget(t, {
+            occurrenceISO: t.opDate,
+            nextOccurrenceISO: t.postDate,
+            recurrenceId: t.recurrenceId || t.parentId || null,
+          });
           break;
         }
       }
       // Reset editing state - update BOTH local variables AND global state
+      refreshBudgetsCache(getTxs());
       pendingEditMode    = null;
       pendingEditTxId    = null;
       pendingEditTxIso   = null;
@@ -696,6 +814,30 @@ export async function addTx() {
       const newPostDate = computePostDate(newOpDate, newMethod);
       const newRecurrence  = recurrence && recurrence.value;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
+      const newBudgetTag = extractFirstHashtag(newDesc);
+      const recurrenceActive = isRecurrenceActive(newRecurrence);
+      if (recurrenceActive && isFutureDate(newOpDate)) {
+        if (blockMessage('A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.')) {
+          return;
+        }
+      }
+      if (recurrenceActive && hasActiveRecurringBudgetForTag(newBudgetTag)) {
+        if (blockMessage(`Já existe um orçamento recorrente ativo para ${newBudgetTag}.`)) {
+          return;
+        }
+      }
+      // Anti-duplicidade (ad-hoc): impedir criar novo orçamento futuro
+      // quando já existe ciclo ativo para a mesma tag abrangendo a data.
+      if (!recurrenceActive && isFutureDate(newOpDate) && budgetsEnabled && newBudgetTag && findActiveBudgetFn) {
+        try {
+          const activeBudget = findActiveBudgetFn(newBudgetTag);
+          if (activeBudget && activeBudget.status === 'active' && isWithinCycle(activeBudget, newOpDate)) {
+            if (blockMessage(`Já existe um orçamento ativo para ${newBudgetTag}. Use o ciclo ativo.`)) {
+              return;
+            }
+          }
+        } catch (_) {}
+      }
       const newTx = {
         id: Date.now(),
         desc: newDesc,
@@ -707,7 +849,8 @@ export async function addTx() {
         installments: newInstallments,
         planned: newOpDate > todayFn(),
         ts: new Date().toISOString(),
-        modifiedAt: new Date().toISOString()
+        modifiedAt: new Date().toISOString(),
+        budgetTag: newBudgetTag
       };
       // Force add transaction to state immediately
       const currentTxs = getTxs() || [];
@@ -722,9 +865,16 @@ export async function addTx() {
       if (typeof window.setTransactions === 'function') {
         window.setTransactions(updatedTxs);
       }
+      tryUpsertBudget(newTx, {
+        occurrenceISO: newTx.opDate,
+        nextOccurrenceISO: newTx.postDate,
+        recurrenceId: newTx.recurrence ? newTx.id : null,
+        creationDate: todayFn(),
+      });
       
       // Persist to storage
       saveFn('tx', updatedTxs);
+      refreshBudgetsCache(updatedTxs);
       
       // Reset form before closing
       if (desc) desc.value = '';

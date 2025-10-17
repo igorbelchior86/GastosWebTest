@@ -204,7 +204,15 @@ export function runBootstrap() {
       }
     };
   }
-  if (typeof openCardBtn !== 'undefined' && openCardBtn && openCardBtn) openCardBtn.onclick = () => showCardModal();
+  if (openCardBtn) {
+    if (openCardBtn.dataset.panoramaHook !== '1') {
+      openCardBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        showCardModal();
+      });
+    }
+  }
   if (typeof closeCardModal !== 'undefined' && closeCardModal) closeCardModal.onclick = hideCardModal;
   if (cardModal) {
     cardModal.onclick = e => {

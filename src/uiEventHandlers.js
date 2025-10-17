@@ -76,6 +76,15 @@ export function setupMainEventHandlers(ctx) {
         openPlannedBtn.click();
       } else if (action === 'cards') {
         headerSeg.dataset.selected = 'cards';
+        // Try open Panorama first; fallback to legacy cards modal
+        try {
+          const g = window.__gastos || {};
+          if (g.openPanorama && typeof g.openPanorama === 'function') {
+            const opened = g.openPanorama();
+            if (opened) return;
+          }
+          if (typeof g.showCardModal === 'function') g.showCardModal();
+        } catch (_) {}
       }
     });
   }

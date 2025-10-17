@@ -191,6 +191,9 @@ export function createPerformResetAllData(context) {
       renderTable,
       showToast,
       syncStartInputFromState: syncStart,
+      saveBudgets,
+      resetBudgetCache,
+      maybeRefreshBudgetsCache,
     } = context;
     if (askConfirm) {
       // Use the global confirm dialogue for user confirmation.
@@ -228,12 +231,16 @@ export function createPerformResetAllData(context) {
       try { cacheSet && cacheSet('startDate', null); } catch (_) {}
       try { cacheSet && cacheSet('startSet', false); } catch (_) {}
       try { cacheSet && cacheSet('dirtyQueue', []); } catch (_) {}
+      try { cacheSet && cacheSet('budgets', []); } catch (_) {}
       // Persist cleared values to the remote database.
       try { await (save && save('tx', getTransactions())); } catch (_) {}
       try { await (save && save('cards', getCards())); } catch (_) {}
       try { await (save && save('startBal', null)); } catch (_) {}
       try { await (save && save('startDate', null)); } catch (_) {}
       try { await (save && save('startSet', false)); } catch (_) {}
+      try { await (save && save('budgets', [])); } catch (_) {}
+      try { saveBudgets && saveBudgets([]); resetBudgetCache && resetBudgetCache(); } catch (_) {}
+      try { maybeRefreshBudgetsCache && maybeRefreshBudgetsCache([]); } catch (_) {}
       // Refresh derived views.
       try { refreshMethods && refreshMethods(); } catch (_) {}
       try { renderCardList && renderCardList(); } catch (_) {}
@@ -322,6 +329,7 @@ export function createFloatingResetButton(performResetAllData, documentRef = doc
  *   - renderTable: Function re-rendering the main transactions table.
  *   - renderPlannedModal: Function re-rendering the planned modal.
  *   - notify: Function (msg, type) showing a toast notification.
+ *   - refreshBudgetsCache: Optional function to refresh budget caches when transactions change.
  */
 export function createTogglePlanned(context) {
   return async function togglePlanned(id, iso) {
@@ -338,6 +346,7 @@ export function createTogglePlanned(context) {
       renderTable,
       renderPlannedModal,
       notify,
+      refreshBudgetsCache,
     } = context;
     
     // Get current transactions list
@@ -377,6 +386,7 @@ export function createTogglePlanned(context) {
           planned: false,
           ts: new Date().toISOString(),
           modifiedAt: new Date().toISOString(),
+          budgetTag: master.budgetTag,
         };
         // Attempt to use a provided addTransaction; fall back to setTransactions.
         let added = false;
@@ -438,6 +448,14 @@ export function createTogglePlanned(context) {
     // Notify the user if applicable.
     if (toastMsg && typeof notify === 'function') {
       try { notify(toastMsg, 'success'); } catch (_) {}
+    }
+    if (typeof refreshBudgetsCache === 'function') {
+      try {
+        const latest = typeof getTransactions === 'function' ? getTransactions() : transactions;
+        refreshBudgetsCache(latest);
+      } catch (err) {
+        console.warn('refreshBudgetsCache failed after toggle', err);
+      }
     }
   };
 }

@@ -8,6 +8,8 @@ import { formatToISO, todayISO, occursOn } from '../utils/date.js';
 import { postDateForCard } from '../utils/date.js';
 import { getMonthCache, setMonthCache, getCurrentMonth, isMonthStale } from '../utils/monthlyCache.js';
 import { syncCurrentMonth, smartSync } from '../utils/deltaSync.js';
+import { loadBudgets } from '../services/budgetStorage.js';
+import { recomputeBudget } from '../services/budgetCalculations.js';
 
 /**
  * Initialize the accordion renderer.
@@ -42,8 +44,13 @@ export function initAccordion(config) {
     txByDate,
     safeFmtCurrency,
     SALARY_WORDS,
-    makeLine
+    makeLine,
+    getReservedTotalForDate,
+    isBudgetsFeatureEnabled,
   } = config;
+
+  // Inject polished styles for budget cards rendered inside the accordion
+  ensureBudgetCardStyles();
   const resolveViewYear = () => {
     if (typeof getViewYear === 'function') {
       const dynamicYear = Number(getViewYear());
@@ -53,6 +60,333 @@ export function initAccordion(config) {
     if (Number.isFinite(fallbackYear)) return fallbackYear;
     return new Date().getFullYear();
   };
+
+  const resolveReservedTotalForDate =
+    typeof getReservedTotalForDate === 'function'
+      ? getReservedTotalForDate
+      : () => 0;
+
+  const resolveBudgetsFeatureEnabled =
+    typeof isBudgetsFeatureEnabled === 'function'
+      ? isBudgetsFeatureEnabled
+      : () => false;
+
+  function getReservedAdjustmentForDate(iso) {
+    if (!iso || !resolveBudgetsFeatureEnabled()) return 0;
+    try {
+      const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+      const raw = resolveReservedTotalForDate(iso, txs);
+      const numeric = typeof raw === 'number' ? raw : Number(raw);
+      return Number.isFinite(numeric) ? numeric : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function normalizeBudgetDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    const str = String(value).trim();
+    if (!str) return null;
+    const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+
+  function formatDayMonth(iso) {
+    if (!iso) return '';
+    try {
+      const date = new Date(`${iso}T00:00:00`);
+      return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  function computeInitialValueForRange(transactionsList, tag, startIso, endIso) {
+    if (!Array.isArray(transactionsList) || !tag) return 0;
+    const start = normalizeBudgetDate(startIso);
+    const end = normalizeBudgetDate(endIso);
+    return transactionsList.reduce((sum, tx) => {
+      if (!tx || tx.budgetTag !== tag) return sum;
+      const iso = normalizeBudgetDate(tx.opDate || tx.postDate);
+      if (!iso) return sum;
+      if (start && iso < start) return sum;
+      if (end && iso >= end) return sum;
+      const val = Number(tx.val);
+      if (!Number.isFinite(val)) return sum;
+      return sum + Math.abs(val);
+    }, 0);
+  }
+
+  function computeSpentForRange(transactionsList, tag, startIso, endIso) {
+    if (!Array.isArray(transactionsList) || !tag) return 0;
+    const start = normalizeBudgetDate(startIso);
+    const end = normalizeBudgetDate(endIso);
+    return transactionsList.reduce((sum, tx) => {
+      if (!tx || tx.budgetTag !== tag) return sum;
+      if (tx.planned === true) return sum;
+      const iso = normalizeBudgetDate(tx.opDate || tx.postDate);
+      if (!iso) return sum;
+      if (start && iso < start) return sum;
+      if (end && iso >= end) return sum;
+      const val = Number(tx.val);
+      if (!Number.isFinite(val)) return sum;
+      return sum + Math.abs(val);
+    }, 0);
+  }
+
+  function findNextOccurrence(master, afterIso) {
+    if (!master || !afterIso) return null;
+    const maxScan = 365;
+    for (let offset = 1; offset <= maxScan; offset++) {
+      const date = new Date(`${afterIso}T00:00:00`);
+      date.setDate(date.getDate() + offset);
+      const iso = date.toISOString().slice(0, 10);
+      try {
+        if (occursOn(master, iso)) return iso;
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    return null;
+  }
+
+  function buildBudgetDisplayMap(list, txs) {
+    const map = new Map();
+    const mastersById = new Map();
+    (txs || []).forEach((tx) => {
+      if (tx && tx.recurrence) {
+        mastersById.set(String(tx.id), tx);
+      }
+    });
+
+    const addBudget = (budget) => {
+      if (!budget) return;
+      const key = normalizeBudgetDate(budget.startDate);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(budget);
+    };
+
+    (list || []).forEach((budget) => {
+      if (!budget || budget.status !== 'active') return;
+      addBudget(budget);
+    });
+    (list || []).forEach((budget) => {
+      if (!budget || budget.status !== 'active' || budget.budgetType !== 'recurring') return;
+      const master = budget.recurrenceId != null ? mastersById.get(String(budget.recurrenceId)) : null;
+      if (!master) return;
+      let start = normalizeBudgetDate(budget.endDate);
+      const cyclesLimit = 4;
+      for (let i = 0; i < cyclesLimit && start; i++) {
+        const next = findNextOccurrence(master, start);
+        if (!next) break;
+        const initial = computeInitialValueForRange(txs, budget.tag, start, next) || Number(budget.initialValue || 0);
+        const synthetic = {
+          ...budget,
+          id: `${budget.id || budget.tag || 'budget'}__future_${i + 1}`,
+          startDate: start,
+          endDate: next,
+          initialValue: initial,
+          reservedValue: initial,
+          spentValue: 0,
+          triggerTxId: master.id != null ? String(master.id) : null,
+          triggerTxIso: start,
+          status: 'future',
+          isSynthetic: true,
+        };
+        addBudget(synthetic);
+        start = next;
+      }
+    });
+    return map;
+  }
+
+  function deriveFallbackBudgetsForDay(iso, txs, budgetTriggerIds, budgetTriggersByIso, dayTx, triggerSet) {
+    const results = [];
+    const prev = (() => { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+    const masters = (txs || []).filter(t => t && t.recurrence && t.budgetTag);
+    for (const master of masters) {
+      try {
+        if (!occursOn(master, iso)) continue;
+        if (occursOn(master, prev)) continue; // not start of cycle
+        const next = findNextOccurrence(master, iso) || iso;
+        const tag = master.budgetTag;
+        const initial = computeInitialValueForRange(txs, tag, iso, next);
+        const spent = computeSpentForRange(txs, tag, iso, next);
+        const synthetic = {
+          id: `${master.id || tag}_fb_${iso}`,
+          tag,
+          budgetType: 'recurring',
+          status: 'active',
+          startDate: iso,
+          endDate: next,
+          initialValue: initial,
+          reservedValue: Math.max(initial - spent, 0),
+          spentValue: spent,
+          recurrenceId: master.id != null ? String(master.id) : null,
+          triggerTxId: master.id != null ? String(master.id) : null,
+          triggerTxIso: iso,
+          isSynthetic: true,
+        };
+        results.push(synthetic);
+        // Mark a concrete transaction on this day as the trigger so lists can hide it
+        if (triggerSet && Array.isArray(dayTx)) {
+          const trig = dayTx.find(t => t && t.budgetTag === tag);
+          if (trig) {
+            try { triggerSet.add(trig); } catch (_) {}
+          }
+        }
+        if (budgetTriggerIds) budgetTriggerIds.add(String(master.id));
+        if (budgetTriggersByIso) {
+          if (!budgetTriggersByIso.has(iso)) budgetTriggersByIso.set(iso, []);
+          budgetTriggersByIso.get(iso).push({ tag, id: master.id != null ? String(master.id) : null });
+        }
+      } catch (_) { /* ignore */ }
+    }
+    return results;
+  }
+
+  function findTriggerTransaction(budget, dayTransactions) {
+    if (!budget || !Array.isArray(dayTransactions)) return null;
+    const tag = budget.tag;
+    if (!tag) return null;
+    if (budget.triggerTxId != null) {
+      const targetId = String(budget.triggerTxId);
+      const byId = dayTransactions.find((tx) => tx && String(tx.id) === targetId);
+      if (byId) return byId;
+    }
+    const startISO = normalizeBudgetDate(budget.startDate);
+    const triggerISO = normalizeBudgetDate(budget.triggerTxIso);
+    return dayTransactions.find((tx) => {
+      if (!tx) return false;
+      if (tx.budgetTag !== tag) return false;
+      const txDate = normalizeBudgetDate(tx.opDate);
+      if (triggerISO && txDate === triggerISO) return true;
+      return txDate === startISO;
+    }) || null;
+  }
+
+  function createBudgetCardElement(budget, dayTransactions, triggerSet) {
+    const card = document.createElement('div');
+    card.className = 'budget-card op-line';
+    card.dataset.cardType = 'budget';
+
+    const header = document.createElement('div');
+    header.className = 'budget-card__header';
+    header.style.display = 'flex';
+    header.style.flexDirection = 'column';
+    header.style.gap = '2px';
+
+    const titleRow = document.createElement('div');
+    titleRow.style.display = 'flex';
+    titleRow.style.justifyContent = 'space-between';
+    titleRow.style.alignItems = 'center';
+
+    const tagLabel = document.createElement('span');
+    tagLabel.className = 'budget-card__tag';
+    tagLabel.textContent = budget.tag || '#orçamento';
+    tagLabel.style.fontWeight = '600';
+
+    const periodLabel = document.createElement('span');
+    periodLabel.className = 'budget-card__period';
+    periodLabel.style.fontSize = '0.85em';
+    periodLabel.style.color = 'var(--text-secondary, #b3b3b3)';
+    const start = formatDayMonth(normalizeBudgetDate(budget.startDate));
+    const end = formatDayMonth(normalizeBudgetDate(budget.endDate));
+    const totalValue = safeFmtCurrency(Number(budget.initialValue || 0));
+    periodLabel.textContent = `${start} até ${end} · ${totalValue}`;
+
+    titleRow.appendChild(tagLabel);
+    titleRow.appendChild(periodLabel);
+
+    const meta = document.createElement('div');
+    meta.className = 'budget-card__meta';
+    meta.style.fontSize = '0.85em';
+    meta.style.color = 'var(--text-secondary, #b3b3b3)';
+    const triggerTx = findTriggerTransaction(budget, dayTransactions);
+    if (triggerTx && triggerSet) {
+      try { triggerSet.add(triggerTx); } catch (_) {}
+    }
+    let timeLabel = 'Orçamento';
+    if (triggerTx && triggerTx.ts) {
+      try {
+        const time = new Date(triggerTx.ts);
+        const formatted = time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        timeLabel = `${formatted} – Orçamento`;
+      } catch (_) {}
+    }
+    meta.textContent = timeLabel;
+
+    header.appendChild(titleRow);
+    header.appendChild(meta);
+
+    const details = document.createElement('div');
+    details.className = 'budget-card__details';
+    details.style.display = 'flex';
+    details.style.justifyContent = 'space-between';
+    details.style.marginTop = '12px';
+    details.style.fontSize = '0.85em';
+
+    // Match Panorama card logic exactly: compute period spending on UI,
+    // ignoring only the trigger (reserva) by id; end is inclusive.
+    const allTxs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
+    const trigId = budget && budget.triggerTxId != null ? String(budget.triggerTxId) : null;
+    const startIso = normalizeBudgetDate(budget.startDate);
+    const endIso   = normalizeBudgetDate(budget.endDate);
+    const spentValue = (allTxs || []).reduce((sum, tx) => {
+      if (!tx || tx.budgetTag !== budget.tag) return sum;
+      if (trigId && String(tx.id) === trigId) return sum; // não contar a reserva
+      if (tx.planned === true) return sum;
+      const iso = normalizeBudgetDate(tx.opDate || tx.postDate);
+      if (!iso) return sum;
+      if (startIso && iso < startIso) return sum;
+      if (endIso && iso > endIso) return sum;
+      const v = Number(tx.val);
+      if (!Number.isFinite(v)) return sum;
+      return sum + Math.abs(v);
+    }, 0);
+    const totalForCard = Number(budget.initialValue || 0);
+    const reservedValue = Math.max(totalForCard - spentValue, 0);
+
+    const spentLabel = document.createElement('span');
+    spentLabel.textContent = `Gasto: ${safeFmtCurrency(spentValue)}`;
+    const remainingLabel = document.createElement('span');
+    remainingLabel.textContent = `Restante: ${safeFmtCurrency(reservedValue)}`;
+
+    details.appendChild(spentLabel);
+    details.appendChild(remainingLabel);
+
+    const progress = document.createElement('div');
+    progress.className = 'budget-card__progress';
+    progress.style.height = '4px';
+    progress.style.background = 'rgba(255,255,255,0.12)';
+    progress.style.borderRadius = '2px';
+    progress.style.marginTop = '6px';
+    progress.style.overflow = 'hidden';
+
+    const fill = document.createElement('div');
+    fill.className = 'budget-card__progress-fill';
+    fill.style.height = '100%';
+    fill.style.background = 'var(--accent-color, #5DD39E)';
+    fill.style.borderRadius = '2px';
+    const denominator = Number(budget.initialValue || 0) || 0;
+    const ratio = denominator > 0 ? Math.min(1, spentValue / denominator) : 0;
+    fill.style.width = `${Math.round(ratio * 100)}%`;
+
+    progress.appendChild(fill);
+
+    card.appendChild(header);
+    card.appendChild(details);
+    card.appendChild(progress);
+    // Open compact history on tap
+    card.addEventListener('click', () => {
+      try { window.__gastos?.showBudgetHistory?.(budget.tag); } catch (_) {}
+    });
+
+    return card;
+  }
+
 
   // Local alias for postDate calculation: compute due date for a given opDate and card.
   function post(opISO, cardName) {
@@ -99,6 +433,23 @@ export function initAccordion(config) {
    */
   function buildRunningBalanceMap() {
     const { minDate, maxDate } = calculateDateRange();
+    // Build a quick lookup of budget trigger transactions to avoid
+    // double-counting: the trigger reserves value via reservedAdjustment
+    // and should NOT impact cash on the opDate.
+    const budgetsEnabled = resolveBudgetsFeatureEnabled();
+    const triggerIdSet = new Set();
+    const triggerKeySet = new Set(); // key = `${iso}|${tag}`
+    if (budgetsEnabled) {
+      try {
+        const active = (loadBudgets() || []).filter(b => b && b.status === 'active');
+        active.forEach(b => {
+          if (!b) return;
+          if (b.triggerTxId != null) triggerIdSet.add(String(b.triggerTxId));
+          const iso = normalizeBudgetDate(b.triggerTxIso || b.startDate);
+          if (iso && b.tag) triggerKeySet.add(`${iso}|${b.tag}`);
+        });
+      } catch (_) {}
+    }
     const balanceMap = new Map();
     let runningBalance = 0;
     const hasAnchor = !!state.startDate;
@@ -142,9 +493,32 @@ export function initAccordion(config) {
       }
       // Determine the impact on this day using existing logic
       const dayTx = txByDate(iso);
-      // 1) Cash transactions impact the balance on opDate
+      // Identify derived budget trigger masters that start today
+      const derivedTriggerIds = new Set();
+      try {
+        const prevIso = (() => { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+        (txs || []).forEach((t) => {
+          if (!t || !t.recurrence || !t.budgetTag) return;
+          try {
+            if (occursOn(t, iso) && !occursOn(t, prevIso) && t.id != null) {
+              derivedTriggerIds.add(String(t.id));
+            }
+          } catch (_) {}
+        });
+      } catch (_) {}
+      // 1) Cash transactions impact the balance on opDate, except
+      //    budget trigger transactions which only create a reservation.
       const cashImpact = dayTx
         .filter(t => t.method === 'Dinheiro')
+        .filter(t => {
+          if (!budgetsEnabled || !t) return true;
+          if (t.id != null && (triggerIdSet.has(String(t.id)) || derivedTriggerIds.has(String(t.id)))) return false;
+          const tag = t.budgetTag || null;
+          if (!tag) return true;
+          const key = `${iso}|${tag}`;
+          if (triggerKeySet.has(key)) return false;
+          return true;
+        })
         .reduce((s, t) => s + (t.val || 0), 0);
       // 2) Card invoices impact the balance on due dates
       const invoicesByCard = {};
@@ -184,7 +558,8 @@ export function initAccordion(config) {
       });
       const dayTotal = cashImpact + cardImpact;
       runningBalance += dayTotal;
-      balanceMap.set(iso, runningBalance);
+      const reservedAdjustment = getReservedAdjustmentForDate(iso);
+      balanceMap.set(iso, runningBalance - reservedAdjustment);
     }
     return balanceMap;
   }
@@ -301,6 +676,47 @@ export function initAccordion(config) {
     // Build the running balance map once per render
     const balanceMap = buildRunningBalanceMap();
     const txs = getTransactions ? getTransactions() : transactions;
+    const budgetsFeature = resolveBudgetsFeatureEnabled();
+    const activeBudgets = budgetsFeature ? loadBudgets().filter((b) => b && b.status === 'active') : [];
+    const budgetsByStart = budgetsFeature ? buildBudgetDisplayMap(activeBudgets, txs) : new Map();
+    const budgetTriggerSet = budgetsFeature ? new WeakSet() : null;
+    const budgetTriggerIds = budgetsFeature ? new Set() : null;
+    const budgetTriggersByIso = budgetsFeature ? new Map() : null;
+    if (budgetsFeature) {
+      activeBudgets.forEach((budget) => {
+        if (!budget) return;
+        if (budget.triggerTxId != null) {
+          budgetTriggerIds.add(String(budget.triggerTxId));
+        }
+        const iso = normalizeBudgetDate(budget.triggerTxIso || budget.startDate);
+        if (iso) {
+          if (!budgetTriggersByIso.has(iso)) budgetTriggersByIso.set(iso, []);
+          budgetTriggersByIso.get(iso).push({
+            tag: budget.tag,
+            id: budget.triggerTxId != null ? String(budget.triggerTxId) : null,
+          });
+        }
+      });
+    }
+    const isBudgetTriggerTransaction = (tx) => {
+      if (!budgetsFeature || !tx) return false;
+      try {
+        if (budgetTriggerSet && budgetTriggerSet.has(tx)) return true;
+      } catch (_) {}
+      if (budgetTriggerIds && tx.id != null && budgetTriggerIds.has(String(tx.id))) {
+        return true;
+      }
+      const iso = normalizeBudgetDate(tx.opDate || tx.postDate);
+      if (!iso) return false;
+      const candidates = budgetTriggersByIso && budgetTriggersByIso.get(iso);
+      if (!candidates || !candidates.length) return false;
+      return candidates.some((info) => {
+        if (!info) return false;
+        if (info.tag && tx.budgetTag && info.tag !== tx.budgetTag) return false;
+        if (info.id) return info.id === String(tx.id);
+        return true;
+      });
+    };
     
     const now = new Date();
     const curMonth = now.getMonth();
@@ -506,6 +922,18 @@ export function initAccordion(config) {
         dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
         if (dayBalance < 0) dDet.classList.add('negative');
         dDet.appendChild(dSum);
+
+        if (budgetsFeature) {
+          let dayBudgets = budgetsByStart.get(iso) || [];
+          if (!dayBudgets.length) {
+            const fb = deriveFallbackBudgetsForDay(iso, txs, budgetTriggerIds, budgetTriggersByIso, dayTx, budgetTriggerSet);
+            if (fb.length) dayBudgets = fb;
+          }
+          dayBudgets.forEach((budget) => {
+            const cardEl = createBudgetCardElement(budget, dayTx, budgetTriggerSet);
+            dDet.appendChild(cardEl);
+          });
+        }
         // Always clear any existing invoices
         const createdInvoicesForDay = new Set();
         Object.keys(invoicesByCard).forEach(cardName => {
@@ -628,7 +1056,8 @@ export function initAccordion(config) {
           dDet.appendChild(det);
         });
         // Planned operations section
-        const plannedOps = dayTx
+        const visibleTx = dayTx.filter(tx => !isBudgetTriggerTransaction(tx));
+        const plannedOps = visibleTx
           .filter(t => t.planned)
           .sort((a, b) => {
             const dateCmp = a.opDate.localeCompare(b.opDate);
@@ -667,7 +1096,7 @@ export function initAccordion(config) {
           dDet.appendChild(plannedContainer);
         }
         // Executed operations section
-        const executedOps = dayTx
+        const executedOps = visibleTx
           .filter(t => !t.planned)
           .sort((a, b) => {
             const dateCmp = a.opDate.localeCompare(b.opDate);
@@ -796,7 +1225,8 @@ export function initAccordion(config) {
         const cashImpact = cashNonRecurring + cashRecurring;
         
         runningBalance += cashImpact;
-        monthBalanceMap.set(iso, runningBalance);
+        const reservedAdjustment = getReservedAdjustmentForDate(iso);
+        monthBalanceMap.set(iso, runningBalance - reservedAdjustment);
       }
       
       const simpleGetBalanceBefore = (iso) => {
@@ -808,7 +1238,19 @@ export function initAccordion(config) {
       };
       
       // Render full month content with calculated balances
-      const content = renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs, monthBalanceMap, simpleGetBalanceBefore);
+      const content = renderFullMonthContent(
+        monthIndex,
+        viewYear,
+        daysInMonth,
+        txs,
+        monthBalanceMap,
+        simpleGetBalanceBefore,
+        budgetsFeature,
+        budgetsByStart,
+        budgetTriggerSet,
+        budgetTriggerIds,
+        budgetTriggersByIso
+      );
       
       // Replace placeholder with real content
       placeholder.replaceWith(...content);
@@ -945,7 +1387,7 @@ export function initAccordion(config) {
   }
   
   // Extract full month content rendering
-  function renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs, balanceMap, getBalanceBefore) {
+  function renderFullMonthContent(monthIndex, viewYear, daysInMonth, txs, balanceMap, getBalanceBefore, budgetsFeature, budgetsByStart, budgetTriggerSet, budgetTriggerIds, budgetTriggersByIso) {
     const elements = [];
     
     // Get all required helpers from already resolved context variables
@@ -960,6 +1402,24 @@ export function initAccordion(config) {
       const direct = (txs || []).filter(t => !t.recurrence && (t.opDate === iso || t.postDate === iso));
       const recurring = (txs || []).filter(t => t.recurrence && occursOn(t, iso));
       return [...direct, ...recurring];
+    };
+
+    const isBudgetTriggerTx = (tx) => {
+      if (!budgetsFeature || !tx) return false;
+      try {
+        if (budgetTriggerSet && budgetTriggerSet.has(tx)) return true;
+      } catch (_) {}
+      if (budgetTriggerIds && tx.id != null && budgetTriggerIds.has(String(tx.id))) return true;
+      const iso = normalizeBudgetDate(tx.opDate || tx.postDate);
+      if (!iso) return false;
+      const candidates = budgetTriggersByIso && budgetTriggersByIso.get(iso);
+      if (!candidates || !candidates.length) return false;
+      return candidates.some((info) => {
+        if (!info) return false;
+        if (info.tag && tx.budgetTag && info.tag !== tx.budgetTag) return false;
+        if (info.id) return info.id === String(tx.id);
+        return true;
+      });
     };
     
     const openKeys = []; // No preserved open state for lazy loaded content
@@ -1054,6 +1514,18 @@ export function initAccordion(config) {
       if (dayBalance < 0) dDet.classList.add('negative');
       dDet.appendChild(dSum);
       
+      if (budgetsFeature) {
+        let dayBudgets = budgetsByStart.get(iso) || [];
+        if (!dayBudgets.length) {
+          const fb = deriveFallbackBudgetsForDay(iso, txs, budgetTriggerIds, budgetTriggersByIso, dayTx, budgetTriggerSet);
+          if (fb.length) dayBudgets = fb;
+        }
+        dayBudgets.forEach((budget) => {
+          const cardEl = createBudgetCardElement(budget, dayTx, budgetTriggerSet);
+          dDet.appendChild(cardEl);
+        });
+      }
+
       // Add invoice details (simplified - just the list, no swipe actions for lazy loaded content)
       Object.keys(invoicesByCard).forEach(cardName => {
         const det = document.createElement('details');
@@ -1078,7 +1550,8 @@ export function initAccordion(config) {
       });
       
       // Planned operations
-      const plannedOps = dayTx.filter(t => t.planned);
+      const visibleTx = dayTx.filter(tx => !isBudgetTriggerTx(tx));
+      const plannedOps = visibleTx.filter(t => t.planned);
       if (plannedOps.length > 0 && typeof makeLine === 'function') {
         const plannedContainer = document.createElement('div');
         plannedContainer.className = 'planned-cash';
@@ -1095,7 +1568,7 @@ export function initAccordion(config) {
       }
       
       // Executed operations
-      const executedOps = dayTx.filter(t => !t.planned);
+      const executedOps = visibleTx.filter(t => !t.planned);
       if (executedOps.length > 0 && typeof makeLine === 'function') {
         const executedContainer = document.createElement('div');
         executedContainer.className = 'executed-cash';
@@ -1118,4 +1591,61 @@ export function initAccordion(config) {
   }
   
   return { renderAccordion };
+}
+
+function ensureBudgetCardStyles() {
+  if (document.getElementById('budget-card-styles')) return;
+  const st = document.createElement('style');
+  st.id = 'budget-card-styles';
+  st.textContent = `
+    /* Gorgeous budget card for the accordion list */
+    .op-line.budget-card{
+      position: relative;
+      /* Match width and alignment of other day blocks (e.g., Executados) */
+      margin: 10px 0 8px;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transition: transform .15s ease, box-shadow .2s ease;
+      color: var(--txt-main, #EDEDEF);
+    }
+    .op-line.budget-card:active{ transform: scale(0.995); }
+
+    .op-line.budget-card .budget-card__header{ display:flex; gap:6px; }
+    .op-line.budget-card .budget-card__tag{
+      color:#5DD39E; font-weight:700; letter-spacing:.01em;
+    }
+    .op-line.budget-card .budget-card__period{
+      color: rgba(255,255,255,0.75); font-size:12px;
+    }
+    .op-line.budget-card .budget-card__meta{
+      color: rgba(255,255,255,0.65); font-size:12px; margin-top:-2px;
+    }
+    .op-line.budget-card .budget-card__details{
+      display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:13px; color: var(--txt-main, #EDEDEF);
+    }
+    .op-line.budget-card .budget-card__progress{
+      height:6px; background: rgba(255,255,255,0.22); border-radius: 6px; overflow:hidden; margin-top:10px; position:relative;
+    }
+    .op-line.budget-card .budget-card__progress::before{
+      content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+    }
+    .op-line.budget-card .budget-card__progress-fill{
+      height:100%; background: linear-gradient(90deg, #5DD39E, #3ecf8e); border-radius:6px; transition: width .35s ease;
+    }
+
+    /* Light theme tweaks */
+    html[data-theme="light"] .op-line.budget-card{ background:#ffffffec; border:1px solid rgba(0,0,0,0.10); box-shadow:0 6px 14px rgba(0,0,0,0.08); color:#111; }
+    html[data-theme="light"] .op-line.budget-card .budget-card__period{ color: rgba(0,0,0,0.6); }
+    html[data-theme="light"] .op-line.budget-card .budget-card__meta{ color: rgba(0,0,0,0.55); }
+    html[data-theme="light"] .op-line.budget-card .budget-card__details{ color:#111; }
+    html[data-theme="light"] .op-line.budget-card .budget-card__progress{ background: rgba(0,0,0,0.12); }
+  `;
+  document.head.appendChild(st);
 }
