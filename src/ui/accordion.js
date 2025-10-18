@@ -102,6 +102,27 @@ export function initAccordion(config) {
     }
   }
 
+  function formatDayMonthShort(iso) {
+    if (!iso) return '';
+    try {
+      const date = new Date(`${iso}T00:00:00`);
+      const day = String(date.getDate()).padStart(2, '0');
+      let mon = date.toLocaleDateString('pt-BR', { month: 'short' });
+      mon = (mon || '').replace('.', '');
+      mon = mon.charAt(0).toUpperCase() + mon.slice(1);
+      return `${day} de ${mon}`;
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  function formatTagLabel(tag) {
+    if (!tag) return '';
+    const clean = String(tag).replace(/^#+/, '').trim();
+    if (!clean) return '';
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  }
+
   function computeInitialValueForRange(transactionsList, tag, startIso, endIso) {
     if (!Array.isArray(transactionsList) || !tag) return 0;
     const start = normalizeBudgetDate(startIso);
@@ -276,7 +297,7 @@ export function initAccordion(config) {
     header.className = 'budget-card__header';
     header.style.display = 'flex';
     header.style.flexDirection = 'column';
-    header.style.gap = '2px';
+    header.style.gap = '4px';
 
     const titleRow = document.createElement('div');
     titleRow.style.display = 'flex';
@@ -284,49 +305,32 @@ export function initAccordion(config) {
     titleRow.style.alignItems = 'center';
 
     const tagLabel = document.createElement('span');
-    tagLabel.className = 'budget-card__tag';
-    tagLabel.textContent = budget.tag || '#orçamento';
-    tagLabel.style.fontWeight = '600';
+    tagLabel.className = 'budget-tag-pill';
+    tagLabel.textContent = formatTagLabel(budget.tag) || 'Orçamento';
 
     const periodLabel = document.createElement('span');
     periodLabel.className = 'budget-card__period';
     periodLabel.style.fontSize = '0.85em';
     periodLabel.style.color = 'var(--text-secondary, #b3b3b3)';
-    const start = formatDayMonth(normalizeBudgetDate(budget.startDate));
-    const end = formatDayMonth(normalizeBudgetDate(budget.endDate));
-    const totalValue = safeFmtCurrency(Number(budget.initialValue || 0));
-    periodLabel.textContent = `${start} até ${end} · ${totalValue}`;
+    const start = formatDayMonthShort(normalizeBudgetDate(budget.startDate));
+    const end = formatDayMonthShort(normalizeBudgetDate(budget.endDate));
+    periodLabel.textContent = `${start} - ${end}`;
 
     titleRow.appendChild(tagLabel);
     titleRow.appendChild(periodLabel);
 
-    const meta = document.createElement('div');
-    meta.className = 'budget-card__meta';
-    meta.style.fontSize = '0.85em';
-    meta.style.color = 'var(--text-secondary, #b3b3b3)';
+    // Mark trigger tx (hide in list) but do NOT show time/meta here
     const triggerTx = findTriggerTransaction(budget, dayTransactions);
-    if (triggerTx && triggerSet) {
-      try { triggerSet.add(triggerTx); } catch (_) {}
-    }
-    let timeLabel = 'Orçamento';
-    if (triggerTx && triggerTx.ts) {
-      try {
-        const time = new Date(triggerTx.ts);
-        const formatted = time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-        timeLabel = `${formatted} – Orçamento`;
-      } catch (_) {}
-    }
-    meta.textContent = timeLabel;
+    if (triggerTx && triggerSet) { try { triggerSet.add(triggerTx); } catch (_) {} }
 
     header.appendChild(titleRow);
-    header.appendChild(meta);
 
     const details = document.createElement('div');
     details.className = 'budget-card__details';
     details.style.display = 'flex';
     details.style.justifyContent = 'space-between';
-    details.style.marginTop = '12px';
-    details.style.fontSize = '0.85em';
+    details.style.marginTop = '8px';
+    details.style.fontSize = '0.95em';
 
     // Match Panorama card logic exactly: compute period spending on UI,
     // ignoring only the trigger (reserva) by id; end is inclusive.
@@ -348,14 +352,25 @@ export function initAccordion(config) {
     }, 0);
     const totalForCard = Number(budget.initialValue || 0);
     const reservedValue = Math.max(totalForCard - spentValue, 0);
+    const exceeded = Math.max(spentValue - totalForCard, 0);
 
-    const spentLabel = document.createElement('span');
-    spentLabel.textContent = `Gasto: ${safeFmtCurrency(spentValue)}`;
-    const remainingLabel = document.createElement('span');
-    remainingLabel.textContent = `Restante: ${safeFmtCurrency(reservedValue)}`;
+    // Main emphasis
+    const mainLabel = document.createElement('span');
+    mainLabel.className = 'budget-card__main';
+    if (exceeded > 0) {
+      mainLabel.textContent = `Excedeu ${safeFmtCurrency(exceeded)}`;
+      mainLabel.dataset.state = 'over';
+    } else {
+      mainLabel.textContent = `Restam ${safeFmtCurrency(reservedValue)}`;
+      mainLabel.dataset.state = reservedValue <= totalForCard * 0.2 ? 'warn' : 'ok';
+    }
 
-    details.appendChild(spentLabel);
-    details.appendChild(remainingLabel);
+    const subRight = document.createElement('span');
+    subRight.className = 'budget-card__total';
+    subRight.textContent = `Total ${safeFmtCurrency(totalForCard)}`;
+
+    details.appendChild(mainLabel);
+    details.appendChild(subRight);
 
     const progress = document.createElement('div');
     progress.className = 'budget-card__progress';
@@ -368,11 +383,17 @@ export function initAccordion(config) {
     const fill = document.createElement('div');
     fill.className = 'budget-card__progress-fill';
     fill.style.height = '100%';
-    fill.style.background = 'var(--accent-color, #5DD39E)';
     fill.style.borderRadius = '2px';
     const denominator = Number(budget.initialValue || 0) || 0;
     const ratio = denominator > 0 ? Math.min(1, spentValue / denominator) : 0;
     fill.style.width = `${Math.round(ratio * 100)}%`;
+    if (exceeded > 0) {
+      fill.dataset.state = 'over';
+    } else if (ratio >= 0.8) {
+      fill.dataset.state = 'warn';
+    } else {
+      fill.dataset.state = 'ok';
+    }
 
     progress.appendChild(fill);
 
@@ -433,6 +454,8 @@ export function initAccordion(config) {
    */
   function buildRunningBalanceMap() {
     const { minDate, maxDate } = calculateDateRange();
+    const txCount = (getTransactions ? getTransactions() : transactions).length;
+    console.log(`📊 Balance: Computing for ${txCount} transaction(s), range ${minDate} to ${maxDate}`);
     // Build a quick lookup of budget trigger transactions to avoid
     // double-counting: the trigger reserves value via reservedAdjustment
     // and should NOT impact cash on the opDate.
@@ -454,23 +477,11 @@ export function initAccordion(config) {
     let runningBalance = 0;
     const hasAnchor = !!state.startDate;
     const anchorISO = hasAnchor ? String(state.startDate) : null;
-    const startDateObj = new Date(minDate);
+    // If anchor is before minDate, start from anchor to include retroactive transactions
+    const effectiveMinDate = (hasAnchor && anchorISO && anchorISO < minDate) ? anchorISO : minDate;
+    const startDateObj = new Date(effectiveMinDate);
     const endDateObj = new Date(maxDate);
     
-    console.log('[accordion] buildRunningBalanceMap:', {
-      'state.startDate': state.startDate,
-      'state.startBalance': state.startBalance,
-      hasAnchor,
-      anchorISO,
-      minDate,
-      maxDate
-    });
-    
-    // If the anchor occurs before the current range, seed the running balance at the anchor.
-    if (hasAnchor && anchorISO && anchorISO < minDate && anchorISO <= maxDate) {
-      runningBalance = (state.startBalance != null) ? state.startBalance : 0;
-      console.log('[accordion] Anchor before range - seeding balance:', runningBalance);
-    }
     const txs = getTransactions ? getTransactions() : transactions;
     for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
       const iso = current.toISOString().slice(0, 10);
@@ -481,16 +492,13 @@ export function initAccordion(config) {
         continue;
       }
       
-      // ON the startDate, initialize with startBalance
-      if (hasAnchor && iso === anchorISO) {
+      // Initialize balance on anchor date or first date of range
+      if (iso === anchorISO && hasAnchor) {
         runningBalance = (state.startBalance != null) ? state.startBalance : 0;
-        console.log(`[accordion] ON startDate ${iso} - setting balance to:`, runningBalance);
+      } else if (!hasAnchor && iso === minDate) {
+        runningBalance = (state.startBalance != null) ? state.startBalance : 0;
       }
       
-      // If no anchor is set, use startBalance on the first date (legacy behavior)
-      if (!hasAnchor && iso === minDate) {
-        runningBalance = (state.startBalance != null) ? state.startBalance : 0;
-      }
       // Determine the impact on this day using existing logic
       const dayTx = txByDate(iso);
       // Identify derived budget trigger masters that start today
@@ -891,17 +899,6 @@ export function initAccordion(config) {
         // Retrieve the running balance for this day
         const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : getBalanceBefore(iso);
         
-        // DEBUG: Log balance for days around startDate
-        if (state.startDate && (iso === state.startDate || 
-            (iso >= '2025-09-20' && iso <= '2025-09-24'))) {
-          console.log(`[accordion] Day ${iso} balance:`, {
-            hasInMap: balanceMap.has(iso),
-            mapValue: balanceMap.get(iso),
-            finalBalance: dayBalance,
-            isStartDate: iso === state.startDate
-          });
-        }
-        
         const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
         const dDet = document.createElement('details');
         dDet.className = 'day';
@@ -1152,9 +1149,8 @@ export function initAccordion(config) {
     
     const endTime = performance.now();
     const renderTime = endTime - startTime;
-    if (renderTime > 50) { // Lower threshold to track improvements
-      console.info('Accordion render:', renderTime.toFixed(2) + 'ms for', accEl.querySelectorAll('details.month').length, 'months');
-    }
+    const monthCount = accEl.querySelectorAll('details.month').length;
+    console.log(`🎨 UI: Rendered ${monthCount} month(s) in ${renderTime.toFixed(2)}ms`);
   }
   
   // Lazy loading setup - listens for month expansion
@@ -1618,9 +1614,7 @@ function ensureBudgetCardStyles() {
     .op-line.budget-card:active{ transform: scale(0.995); }
 
     .op-line.budget-card .budget-card__header{ display:flex; gap:6px; }
-    .op-line.budget-card .budget-card__tag{
-      color:#5DD39E; font-weight:700; letter-spacing:.01em;
-    }
+    .op-line.budget-card .budget-tag-pill{ display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; color:#2B8B66; background:rgba(93,211,158,0.16); border:1px solid #5DD39E; }
     .op-line.budget-card .budget-card__period{
       color: rgba(255,255,255,0.75); font-size:12px;
     }
@@ -1630,6 +1624,10 @@ function ensureBudgetCardStyles() {
     .op-line.budget-card .budget-card__details{
       display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:13px; color: var(--txt-main, #EDEDEF);
     }
+    .op-line.budget-card .budget-card__main{ font-weight:700; font-size:15px; }
+    .op-line.budget-card .budget-card__main[data-state="warn"]{ color:#FFC65A; }
+    .op-line.budget-card .budget-card__main[data-state="over"]{ color:#FF6B6B; }
+    .op-line.budget-card .budget-card__total{ opacity:.8; font-size:12px; }
     .op-line.budget-card .budget-card__progress{
       height:6px; background: rgba(255,255,255,0.22); border-radius: 6px; overflow:hidden; margin-top:10px; position:relative;
     }
@@ -1637,14 +1635,24 @@ function ensureBudgetCardStyles() {
       content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
     }
     .op-line.budget-card .budget-card__progress-fill{
-      height:100%; background: linear-gradient(90deg, #5DD39E, #3ecf8e); border-radius:6px; transition: width .35s ease;
+      height:100%; border-radius:6px; transition: width .35s ease, background .2s ease;
+      background: linear-gradient(90deg, #5DD39E, #3ecf8e);
+    }
+    .op-line.budget-card .budget-card__progress-fill[data-state="warn"]{
+      background: linear-gradient(90deg, #FFB703, #FFA23A);
+    }
+    .op-line.budget-card .budget-card__progress-fill[data-state="over"]{
+      background: linear-gradient(90deg, #FF6B6B, #F05050);
     }
 
     /* Light theme tweaks */
     html[data-theme="light"] .op-line.budget-card{ background:#ffffffec; border:1px solid rgba(0,0,0,0.10); box-shadow:0 6px 14px rgba(0,0,0,0.08); color:#111; }
     html[data-theme="light"] .op-line.budget-card .budget-card__period{ color: rgba(0,0,0,0.6); }
+    html[data-theme="light"] .op-line.budget-card .budget-tag-pill{ color:#1f6b53; background:rgba(46,191,140,0.12); border-color:#2B8B66; }
     html[data-theme="light"] .op-line.budget-card .budget-card__meta{ color: rgba(0,0,0,0.55); }
     html[data-theme="light"] .op-line.budget-card .budget-card__details{ color:#111; }
+    html[data-theme="light"] .op-line.budget-card .budget-card__main[data-state="warn"]{ color:#B26A00; }
+    html[data-theme="light"] .op-line.budget-card .budget-card__main[data-state="over"]{ color:#C53030; }
     html[data-theme="light"] .op-line.budget-card .budget-card__progress{ background: rgba(0,0,0,0.12); }
   `;
   document.head.appendChild(st);

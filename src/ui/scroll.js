@@ -7,9 +7,7 @@
  * the global object (see main.js for details).
  */
 export function scrollTodayIntoView() {
-  console.log('scrollTodayIntoView called');
   const g = typeof window !== 'undefined' ? window.__gastos || {} : {};
-  console.log('window.__gastos:', g);
   const todayISO = g.todayISO || (() => {
     // fallback: ISO date for today
     const d = new Date();
@@ -124,17 +122,6 @@ export function scrollTodayIntoView() {
           return;
         }
         
-        console.log('Scroll positioning:', {
-          headerHeight,
-          stickyHeight, 
-          gap,
-          targetFromTop,
-          currentFromTop,
-          scrollDelta,
-          targetScrollTop
-        });
-        
-        console.log('About to call animateWrapperScroll with targetTop:', targetScrollTop, 'animateWrapperScroll type:', typeof animateWrapperScroll);
         animateWrapperScroll(targetScrollTop);
       } catch (err) {
         console.error('scrollTodayIntoView compute failed', err);

@@ -392,7 +392,7 @@ export async function addTx() {
         return;
       }
       const newDesc    = desc && desc.value ? desc.value.trim() : '';
-      const newBudgetTag = extractFirstHashtag(newDesc);
+      const newBudgetTag = (window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc);
       let newVal = parseCurrency(val && val.value);
       const activeTypeEl = document.querySelector('.value-toggle button.active');
       const activeType = activeTypeEl && activeTypeEl.dataset ? activeTypeEl.dataset.type : 'expense';
@@ -814,7 +814,7 @@ export async function addTx() {
       const newPostDate = computePostDate(newOpDate, newMethod);
       const newRecurrence  = recurrence && recurrence.value;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
-      const newBudgetTag = extractFirstHashtag(newDesc);
+      const newBudgetTag = (window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc);
       const recurrenceActive = isRecurrenceActive(newRecurrence);
       if (recurrenceActive && isFutureDate(newOpDate)) {
         if (blockMessage('A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.')) {
@@ -873,6 +873,7 @@ export async function addTx() {
       });
       
       // Persist to storage
+      console.log(`💾 Transaction: Saving "${newTx.desc}" (${newTx.val > 0 ? '+' : ''}${newTx.val}) on ${newTx.opDate}`);
       saveFn('tx', updatedTxs);
       refreshBudgetsCache(updatedTxs);
       
@@ -880,6 +881,12 @@ export async function addTx() {
       if (desc) desc.value = '';
       if (val) val.value = '';
       if (date) date.value = todayFn();
+      // Clear pending budget pill/state
+      try {
+        if (window.__gastos) window.__gastos.pendingBudgetTag = null;
+        const chip = document.getElementById('budgetTagChip');
+        if (chip && chip.parentElement) chip.parentElement.removeChild(chip);
+      } catch (_) {}
       
       // Close modal
       toggleModalFn();
@@ -905,3 +912,105 @@ export async function addTx() {
     g.transactions = transactions;
   }
 }
+
+// ----- Budget tag pill (chip) selection API -----
+(function attachBudgetTagChip(){
+  try {
+    const g = (window.__gastos = window.__gastos || {});
+    if (g.setPendingBudgetTag) return; // don't re-register
+
+    const ensureStyles = () => {
+      if (document.getElementById('budget-chip-styles')) return;
+      const st = document.createElement('style');
+      st.id = 'budget-chip-styles';
+      st.textContent = `
+        #budgetTagChip{position:absolute;z-index:10000;display:inline-flex;gap:8px;align-items:center;padding:5px 10px;border-radius:999px;background:rgba(93,211,158,0.18);color:#EDEDEF;border:1px solid #5DD39E;box-shadow:0 4px 14px rgba(0,0,0,0.25);font-size:12.5px;font-weight:700; height:24px;}
+        #budgetTagChip .x{cursor:pointer;opacity:.9; font-weight:700}
+        #budgetTagChip .x:hover{opacity:1}
+        html[data-theme="light"] #budgetTagChip{background:rgba(46,191,140,0.12);color:#111;border:1px solid #2B8B66}
+      `;
+      document.head.appendChild(st);
+    };
+
+    const capitalise = (tag) => {
+      const t = String(tag || '').replace(/^#+/, '').trim();
+      if (!t) return '';
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    };
+
+    const positionChip = () => {
+      const chip = document.getElementById('budgetTagChip');
+      const modal = document.getElementById('txModal');
+      const descInput = document.getElementById('desc');
+      if (!chip || !modal || !descInput) return;
+      const r = descInput.getBoundingClientRect();
+      const host = modal.getBoundingClientRect();
+      // center the chip vertically inside the input and add left padding
+      const chipH = chip.getBoundingClientRect().height || 28;
+      const top = r.top - host.top + Math.max(0, (r.height - chipH) / 2);
+      const left = r.left - host.left + 8;
+      chip.style.top = `${top}px`;
+      chip.style.left = `${left}px`;
+    };
+
+    const setInputPaddingForChip = () => {
+      try {
+        const descInput = document.getElementById('desc');
+        const chip = document.getElementById('budgetTagChip');
+        if (!descInput || !chip) return;
+        const chipRect = chip.getBoundingClientRect();
+        const inputRect = descInput.getBoundingClientRect();
+        // padding-left equals chip width plus spacing to start typing after the chip
+        const leftPad = Math.max(0, (chipRect.width + 16));
+        // Keep right padding intact
+        descInput.style.paddingLeft = `${leftPad}px`;
+      } catch (_) {}
+    };
+
+    const clearInputPaddingForChip = () => {
+      try { const descInput = document.getElementById('desc'); if (descInput) descInput.style.paddingLeft = ''; } catch (_) {}
+    };
+
+    const showChip = (tag) => {
+      ensureStyles();
+      const modal = document.getElementById('txModal');
+      if (!modal) return;
+      let chip = document.getElementById('budgetTagChip');
+      if (!chip) {
+        chip = document.createElement('div');
+        chip.id = 'budgetTagChip';
+        chip.innerHTML = `<span class="label"></span><span class="x" aria-label="Remover">✕</span>`;
+        modal.appendChild(chip);
+        chip.querySelector('.x').onclick = () => {
+          try { g.pendingBudgetTag = null; } catch (_) {}
+          if (chip && chip.parentElement) chip.parentElement.removeChild(chip);
+          try {
+            const input = document.getElementById('desc');
+            if (input) {
+              input.style.paddingLeft = '';
+              input.focus();
+              if (typeof input.setSelectionRange === 'function') input.setSelectionRange(0, 0);
+            }
+          } catch (_) {}
+        };
+      }
+      const lbl = chip.querySelector('.label');
+      if (lbl) lbl.textContent = capitalise(tag);
+      positionChip();
+      // After layout, adjust input padding so typing starts after the pill
+      requestAnimationFrame(() => { positionChip(); setInputPaddingForChip(); });
+    };
+
+    g.setPendingBudgetTag = (tag /*, budget */) => {
+      g.pendingBudgetTag = tag;
+      showChip(tag);
+      try { document.getElementById('desc')?.focus(); } catch (_) {}
+    };
+
+    const reflow = () => { positionChip(); setInputPaddingForChip(); };
+    window.addEventListener('resize', reflow);
+    window.addEventListener('scroll', reflow, true);
+    // When modal closes or form resets elsewhere, ensure padding is cleared
+    document.addEventListener('txModalResetPadding', clearInputPaddingForChip);
+  } catch (_) {}
+})();

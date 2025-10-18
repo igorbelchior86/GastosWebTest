@@ -133,17 +133,33 @@ export function getReservedTotalForDate(dateISO, transactions) {
   const budgets = loadBudgets();
   const shouldDebug = (() => { try { return !!(window && window.__gastos && window.__gastos.debugBudgetReserve); } catch (_) { return false; } })();
   const dbg = shouldDebug ? { date: target, persisted: [], synthetic: [], total: 0 } : null;
+  // Helper: compute reserved value AS OF target date for a given window
+  const computeReservedAsOf = (tag, startIso, endIso, initialValue, opts = {}) => {
+    const start = normalizeISODate(startIso);
+    const end = normalizeISODate(endIso);
+    const cutoff = (!end || target < end) ? target : end; // spend up to the earlier of target or end
+    const spent = spentNoPeriodo(transactions, tag, start, cutoff, {
+      excludeTxId: opts.excludeTxId || null,
+      excludeISO: opts.excludeISO || null,
+    });
+    const initial = Number(initialValue) || 0;
+    return Math.max(initial - spent, 0);
+  };
+
   // Sum only ad-hoc budgets via storage (recurring handled synthetically below)
   let total = budgets.reduce((acc, budget) => {
     if (!budget || budget.status !== 'active' || budget.budgetType !== 'ad-hoc') return acc;
     const start = normalizeISODate(budget.startDate);
     const end = normalizeISODate(budget.endDate);
     if (!isWithinRange(target, start, end)) return acc;
-    const recalculated = recomputeBudget(budget, transactions);
+    const reservedAsOf = computeReservedAsOf(budget.tag, start, end, budget.initialValue, {
+      excludeTxId: budget.triggerTxId != null ? String(budget.triggerTxId) : null,
+      excludeISO: budget.triggerTxIso || null,
+    });
     if (shouldDebug) {
-      dbg.persisted.push({ tag: budget.tag, start, end, type: 'ad-hoc', initial: budget.initialValue, spent: recalculated?.spentValue ?? null, reserved: recalculated?.reservedValue ?? null });
+      dbg.persisted.push({ tag: budget.tag, start, end, type: 'ad-hoc', initial: budget.initialValue, reservedAsOf });
     }
-    return acc + (recalculated ? recalculated.reservedValue : 0);
+    return acc + reservedAsOf;
   }, 0);
 
   // Include synthetic reservation for recurring masters occurring on `target`
@@ -186,9 +202,9 @@ export function getReservedTotalForDate(dateISO, transactions) {
         if (!(persistedStarts && persistedStarts.has(start))) {
           const next = nextFrom(start, m.recurrence) || start;
           const initial = computeInitialForRange(txs, tag, start, next) || Math.abs(Number(m.val) || 0);
-          const spent = spentNoPeriodo(txs, tag, start, next, { excludeTxId: m.id != null ? String(m.id) : null, excludeISO: start });
-          const reserved = Math.max(initial - spent, 0);
-          if (shouldDebug) { dbg.synthetic.push({ tag, start, end: next, initial, spent, reserved }); }
+          // Spend only up to the earlier of target or cycle end
+          const reserved = computeReservedAsOf(tag, start, next, initial, { excludeTxId: m.id != null ? String(m.id) : null, excludeISO: start });
+          if (shouldDebug) { dbg.synthetic.push({ tag, start, end: next, initial, reservedAsOf: reserved }); }
           total += reserved;
         } else {
           // If persisted exists for this cycle, add its computed reserved via budgets
@@ -196,10 +212,13 @@ export function getReservedTotalForDate(dateISO, transactions) {
             if (!b || b.status !== 'active' || b.tag !== tag) return sum;
             const s = normalizeISODate(b.startDate);
             if (s !== start) return sum;
-            const rb = recomputeBudget(b, txs);
-            return sum + (rb ? rb.reservedValue : 0);
+            const reservedAsOf = computeReservedAsOf(b.tag, b.startDate, b.endDate, b.initialValue, {
+              excludeTxId: b.triggerTxId != null ? String(b.triggerTxId) : null,
+              excludeISO: b.triggerTxIso || null,
+            });
+            return sum + reservedAsOf;
           }, 0);
-          if (add) { total += add; if (shouldDebug) dbg.persisted.push({ tag, start, from: 'recurring', reserved: add }); }
+          if (add) { total += add; if (shouldDebug) dbg.persisted.push({ tag, start, from: 'recurring', reservedAsOf: add }); }
         }
         // move to previous cycle
         start = prevFrom(start, m.recurrence);

@@ -33,13 +33,29 @@ export function setupBudgetAutocomplete(ctx = {}) {
     items.forEach((b) => {
       const el = document.createElement('div');
       el.className = 'budget-ac-item';
-      const start = (b.startDate || '').slice(8,10) + '/' + (b.startDate || '').slice(5,7);
-      const end = (b.endDate || '').slice(8,10) + '/' + (b.endDate || '').slice(5,7);
-      const initial = safeFmt(b.initialValue);
+      const start = formatDayMonthShort((b.startDate || '').slice(0,10));
+      const end = formatDayMonthShort((b.endDate || '').slice(0,10));
       const remaining = safeFmt(Math.max(0, Number(b.initialValue || 0) - Number(b.spentValue || 0)));
-      el.innerHTML = `<span class="tag">${b.tag}</span><span class="values">${remaining} / ${initial} <small>(${start}–${end})</small></span>`;
+      el.innerHTML = `
+        <div class="row top">
+          <span class="tag">${b.tag}</span>
+          <span class="remaining">Restam: ${remaining}</span>
+        </div>
+        <div class="row sub">${start} a ${end}</div>
+      `;
       el.onclick = () => {
-        insertTagIntoDesc(b.tag);
+        try {
+          const api = window.__gastos || {};
+          if (typeof api.setPendingBudgetTag === 'function') {
+            api.setPendingBudgetTag(b.tag, b);
+            // Keep focus on description so user can type right away
+            try { descInput && descInput.focus(); } catch (_) {}
+          } else {
+            insertTagIntoDesc(b.tag);
+          }
+        } catch (_) {
+          insertTagIntoDesc(b.tag);
+        }
         close();
       };
       panel.appendChild(el);
@@ -67,7 +83,16 @@ export function setupBudgetAutocomplete(ctx = {}) {
     const left = r.left - host.left;
     panel.style.top = `${top}px`;
     panel.style.left = `${left}px`;
-    panel.style.width = `${Math.max(220, r.width)}px`;
+    // Match the description input width exactly for visual alignment
+    panel.style.width = `${r.width}px`;
+    // Mirror the input border radius/border to avoid mismatch
+    try {
+      const cs = getComputedStyle(descInput);
+      if (cs && cs.borderRadius) panel.style.borderRadius = cs.borderRadius;
+      if (cs && cs.borderWidth && cs.borderStyle && cs.borderColor) {
+        panel.style.border = `${cs.borderWidth} ${cs.borderStyle} ${cs.borderColor}`;
+      }
+    } catch (_) {}
   }
 
   function listActiveBudgets() {
@@ -89,12 +114,19 @@ export function setupBudgetAutocomplete(ctx = {}) {
     const st = document.createElement('style');
     st.id = 'budget-ac-styles';
     st.textContent = `
-      .budget-autocomplete{position:absolute;z-index:9999;background:#252527;border:1px solid #3e3e40;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.25);padding:6px;max-height:220px;overflow:auto}
+      .budget-autocomplete{position:absolute;z-index:9999;box-sizing:border-box;background:#2b2b2e;border:1px solid #3e3e40;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,0.28);padding:6px;max-height:220px;overflow:auto}
       .budget-autocomplete.hidden{display:none}
-      .budget-ac-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:6px;color:#fff;cursor:pointer}
-      .budget-ac-item:hover{background:#2f2f31}
-      .budget-ac-item .tag{color:#5DD39E;font-weight:600}
-      .budget-ac-item .values{color:#B3B3B3;font-size:12px}
+      .budget-ac-item{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:10px;color:#fff;cursor:pointer}
+      .budget-ac-item + .budget-ac-item{border-top:1px solid rgba(255,255,255,0.08); margin-top:4px;}
+      .budget-ac-item:hover{background:#323235}
+      .budget-ac-item .row.top{display:flex;justify-content:space-between;align-items:center}
+      .budget-ac-item .tag{color:#5DD39E;font-weight:700}
+      .budget-ac-item .remaining{font-weight:700}
+      .budget-ac-item .row.sub{color:#B3B3B3;font-size:12px}
+      html[data-theme="light"] .budget-autocomplete{background:#ffffff;border:1px solid rgba(0,0,0,0.10);box-shadow:0 6px 14px rgba(0,0,0,0.08);}
+      html[data-theme="light"] .budget-ac-item{color:#111}
+      html[data-theme="light"] .budget-ac-item + .budget-ac-item{border-top:1px solid rgba(0,0,0,0.08)}
+      html[data-theme="light"] .budget-ac-item:hover{background:rgba(0,0,0,0.06)}
     `;
     document.head.appendChild(st);
   }
@@ -103,10 +135,25 @@ export function setupBudgetAutocomplete(ctx = {}) {
     try { return (window.__gastos?.safeFmtCurrency || ((n)=>String(n)))(Number(v)||0); } catch (_) { return String(v); }
   };
 
+  function formatDayMonthShort(iso) {
+    if (!iso) return '';
+    try {
+      const date = new Date(`${iso}T00:00:00`);
+      const day = String(date.getDate()).padStart(2, '0');
+      let mon = date.toLocaleDateString('pt-BR', { month: 'short' });
+      mon = (mon || '').replace('.', '');
+      mon = mon.charAt(0).toUpperCase() + mon.slice(1);
+      return `${day} de ${mon}`;
+    } catch (_) { return iso; }
+  }
+
   descInput.addEventListener('focus', () => {
+    // Do not open if a budget pill is already selected
+    if (window.__gastos && window.__gastos.pendingBudgetTag) return;
     refreshAndOpen();
   });
   descInput.addEventListener('input', () => {
+    if (window.__gastos && window.__gastos.pendingBudgetTag) return; // keep dropdown closed while pill is active
     if (!open) return;
     positionPanel();
   });
@@ -117,4 +164,3 @@ export function setupBudgetAutocomplete(ctx = {}) {
     close();
   });
 }
-

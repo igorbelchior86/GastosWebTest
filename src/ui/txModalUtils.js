@@ -81,6 +81,15 @@ export function resetTxModal() {
     if (parcelasBlock) parcelasBlock.classList.add('hidden');
     if (installments) installments.disabled = true;
 
+    // Clear budget pill/state
+    try {
+      const chip = document.getElementById('budgetTagChip');
+      if (chip && chip.parentElement) chip.parentElement.removeChild(chip);
+      if (window.__gastos) window.__gastos.pendingBudgetTag = null;
+      // Inform any listeners to clear input padding adjustments
+      document.dispatchEvent(new Event('txModalResetPadding'));
+    } catch (_) {}
+
     // Clear any error states
     clearFieldErrors();
 

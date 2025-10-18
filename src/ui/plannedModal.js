@@ -99,13 +99,25 @@ export function setupPlannedModal() {
       // Include child transactions of recurring series that are in the future
       // (but NOT the master transaction itself, even if it's in the future)
       if (tx.parentId && tx.opDate >= today) {
-        add(tx);
+        // If the parent/master of this child is a recurring BUDGET trigger (has budgetTag), skip.
+        try {
+          const parent = (txs || []).find(p => p && (p.id === tx.parentId || (typeof sameId === 'function' && sameId(p.id, tx.parentId))));
+          if (parent && parent.recurrence && parent.budgetTag) {
+            // budget-generated child; do not list in planned modal
+          } else {
+            add(tx);
+          }
+        } catch (_) {
+          add(tx);
+        }
       }
     }
     // Project recurring master transactions for the next 90 days
     const DAYS_AHEAD = 90;
     for (const master of txs) {
       if (!master || !master.recurrence) continue;
+      // Visual rule: do NOT project occurrences for recurring budget triggers.
+      if (master.budgetTag) continue;
       for (let i = 1; i <= DAYS_AHEAD; i++) {
         const d = new Date();
         d.setHours(0, 0, 0, 0);

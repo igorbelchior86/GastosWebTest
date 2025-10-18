@@ -155,13 +155,27 @@ export function initTransactionLine(deps) {
         left.appendChild(checkbox);
         left.appendChild(leftText);
       } else {
-        const descNode = document.createElement('span');
-        descNode.textContent = tx.desc;
+        const descText = (tx.desc || '').trim();
         const leftText = document.createElement('div');
         leftText.className = 'left-text';
         const titleRow = document.createElement('div');
         titleRow.className = 'left-title';
-        titleRow.appendChild(descNode);
+        if (descText) {
+          const descNode = document.createElement('span');
+          descNode.textContent = descText;
+          titleRow.appendChild(descNode);
+        }
+        // Append budget pill if linked to a budget
+        if (tx && tx.budgetTag) {
+          const pill = document.createElement('span');
+          pill.className = 'budget-pill';
+          const label = String(tx.budgetTag).replace(/^#+/, '');
+          const cap = label ? (label.charAt(0).toUpperCase() + label.slice(1)) : '';
+          pill.textContent = cap;
+          pill.title = 'Orçamento';
+          titleRow.appendChild(pill);
+          if (!descText) titleRow.classList.add('only-pill');
+        }
         appendInvoiceBadge(titleRow);
         leftText.appendChild(titleRow);
         leftText.appendChild(ts);
@@ -220,13 +234,26 @@ export function initTransactionLine(deps) {
         };
         left.appendChild(chk);
       }
-      const descNode = document.createElement('span');
-      descNode.textContent = tx.desc;
+      const descText2 = (tx.desc || '').trim();
       const leftText = document.createElement('div');
       leftText.className = 'left-text';
       const titleRow = document.createElement('div');
       titleRow.className = 'left-title';
-      titleRow.appendChild(descNode);
+      if (descText2) {
+        const descNode = document.createElement('span');
+        descNode.textContent = descText2;
+        titleRow.appendChild(descNode);
+      }
+      if (tx && tx.budgetTag) {
+        const pill = document.createElement('span');
+        pill.className = 'budget-pill';
+        const label = String(tx.budgetTag).replace(/^#+/, '');
+        const cap = label ? (label.charAt(0).toUpperCase() + label.slice(1)) : '';
+        pill.textContent = cap;
+        pill.title = 'Orçamento';
+        titleRow.appendChild(pill);
+        if (!descText2) titleRow.classList.add('only-pill');
+      }
       appendInvoiceBadge(titleRow);
       leftText.appendChild(titleRow);
       leftText.appendChild(ts);
@@ -292,3 +319,19 @@ export function initTransactionLine(deps) {
 
   return makeLine;
 }
+
+// Provide minimal styles for the budget pill shown in executed lines
+(function ensureBudgetPillStyles(){
+  try {
+    if (document.getElementById('budget-pill-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'budget-pill-styles';
+    st.textContent = `
+      .left-title .budget-pill{ margin-left:8px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; background:#2f2f31; color:#5DD39E; border:1px solid #3e3e40; }
+      .left-title .budget-pill:first-child{ margin-left:0; }
+      .left-title.only-pill .budget-pill{ margin-left:0; }
+      html[data-theme="light"] .left-title .budget-pill{ background:#f2f2f2; color:#2B8B66; border:1px solid rgba(0,0,0,0.12); }
+    `;
+    document.head.appendChild(st);
+  } catch (_) {}
+})();

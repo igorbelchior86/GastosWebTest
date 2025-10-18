@@ -171,6 +171,7 @@ export function createStartRealtime(ctx) {
         try {
           const raw = snap.val() ?? [];
           const incoming = Array.isArray(raw) ? raw : Object.values(raw);
+          console.log(`📥 Firebase: Loaded ${incoming.length} transaction(s)`);
           const norm = normalizeTransactionRecord;
           const remote = (incoming || []).filter(t => t).map(t => norm ? norm(t) : t);
           const dirty = cacheGet ? cacheGet('dirtyQueue', []) : [];
@@ -266,6 +267,7 @@ export function createStartRealtime(ctx) {
         const raw = snap.exists() ? snap.val() : null;
         const next = normalizeStartBalance(raw);
         const current = normalizeStartBalance(state?.startBalance);
+        console.log(`💰 Firebase: Start balance = ${next ?? 'not set'}`);
         if (next === current) {
           if (markHydrationTargetReady) markHydrationTargetReady('startBal');
           return;
@@ -280,6 +282,7 @@ export function createStartRealtime(ctx) {
           syncStartInputFromState && syncStartInputFromState();
           ensureStartSetFromBalance && ensureStartSetFromBalance();
           initStart && initStart();
+          // Render table when balance changes to ensure balances are recalculated
           renderTable && renderTable();
         } finally {
           if (markHydrationTargetReady) markHydrationTargetReady('startBal');
@@ -297,14 +300,13 @@ export function createStartRealtime(ctx) {
           return;
         }
         try {
-          state.startDate = normalized;
-          try { cacheSet && cacheSet('startDate', state.startDate); } catch (_) {}
-          if (normalized && normalized !== raw && typeof save === 'function' && (typeof getPath === 'function' ? getPath() : false)) {
-            Promise.resolve().then(() => save('startDate', normalized)).catch(() => {});
-          }
+          // DO NOT apply startDate from Firebase - only set it if explicitly nil
+          // This allows retroactive transactions to work without forcing today's date
+          state.startDate = null;
+          try { cacheSet && cacheSet('startDate', null); } catch (_) {}
           ensureStartSetFromBalance && ensureStartSetFromBalance({ persist: false, refresh: false });
           initStart && initStart();
-          renderTable && renderTable();
+          // Don't call renderTable here - let the transaction listener handle it
         } finally {
           if (markHydrationTargetReady) markHydrationTargetReady('startDate');
         }
@@ -323,7 +325,7 @@ export function createStartRealtime(ctx) {
           state.startSet = val;
           try { cacheSet && cacheSet('startSet', state.startSet); } catch (_) {}
           initStart && initStart();
-          renderTable && renderTable();
+          // Don't call renderTable here - let the transaction listener handle it
         } finally {
           if (markHydrationTargetReady) markHydrationTargetReady('startSet');
         }
@@ -334,5 +336,16 @@ export function createStartRealtime(ctx) {
     if (profileListenersRef && typeof profileListenersRef.set === 'function') {
       profileListenersRef.set(listeners);
     }
+    
+    // Final render after all listeners are attached to ensure data consistency
+    // This ensures that if Firebase has already fired its listeners before we
+    // attached them, we still render with the latest state
+    try {
+      setTimeout(() => {
+        if (typeof renderTable === 'function') {
+          renderTable();
+        }
+      }, 100);
+    } catch (_) {}
   };
 }

@@ -301,7 +301,6 @@ function applyCurrencyProfile(profileId, options = {}) {
 
 try{
   const savedProfile = localStorage.getItem('ui:profile') || (window.CURRENCY_PROFILES ? Object.keys(window.CURRENCY_PROFILES)[0] : null);
-  console.log('[main] Initial currency profile from localStorage ui:profile:', savedProfile);
   if (savedProfile) applyCurrencyProfile(savedProfile);
 }catch(e){}
 
@@ -1345,13 +1344,11 @@ try {
   // This is safe because getTogglePlanned() reads from deps dynamically
   if (makeLine.__deps__) {
     makeLine.__deps__.togglePlanned = togglePlanned;
-    console.log('[main] Updated makeLine.__deps__.togglePlanned', typeof togglePlanned);
   }
   
   // Ensure togglePlanned is available to transactionLine event handlers
   if (window.__gastos) {
     window.__gastos.togglePlanned = togglePlanned;
-    console.log('[main] togglePlanned assigned to window.__gastos', typeof togglePlanned);
   }
   
   performResetAllData = createPerformResetAllData({

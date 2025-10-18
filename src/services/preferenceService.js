@@ -44,7 +44,6 @@ export async function init(config = {}) {
     // Initialize Firebase service
     await firebaseService.init(config);
     initialized = true;
-    console.log('[PreferenceService] Initialized');
   } catch (err) {
     console.error('[PreferenceService] Initialization failed:', err);
     initialized = true; // Still mark as initialized to allow fallback
@@ -59,7 +58,6 @@ export async function init(config = {}) {
  */
 export function enableFirebaseLoad() {
   skipFirebaseLoad = false;
-  console.log('[PreferenceService] Firebase load enabled');
 }
 
 /**
@@ -86,11 +84,9 @@ export async function load(options = {}) {
       
       if (fromFirebase && typeof fromFirebase === 'object') {
         currentPreferences = { ...DEFAULT_PREFERENCES, ...fromFirebase };
-        console.log('[PreferenceService] Loaded from Firebase:', currentPreferences);
         return { ...currentPreferences };
       }
     } else {
-      console.log('[PreferenceService] Firebase load skipped during hydration phase');
     }
   } catch (err) {
     // Permission denied typically means PATH is null (not authenticated)
@@ -105,11 +101,9 @@ export async function load(options = {}) {
   // Fallback to localStorage for offline/anonymous users
   try {
     const fromStorage = localStorage.getItem(PREFS_FALLBACK_KEY);
-    console.log('[PreferenceService] Checking localStorage key:', PREFS_FALLBACK_KEY, '-> value:', fromStorage);
     if (fromStorage) {
       const parsed = JSON.parse(fromStorage);
       currentPreferences = { ...DEFAULT_PREFERENCES, ...parsed };
-      console.log('[PreferenceService] Loaded from localStorage:', currentPreferences);
       return { ...currentPreferences };
     }
   } catch (err) {
@@ -117,7 +111,6 @@ export async function load(options = {}) {
   }
 
   // Return defaults if nothing was found
-  console.log('[PreferenceService] No stored preferences found, using defaults:', DEFAULT_PREFERENCES);
   currentPreferences = { ...DEFAULT_PREFERENCES };
   return { ...currentPreferences };
 }
@@ -160,7 +153,6 @@ export async function save(partialPrefs = {}, options = {}) {
     console.warn('[PreferenceService] localStorage save failed:', err);
   }
 
-  console.log('[PreferenceService] Preferences saved:', updatedPrefs);
 
   // Notify subscribers
   if (shouldEmit) {
@@ -237,7 +229,6 @@ export async function reset() {
   }
 
   notifySubscribers(currentPreferences);
-  console.log('[PreferenceService] Preferences reset to defaults');
 }
 
 /**
@@ -254,19 +245,16 @@ export async function migrateLegacyPreferences() {
   
   if (legacyTheme) {
     toMigrate.theme = legacyTheme;
-    console.log('[PreferenceService] Migrating legacy theme:', legacyTheme);
   }
   
   if (legacyProfile) {
     toMigrate.currencyProfile = legacyProfile;
-    console.log('[PreferenceService] Migrating legacy currency profile:', legacyProfile);
   }
 
   if (Object.keys(toMigrate).length > 0) {
     // Save ONLY to localStorage during initial hydration (user not authenticated yet)
     // Firebase sync will happen later when user authenticates
     await save(toMigrate, { emit: false, skipFirebase: true });
-    console.log('[PreferenceService] Legacy preferences migrated to localStorage');
   }
 }
 
