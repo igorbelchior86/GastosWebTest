@@ -4,7 +4,7 @@
 // dependencies via the config object passed to `initAccordion` and
 // exposes a `renderAccordion` function used by the main application.
 
-import { formatToISO, todayISO, occursOn } from '../utils/date.js';
+import { formatToISO, todayISO, occursOn, weekdayName } from '../utils/date.js';
 import { postDateForCard } from '../utils/date.js';
 import { getMonthCache, setMonthCache, getCurrentMonth, isMonthStale } from '../utils/monthlyCache.js';
 import { syncCurrentMonth, smartSync } from '../utils/deltaSync.js';
@@ -899,7 +899,7 @@ export function initAccordion(config) {
         // Retrieve the running balance for this day
         const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : getBalanceBefore(iso);
         
-        const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
+        const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d, (navigator && navigator.language) || 'pt-PT'); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
         const dDet = document.createElement('details');
         dDet.className = 'day';
         dDet.dataset.key = `d-${iso}`;
@@ -1487,7 +1487,7 @@ export function initAccordion(config) {
       });
       
       const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : 0;
-      const dow = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
+      const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d, (navigator && navigator.language) || 'pt-PT'); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
       
       // Create day details element
       const dDet = document.createElement('details');

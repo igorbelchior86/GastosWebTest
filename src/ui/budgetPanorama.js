@@ -108,10 +108,19 @@ export function setupBudgetPanorama(ctx = {}) {
     updateHint(isYearly);
     // Update pill label and eyebrow
     if (viewToggleBtn) viewToggleBtn.textContent = isYearly ? 'Este mês' : 'Últimos 6m';
-    if (widgetEyebrow) widgetEyebrow.textContent = isYearly ? 'Período' : 'Mês atual';
+    if (widgetEyebrow) widgetEyebrow.textContent = isYearly ? 'Período · 6 meses' : 'Mês atual';
     if (isYearly) {
       // prepara dados do canvas antes de mostrar
       const series = computeMultiMonthSeries(txs, year, month, 6);
+      // Title as month range, e.g., "Mai — Out"
+      try {
+        if (widgetTitle) {
+          const first = (series[0]?.label || '').replace('.', '');
+          const last  = (series[series.length-1]?.label || '').replace('.', '');
+          const cap = (s) => s ? (s.charAt(0).toUpperCase() + s.slice(1)) : s;
+          widgetTitle.textContent = `${cap(first)} — ${cap(last)}`;
+        }
+      } catch (_) {}
       drawYearlyBars(yearlyCanvas, series);
       // Build clean month labels as HTML grid
       if (yearlyLabels) {
