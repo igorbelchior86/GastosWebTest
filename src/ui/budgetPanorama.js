@@ -331,17 +331,64 @@ export function setupBudgetPanorama(ctx = {}) {
   }
 
   function computeMonthlySummary(txs, year, month) {
-    const prefix = `${year}-${month}`;
+    const monthStart = `${year}-${month}-01`;
+    const monthEnd = (() => { try { return new Date(Number(year), Number(month), 0).toISOString().slice(0,10); } catch(_) { return `${year}-${month}-28`; } })();
+    const within = (iso, start, end) => (iso && (!start || iso >= start) && (!end || iso <= end));
+
+    const list = Array.isArray(txs) ? txs : [];
     let income = 0;
-    let expense = 0;
-    (txs || []).forEach(tx => {
+    // base expenses outside of budgets
+    let outOfBudgetSpent = 0;
+    // for overspend computation
+    const budgetsActive = (loadBudgets() || [])
+      .filter(b => b && b.status === 'active')
+      .map(b => recomputeBudget({ ...b }, list) || b)
+      .filter(b => within((b.startDate||'').slice(0,10), null, monthEnd) && within((b.endDate||'').slice(0,10), monthStart, null)
+        || within(monthStart, (b.startDate||'').slice(0,10), (b.endDate||'').slice(0,10))
+        || within(monthEnd, (b.startDate||'').slice(0,10), (b.endDate||'').slice(0,10)));
+
+    // Sum initial values (reservation) for all budgets overlapping this month
+    const reservedSum = budgetsActive.reduce((s,b)=> s + (Number(b.initialValue)||0), 0);
+
+    // helper: does a tx belong to an active budget period for its tag?
+    const coveredByAnyBudget = (iso, tag) => {
+      if (!tag) return false;
+      return budgetsActive.some(b => b.tag === tag && within(iso, (b.startDate||'').slice(0,10), (b.endDate||'').slice(0,10)));
+    };
+
+    // compute spent per budget tag within month for overspend
+    const spentByTag = new Map();
+    list.forEach(tx => {
       if (!tx || tx.planned) return;
-      const iso = (tx.opDate || '').slice(0, 7);
-      if (iso !== prefix) return;
+      const iso = (tx.opDate || '').slice(0,10);
+      if (!within(iso, monthStart, monthEnd)) return;
       const val = Number(tx.val) || 0;
-      if (val > 0) income += val;
-      else expense += Math.abs(val);
+      if (val > 0) { income += val; return; }
+      // expense path
+      const tag = tx.budgetTag || null;
+      const trigId = tx.id != null ? String(tx.id) : null;
+      if (tag && coveredByAnyBudget(iso, tag)) {
+        // exclude reservation trigger if it happens to be in month
+        const isTrigger = budgetsActive.some(b => b.tag === tag && String(b.triggerTxId||'') === trigId);
+        if (isTrigger) return;
+        const cur = spentByTag.get(tag) || 0;
+        spentByTag.set(tag, cur + Math.abs(val));
+      } else {
+        outOfBudgetSpent += Math.abs(val);
+      }
     });
+
+    // overspend: sum max(0, spent - reserved) per tag
+    const reservedByTag = new Map();
+    budgetsActive.forEach(b => {
+      reservedByTag.set(b.tag, (reservedByTag.get(b.tag)||0) + (Number(b.initialValue)||0));
+    });
+    const overspend = Array.from(spentByTag.entries()).reduce((s,[tag,spent]) => {
+      const budgeted = reservedByTag.get(tag) || 0;
+      return s + Math.max(0, spent - budgeted);
+    }, 0);
+
+    const expense = reservedSum + overspend + outOfBudgetSpent;
     const max = Math.max(income, expense, 1);
     return { income, expense, max };
   }

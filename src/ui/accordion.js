@@ -374,7 +374,7 @@ export function initAccordion(config) {
 
     const progress = document.createElement('div');
     progress.className = 'budget-card__progress';
-    progress.style.height = '4px';
+    progress.style.height = '5px';
     progress.style.background = 'rgba(255,255,255,0.12)';
     progress.style.borderRadius = '2px';
     progress.style.marginTop = '6px';
@@ -899,7 +899,7 @@ export function initAccordion(config) {
         // Retrieve the running balance for this day
         const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : getBalanceBefore(iso);
         
-        const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d, (navigator && navigator.language) || 'pt-PT'); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
+        const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
         const dDet = document.createElement('details');
         dDet.className = 'day';
         dDet.dataset.key = `d-${iso}`;
@@ -926,10 +926,19 @@ export function initAccordion(config) {
             const fb = deriveFallbackBudgetsForDay(iso, txs, budgetTriggerIds, budgetTriggersByIso, dayTx, budgetTriggerSet);
             if (fb.length) dayBudgets = fb;
           }
-          dayBudgets.forEach((budget) => {
-            const cardEl = createBudgetCardElement(budget, dayTx, budgetTriggerSet);
-            dDet.appendChild(cardEl);
-          });
+          if (dayBudgets.length > 0) {
+            const section = document.createElement('div');
+            section.className = 'day-section budgets-section';
+            const header = document.createElement('div');
+            header.className = 'section-title';
+            header.textContent = 'Orçamentos';
+            section.appendChild(header);
+            dayBudgets.forEach((budget) => {
+              const cardEl = createBudgetCardElement(budget, dayTx, budgetTriggerSet);
+              section.appendChild(cardEl);
+            });
+            dDet.appendChild(section);
+          }
         }
         // Always clear any existing invoices
         const createdInvoicesForDay = new Set();
@@ -1068,7 +1077,7 @@ export function initAccordion(config) {
           // Add section title
           const plannedTitle = document.createElement('div');
           plannedTitle.className = 'section-title';
-          plannedTitle.textContent = 'Planejados:';
+          plannedTitle.textContent = 'Planejados';
           plannedContainer.appendChild(plannedTitle);
           
           if (isSkeletonMode || typeof makeLine !== 'function') {
@@ -1107,7 +1116,7 @@ export function initAccordion(config) {
           // Add section title
           const executedTitle = document.createElement('div');
           executedTitle.className = 'section-title';
-          executedTitle.textContent = 'Executados:';
+          executedTitle.textContent = 'Executados';
           executedContainer.appendChild(executedTitle);
           
           if (isSkeletonMode || typeof makeLine !== 'function') {
@@ -1487,7 +1496,7 @@ export function initAccordion(config) {
       });
       
       const dayBalance = balanceMap.has(iso) ? balanceMap.get(iso) : 0;
-      const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d, (navigator && navigator.language) || 'pt-PT'); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
+      const dow = (() => { try { return weekdayName(viewYear, mIdx + 1, d); } catch (_) { return dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }); } })();
       
       // Create day details element
       const dDet = document.createElement('details');

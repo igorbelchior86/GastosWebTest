@@ -828,15 +828,16 @@ export async function addTx() {
       }
       // Anti-duplicidade (ad-hoc): impedir criar novo orçamento futuro
       // quando já existe ciclo ativo para a mesma tag abrangendo a data.
+      // Allow future planned launches tied to an EXISTING active budget cycle.
+      // Only prevent creating a NEW ad‑hoc budget if a cycle already covers the date.
+      let budgetCoversOpDate = false;
       if (!recurrenceActive && isFutureDate(newOpDate) && budgetsEnabled && newBudgetTag && findActiveBudgetFn) {
         try {
           const activeBudget = findActiveBudgetFn(newBudgetTag);
           if (activeBudget && activeBudget.status === 'active' && isWithinCycle(activeBudget, newOpDate)) {
-            if (blockMessage(`Já existe um orçamento ativo para ${newBudgetTag}. Use o ciclo ativo.`)) {
-              return;
-            }
+            budgetCoversOpDate = true; // ok to add planned tx; just don't create budget
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
       const newTx = {
         id: Date.now(),
@@ -865,12 +866,16 @@ export async function addTx() {
       if (typeof window.setTransactions === 'function') {
         window.setTransactions(updatedTxs);
       }
-      tryUpsertBudget(newTx, {
-        occurrenceISO: newTx.opDate,
-        nextOccurrenceISO: newTx.postDate,
-        recurrenceId: newTx.recurrence ? newTx.id : null,
-        creationDate: todayFn(),
-      });
+      // If a budget already covers the future date, do NOT attempt to create another
+      // ad‑hoc budget; otherwise upsert will materialize the reservation for that tag/date.
+      if (!(budgetCoversOpDate && isFutureDate(newOpDate))) {
+        tryUpsertBudget(newTx, {
+          occurrenceISO: newTx.opDate,
+          nextOccurrenceISO: newTx.postDate,
+          recurrenceId: newTx.recurrence ? newTx.id : null,
+          creationDate: todayFn(),
+        });
+      }
       
       // Persist to storage
       console.log(`💾 Transaction: Saving "${newTx.desc}" (${newTx.val > 0 ? '+' : ''}${newTx.val}) on ${newTx.opDate}`);

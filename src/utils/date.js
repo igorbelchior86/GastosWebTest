@@ -156,7 +156,10 @@ export function occursOn(tx, iso) {
  */
 export function weekdayName(y, m, d, locale) {
   try {
-    const L = (typeof locale === 'string' && locale) || (typeof navigator !== 'undefined' ? (navigator.language || 'pt-PT') : 'pt-PT');
+    const docLang = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) ? document.documentElement.lang : '';
+    const L = (typeof locale === 'string' && locale)
+      || (docLang && String(docLang))
+      || (typeof navigator !== 'undefined' ? (navigator.language || 'pt-PT') : 'pt-PT');
     // Tomohiko Sakamoto’s algorithm
     const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
     let Y = y;
@@ -166,7 +169,8 @@ export function weekdayName(y, m, d, locale) {
     const ptBR = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
     const ptPT = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
     const enUS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const base = L.startsWith('pt') ? (L.endsWith('BR') ? ptBR : ptPT) : enUS;
+    const l = String(L).toLowerCase();
+    const base = l.startsWith('pt') ? (l.includes('br') ? ptBR : ptPT) : enUS;
     return base[w] || ptPT[w];
   } catch (_) {
     // Fallback to a safe computation via UTC to avoid TZ drift

@@ -438,19 +438,18 @@ html[data-theme="light"] .month-header-title::after{
 
 /* Executed block container and lines */
 html[data-theme="light"] .section-title {
-  color: var(--txt-main) !important;
-  font-weight: 700;
-}
-
-html[data-theme="light"] .executed-cash .section-title {
-  border-bottom-color: var(--green) !important;
-}
-
-html[data-theme="light"] .planned-cash .section-title {
-  border-bottom-color: var(--blue) !important;
+  color: rgba(0,0,0,0.65) !important;
+  font-weight: 600;
 }
 
 html[data-theme="light"] .executed-cash{
+  background: var(--bg-card) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+          backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--divider) !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
+}
+html[data-theme="light"] .planned-cash{
   background: var(--bg-card) !important;
   -webkit-backdrop-filter: blur(20px) saturate(160%);
           backdrop-filter: blur(20px) saturate(160%);
@@ -1316,10 +1315,20 @@ input,select,textarea{font-size:16px!important;box-sizing:border-box;}
   display:inline-block;
   width:24px;
   height:24px;
-  vertical-align:-2px;
-  background:#fff;                       /* icon colour */
-  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M8 2h8l-1.5 3H9.5L8 2z"/><path fill="white" d="M7 6h10v2H7z"/><path fill="white" d="M12 22c-4.5 0-8-3.3-8-7.5C4 11 6.2 9 9 8.2V8a3 3 0 016 0v.2c2.8.8 5 2.8 5 6.3C20 18.7 16.5 22 12 22z"/><path fill="white" d="M12 11.5c-1.1 0-2 .9-2 2h-1v1h1v1H9v1h1a2 2 0 004 0c0-1.1-.9-2-2-2h-1v-1h1a1 1 0 000-2z"/></svg>') no-repeat center/contain;
-  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M8 2h8l-1.5 3H9.5L8 2z"/><path fill="white" d="M7 6h10v2H7z"/><path fill="white" d="M12 22c-4.5 0-8-3.3-8-7.5C4 11 6.2 9 9 8.2V8a3 3 0 016 0v.2c2.8.8 5 2.8 5 6.3C20 18.7 16.5 22 12 22z"/><path fill="white" d="M12 11.5c-1.1 0-2 .9-2 2h-1v1h1v1H9v1h1a2 2 0 004 0c0-1.1-.9-2-2-2h-1v-1h1a1 1 0 000-2z"/></svg>') no-repeat center/contain;
+  background:#fff; /* icon colour */
+  /* Banknote outline + dollar stroke (works well as mask at 18–24px) */
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\
+    <rect x="3" y="6" width="18" height="12" rx="2" ry="2" fill="none" stroke="white" stroke-width="2"/>\
+    <path d="M12 8c-1.8 0-3 .8-3 2 0 1.2 1.2 1.7 3 2 1.8.3 3 .8 3 2s-1.2 2-3 2-3-.8-3-2" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+    <line x1="12" y1="7" x2="12" y2="9" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+    <line x1="12" y1="15" x2="12" y2="17" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+  </svg>') no-repeat center/contain;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\
+    <rect x="3" y="6" width="18" height="12" rx="2" ry="2" fill="none" stroke="white" stroke-width="2"/>\
+    <path d="M12 8c-1.8 0-3 .8-3 2 0 1.2 1.2 1.7 3 2 1.8.3 3 .8 3 2s-1.2 2-3 2-3-.8-3-2" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+    <line x1="12" y1="7" x2="12" y2="9" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+    <line x1="12" y1="15" x2="12" y2="17" stroke="white" stroke-width="2" stroke-linecap="round"/>\
+  </svg>') no-repeat center/contain;
 }
 
 /* —— STATUS ICONES ————————————————————— */
@@ -1507,8 +1516,28 @@ summary.day-summary .icon-invoice::before{
   -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zm12 8H5v10h14V10zM7 8h10V6H7v2z"/></svg>') no-repeat center / 100%;
 }
 .header-seg .seg-option.icon-creditcard::before{
-  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 4v2h18V8H3zm0 6v2h6v-2H3z"/></svg>') no-repeat center / 100%;
-  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 4v2h18V8H3zm0 6v2h6v-2H3z"/></svg>') no-repeat center / 100%;
+  /* Panorama icon: 4 bars only (medium, tall, shorter, very tall) */
+  width: 28px; height: 28px;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\
+    <g fill="white">\
+      <!-- medium -->\
+      <rect x="4"  y="11" width="3.5" height="9"  rx="1"/>\
+      <!-- tall -->\
+      <rect x="9"  y="6"  width="3.5" height="14" rx="1"/>\
+      <!-- shorter -->\
+      <rect x="14" y="13" width="3.5" height="7"  rx="1"/>\
+      <!-- very tall -->\
+      <rect x="19" y="3.5" width="3.5" height="16.5" rx="1"/>\
+    </g>\
+  </svg>') no-repeat center / 100%;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">\
+    <g fill="white">\
+      <rect x="4"  y="11" width="3.5" height="9"  rx="1"/>\
+      <rect x="9"  y="6"  width="3.5" height="14" rx="1"/>\
+      <rect x="14" y="13" width="3.5" height="7"  rx="1"/>\
+      <rect x="19" y="3.5" width="3.5" height="16.5" rx="1"/>\
+    </g>\
+  </svg>') no-repeat center / 100%;
 }
 
 /* esconder os botões antigos sem quebrar JS */
@@ -2009,24 +2038,17 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
 .sticky-month.visible{opacity:1;visibility:visible;pointer-events:auto;}
 
 /* ===================== EXECUTADOS / PLANEJADOS BLOCKS ===================== */
+/* Unified day section header (eyebrow style) */
+.day-section { margin: 10px 0 8px; }
 .section-title {
   font-weight: 600;
-  font-size: 11pt;
-  color: #fff;
-  margin: 0 0 8px 0;
-  padding: 0 4px;
-  font-family: 'SF Pro Display', system-ui, sans-serif;
-  letter-spacing: 0.3px;
-  padding-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+  margin: 0 2px 4px;
 }
-
-.executed-cash .section-title {
-  border-bottom: 1px solid var(--green);
-}
-
-.planned-cash .section-title {
-  border-bottom: 1px solid var(--blue);
-}
+html[data-theme="light"] .section-title { color: rgba(0,0,0,0.65); }
 
 .executed-cash{
   padding:14px 10px;
@@ -2035,7 +2057,17 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   -webkit-backdrop-filter:blur(30px) saturate(180%);
   border-radius:12px;
   box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
-  margin:10px 0 8px;
+  margin:8px 0 8px;
+}
+.executed-cash:active, .planned-cash:active { transform: scale(0.99); transition: transform .12s ease; }
+.planned-cash{
+  padding:14px 10px;
+  background:var(--glass-bg);
+  backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border-radius:12px;
+  box-shadow:inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,.45);
+  margin:8px 0 8px;
 }
 .executed-header,.planned-header{
   font-weight:700;
@@ -2059,18 +2091,17 @@ details.month > summary:not(.month-divider),details.month > .month-meta{display:
   gap:2px;
   height:64px;
   padding:0 10px;
-  /* Use tokens for operation line styles so light/dark themes share the same rule.
-     The colors and backgrounds are defined by --ops-* variables. */
-  background: var(--ops-op-line-bg);
-  border-radius:8px;
-  border: var(--ops-op-line-border);
-  box-shadow: var(--ops-op-line-shadow);
+  /* Lines dentro de containers não devem parecer novos cards */
+  background: transparent;
+  border-radius: 8px;
+  border: 0;
+  box-shadow: none;
   color: var(--ops-value-color);
 }
 .op-main{
   display:flex;
   justify-content:space-between;
-  align-items:center;
+  align-items:flex-start; /* align columns to top (line 1) */
   gap:12px;
   flex-wrap:nowrap;
   width:100%;
@@ -2109,16 +2140,22 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 }
 .executed-cash .op-right{
   display:flex;
-  align-items:center;
+  align-items:flex-start; /* align value with first line (title) */
   gap:16px;
   margin-left:auto;
   flex:0 0 auto;
 }
+/* Fine-tune vertical alignment of value to the first row */
+.swipe-wrapper .op-line .op-right{ margin-top: 0; }
+.swipe-wrapper .op-line[data-planned="1"] .plan-check{ align-self:flex-start; margin-top: 2px; }
 .executed-cash .op-right .value{
   font-weight:600;
   font-size:10pt;
   /* Use token for default value color; specific negative/positive classes override */
   color: var(--ops-value-color);
+  min-width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Checkbox (planejados) */
@@ -2216,7 +2253,54 @@ html[data-theme="light"] .op-left .left-title .invoice-payment-badge{
 .planned-list .op-right .value{
   font-weight:600;  /* match Executados default */
   font-size:10pt;   /* match Executados */
+  min-width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
+
+/* Divisores internos entre linhas */
+.executed-list li + li .op-line,
+.planned-list  li + li .op-line {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 10px;
+  border-radius: 0;
+}
+html[data-theme="light"] .executed-list li + li .op-line,
+html[data-theme="light"] .planned-list  li + li .op-line {
+  border-top-color: rgba(0,0,0,0.06);
+}
+
+/* Valor negativo/positivo sem gradiente dentro das seções */
+.executed-cash .op-right .value.negative,
+.planned-list  .op-right .value.negative { 
+  color: var(--red) !important; 
+  background: transparent !important; 
+  -webkit-background-clip: initial !important; 
+  background-clip: initial !important; 
+  -webkit-text-fill-color: initial !important; 
+}
+.executed-cash .op-right .value.positive,
+.planned-list  .op-right .value.positive { 
+  color: var(--green-soft) !important; 
+  background: transparent !important; 
+  -webkit-background-clip: initial !important; 
+  background-clip: initial !important; 
+  -webkit-text-fill-color: initial !important; 
+}
+
+/* Checkbox dos planejados (accordion) com micro-efeito */
+.planned-list .plan-check {
+  width: 22px; height: 22px; border-radius: 6px; transition: transform .12s ease;
+}
+.planned-list .plan-check:active { transform: scale(0.96); }
+.planned-list .plan-check:checked::after {
+  content: '✓'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  color:#fff; font-size:12px; font-weight:600; line-height:1;
+}
+
+/* Align second line (date/tag/badge) with the start of the title
+   by offsetting the width of the method icon + its gap (18px + 8px). */
+.op-left .sub-row{ padding-left: 0; }
 .planned-list .op-left .icon-repeat{
   margin-left:4px;      /* tighter gap from checkbox */
   margin-right:0;
@@ -2534,6 +2618,8 @@ details.invoice[open] > summary::after{
   font-weight: 600;
   font-size: 10pt;
   text-align: right;
+  min-width: 96px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- ALIGNMENTS INSIDE CARD INVOICE OPERATIONS ---------------------------------- */
