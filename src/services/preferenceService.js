@@ -101,8 +101,14 @@ export async function load(options = {}) {
   // Fallback to localStorage for offline/anonymous users
   try {
     const fromStorage = localStorage.getItem(PREFS_FALLBACK_KEY);
-    if (fromStorage) {
-      const parsed = JSON.parse(fromStorage);
+    let parsed = fromStorage ? JSON.parse(fromStorage) : null;
+    // Merge legacy keys if present (ensures hard-refresh uses same values read early by initThemeFromStorage/applyCurrencyProfile)
+    try {
+      const legacyTheme = localStorage.getItem('ui:theme');
+      const legacyProfile = localStorage.getItem('ui:profile');
+      parsed = { ...(parsed || {}), ...(legacyTheme ? { theme: legacyTheme } : {}), ...(legacyProfile ? { currencyProfile: legacyProfile } : {}) };
+    } catch (_) {}
+    if (parsed) {
       currentPreferences = { ...DEFAULT_PREFERENCES, ...parsed };
       return { ...currentPreferences };
     }
@@ -149,6 +155,13 @@ export async function save(partialPrefs = {}, options = {}) {
   // Always save to localStorage as fallback
   try {
     localStorage.setItem(PREFS_FALLBACK_KEY, JSON.stringify(updatedPrefs));
+    // Keep legacy keys in sync to support early-boot readers (initThemeFromStorage/applyCurrency on cold start)
+    if (Object.prototype.hasOwnProperty.call(updatedPrefs, 'theme')) {
+      try { localStorage.setItem('ui:theme', String(updatedPrefs.theme || 'system')); } catch (_) {}
+    }
+    if (Object.prototype.hasOwnProperty.call(updatedPrefs, 'currencyProfile')) {
+      try { localStorage.setItem('ui:profile', String(updatedPrefs.currencyProfile)); } catch (_) {}
+    }
   } catch (err) {
     console.warn('[PreferenceService] localStorage save failed:', err);
   }
@@ -224,6 +237,8 @@ export async function reset() {
   // Clear from localStorage
   try {
     localStorage.removeItem(PREFS_FALLBACK_KEY);
+    try { localStorage.removeItem('ui:theme'); } catch (_) {}
+    try { localStorage.removeItem('ui:profile'); } catch (_) {}
   } catch (err) {
     console.warn('[PreferenceService] localStorage reset failed:', err);
   }

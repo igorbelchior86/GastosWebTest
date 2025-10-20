@@ -1,4 +1,4 @@
-import { loadBudgets, saveBudgets } from '../services/budgetStorage.js';
+import { loadBudgets, saveBudgets, reconcileBudgetsWithRemote } from '../services/budgetStorage.js';
 import { recomputeBudget } from '../services/budgetCalculations.js';
 
 export function setupBudgetPanorama(ctx = {}) {
@@ -85,6 +85,10 @@ export function setupBudgetPanorama(ctx = {}) {
 
   function handleOpen() {
     if (!isPanoramaEnabled()) return false;
+    try {
+      // Fire-and-forget reconciliation; re-render after completion
+      reconcileBudgetsWithRemote()?.then?.(() => { try { render(); } catch (_) {} });
+    } catch (_) {}
     render();
     modal.classList.remove('hidden');
     try { updateModalOpenState(); } catch (_) {}
@@ -249,6 +253,13 @@ export function setupBudgetPanorama(ctx = {}) {
         try { showBudgetHistory(budget.tag); } catch (_) {}
       });
       budgetsList.appendChild(card);
+      if (!budget.isSynthetic) {
+        try {
+          import('./budgetActions.js')
+            .then((mod) => { if (mod && typeof mod.attachBudgetSwipe === 'function') mod.attachBudgetSwipe(card, budget, { refreshBudgets: () => show() }); })
+            .catch(() => {});
+        } catch (_) {}
+      }
     });
   }
 
@@ -590,6 +601,22 @@ function ensureStyles() {
 
     /* Light theme tweaks */
     html[data-theme="light"] .panorama-content{ color:#111; }
+    html[data-theme="light"] .panorama-content .widget .widget-eyebrow{ color: rgba(0,0,0,0.55); }
+    html[data-theme="light"] .panorama-content .widget .widget-title{ color: rgba(0,0,0,0.92); }
+    html[data-theme="light"] .panorama-content .widget .view-toggle{
+      border:1px solid rgba(0,0,0,0.18);
+      background: rgba(0,0,0,0.06);
+      color:#111;
+    }
+    html[data-theme="light"] .panorama-content .widget .widget-hairline{ background: rgba(0,0,0,0.08); }
+    html[data-theme="light"] .panorama-content .widget .yearly-labels{ color: rgba(0,0,0,0.7); }
+    html[data-theme="light"] .panorama-content .widget .chart .bar-value{
+      color: rgba(0,0,0,0.75);
+      text-shadow: none;
+    }
+    html[data-theme="light"] .panorama-content .widget .chart .baseline{ background: rgba(0,0,0,0.18); }
+    html[data-theme="light"] .panorama-content .widget .chart .bar-rect{ box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+    html[data-theme="light"] .panorama-content .widget .chart .col.expense .bar-rect{ box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
     /* Cards in Panorama now reuse accordion card styles (budget-card-styles) */
   `;
   document.head.appendChild(st);

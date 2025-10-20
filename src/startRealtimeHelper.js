@@ -65,6 +65,11 @@ export function createStartRealtime(ctx) {
       syncStartInputFromState,
       ensureStartSetFromBalance,
       profileListenersRef,
+      // budgets sync
+      loadBudgets,
+      saveBudgets,
+      refreshBudgetCache,
+      rebuildBudgetsByTag,
     } = ctx || {};
 
     // Resolve the current PATH for database access. If getPath is
@@ -125,6 +130,7 @@ export function createStartRealtime(ctx) {
     const cardsRefDB   = profileRef ? profileRef('cards') : null;
     const balRef       = profileRef ? profileRef('startBal') : null;
     const startDateRef = profileRef ? profileRef('startDate') : null;
+    const budgetsRefDB = profileRef ? profileRef('budgets') : null;
     const startSetRef  = profileRef ? profileRef('startSet') : null;
 
     const listeners = [];
@@ -181,19 +187,17 @@ export function createStartRealtime(ctx) {
             setTransactions && setTransactions(remote);
             transactionsRef.set(getTransactions ? getTransactions() : remote);
           } else {
+            // When we have pending local changes (add/edit/delete) or we're offline,
+            // prefer the LOCAL set of ids to avoid resurrecting deletions from remote.
             const local = ((transactionsRef.get() || []).map(t => (norm ? norm(t) : t)));
-            const byId = new Map(local.map(t => [t.id, t]));
-            for (const r of remote) {
-              const l = byId.get(r.id);
-              if (!l) {
-                byId.set(r.id, r);
-                continue;
-              }
+            const remoteById = new Map(remote.map(t => [t.id, t]));
+            const merged = local.map((l) => {
+              const r = remoteById.get(l.id);
+              if (!r) return l; // remote missing → keep local
               const lt = Date.parse(l.modifiedAt || l.ts || 0);
               const rt = Date.parse(r.modifiedAt || r.ts || 0);
-              if (rt >= lt) byId.set(r.id, r);
-            }
-            const merged = Array.from(byId.values());
+              return rt > lt ? r : l;
+            });
             setTransactions && setTransactions(merged);
             transactionsRef.set(getTransactions ? getTransactions() : merged);
           }
@@ -264,6 +268,30 @@ export function createStartRealtime(ctx) {
           renderTable && renderTable();
         } finally {
           if (markHydrationTargetReady) markHydrationTargetReady('cards');
+        }
+      }));
+    }
+
+    // Listener for budgets changes (keep devices in sync)
+    if (budgetsRefDB && onValue) {
+      listeners.push(onValue(budgetsRefDB, (snap) => {
+        try {
+          const raw = snap.val() ?? [];
+          const remote = Array.isArray(raw) ? raw : Object.values(raw || {});
+          // Normalize + enforce single-active-per-tag via saveBudgets
+          const normalized = typeof saveBudgets === 'function' ? saveBudgets(remote) : remote;
+          // Recompute caches so UI widgets use fresh values
+          try { refreshBudgetCache && refreshBudgetCache(getTransactions ? getTransactions() : transactionsRef.get()); } catch (_) {}
+          try { rebuildBudgetsByTag && rebuildBudgetsByTag(getTransactions ? getTransactions() : transactionsRef.get()); } catch (_) {}
+          // If panorama is open, refresh it
+          try {
+            const pano = typeof document !== 'undefined' ? document.getElementById('panoramaModal') : null;
+            if (pano && !pano.classList.contains('hidden')) {
+              window.__gastos?.refreshPanorama?.();
+            }
+          } catch (_) {}
+        } finally {
+          if (markHydrationTargetReady) markHydrationTargetReady('budgets');
         }
       }));
     }

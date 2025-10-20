@@ -318,6 +318,18 @@ export function initAccordion(config) {
 
     titleRow.appendChild(tagLabel);
     titleRow.appendChild(periodLabel);
+    // Inline actions (⋯)
+    if (!budget.isSynthetic) {
+      try {
+        import('./budgetActions.js')
+          .then((mod) => {
+            if (mod && typeof mod.attachBudgetSwipe === 'function') {
+              mod.attachBudgetSwipe(card, budget, { refreshBudgets: () => {} });
+            }
+          })
+          .catch(() => {});
+      } catch (_) {}
+    }
 
     // Mark trigger tx (hide in list) but do NOT show time/meta here
     const triggerTx = findTriggerTransaction(budget, dayTransactions);
@@ -400,8 +412,10 @@ export function initAccordion(config) {
     card.appendChild(header);
     card.appendChild(details);
     card.appendChild(progress);
-    // Open compact history on tap
-    card.addEventListener('click', () => {
+    // Open compact history on tap (tap title area only)
+    card.addEventListener('click', (e) => {
+      const withinActions = e.target.closest('.budget-actions-btn') || e.target.closest('.budget-actions-menu');
+      if (withinActions) return;
       try { window.__gastos?.showBudgetHistory?.(budget.tag); } catch (_) {}
     });
 
@@ -825,7 +839,7 @@ export function initAccordion(config) {
         const placeholder = document.createElement('div');
         placeholder.className = 'month-lazy-placeholder';
         placeholder.dataset.monthIndex = mIdx;
-        placeholder.innerHTML = '<div class="lazy-loading">Carregando mês...</div>';
+        placeholder.innerHTML = '<div class="lazy-loading" aria-hidden="true"></div>';
         mDet.appendChild(placeholder);
       } else {
         // Full rendering for priority months - keep original logic for now
@@ -903,7 +917,7 @@ export function initAccordion(config) {
         const dDet = document.createElement('details');
         dDet.className = 'day';
         dDet.dataset.key = `d-${iso}`;
-        dDet.dataset.has = String(dayTx.length > 0);
+        // dataset.has will be set after filtering out budget trigger rows
         dDet.open = openKeys.includes(dDet.dataset.key);
         if (iso === todayISO()) dDet.classList.add('today');
         const dSum = document.createElement('summary');
@@ -1063,6 +1077,7 @@ export function initAccordion(config) {
         });
         // Planned operations section
         const visibleTx = dayTx.filter(tx => !isBudgetTriggerTransaction(tx));
+        dDet.dataset.has = String(visibleTx.length > 0);
         const plannedOps = visibleTx
           .filter(t => t.planned)
           .sort((a, b) => {
@@ -1148,6 +1163,8 @@ export function initAccordion(config) {
     // Single DOM operation: clear and append all months at once
     accEl.innerHTML = '';
     accEl.appendChild(fragment);
+    // Enhance expand/collapse animations for months and days
+    try { enhanceAccordionAnimations(accEl); } catch (_) {}
     // Restore open invoice panels
     openInvoices.forEach(pd => {
       const det = accEl.querySelector(`details.invoice[data-pd="${pd}"]`);
@@ -1196,12 +1213,35 @@ export function initAccordion(config) {
   // Load full month content on demand
   function loadFullMonthContent(monthEl, monthIndex, placeholder) {
     try {
-      placeholder.innerHTML = '<div class="lazy-loading">Carregando transações...</div>';
+      placeholder.innerHTML = '<div class="lazy-loading" aria-hidden="true"></div>';
       
       // Get fresh data
       const viewYear = resolveViewYear();
       const txs = getTransactions ? getTransactions() : transactions;
       const daysInMonth = new Date(viewYear, monthIndex + 1, 0).getDate();
+      // Resolve budgets context locally for lazy-loaded months (was only in first render)
+      const budgetsFeature = resolveBudgetsFeatureEnabled();
+      const activeBudgets = budgetsFeature ? loadBudgets().filter((b) => b && b.status === 'active') : [];
+      const budgetsByStart = budgetsFeature ? buildBudgetDisplayMap(activeBudgets, txs) : new Map();
+      const budgetTriggerSet = budgetsFeature ? new WeakSet() : null;
+      const budgetTriggerIds = budgetsFeature ? new Set() : null;
+      const budgetTriggersByIso = budgetsFeature ? new Map() : null;
+      if (budgetsFeature) {
+        activeBudgets.forEach((budget) => {
+          if (!budget) return;
+          if (budget.triggerTxId != null) {
+            budgetTriggerIds.add(String(budget.triggerTxId));
+          }
+          const iso = normalizeBudgetDate(budget.triggerTxIso || budget.startDate);
+          if (iso) {
+            if (!budgetTriggersByIso.has(iso)) budgetTriggersByIso.set(iso, []);
+            budgetTriggersByIso.get(iso).push({
+              tag: budget.tag,
+              id: budget.triggerTxId != null ? String(budget.triggerTxId) : null,
+            });
+          }
+        });
+      }
       
       // Calculate balances for this specific month
       // We need to compute from the start of the year to this month to get accurate balances
@@ -1259,11 +1299,171 @@ export function initAccordion(config) {
       
       // Replace placeholder with real content
       placeholder.replaceWith(...content);
+      // Hook up animations for the freshly added nodes
+      try { enhanceAccordionAnimations(monthEl); } catch (_) {}
       
     } catch (error) {
       console.error('❌ Failed to load month content:', error);
       placeholder.innerHTML = '<div class="lazy-error">Erro ao carregar</div>';
     }
+  }
+
+  // ------- Premium open/close animations for details elements -------
+  function enhanceAccordionAnimations(scope) {
+    const root = scope || document;
+    const detailsList = root.querySelectorAll('details.month, details.day');
+    detailsList.forEach((det) => {
+      // Wrap non-summary children in a collapsible body
+      let body = det.querySelector(':scope > .acc-body');
+      if (!body) {
+        body = document.createElement('div');
+        body.className = 'acc-body';
+        const children = Array.from(det.children).filter((el) => el.tagName.toLowerCase() !== 'summary');
+        children.forEach((el) => body.appendChild(el));
+        det.appendChild(body);
+      }
+      body.style.overflow = 'hidden';
+      body.style.willChange = 'height';
+      body.style.transition = 'height .28s cubic-bezier(.22,.61,.36,1)';
+
+      // Set initial height based on open state
+      if (det.open) {
+        body.style.height = 'auto';
+      } else {
+        body.style.height = '0px';
+      }
+
+      // Avoid duplicating listeners
+      if (det.__animBound) return;
+      det.__animBound = true;
+
+      // OPEN animation (after UA toggles to open)
+      det.addEventListener('toggle', () => {
+        const target = det.querySelector(':scope > .acc-body');
+        if (!target) return;
+        if (det.open) {
+          // If this is a month with a lazy placeholder still present, load it synchronously
+          if (det.classList.contains('month')) {
+            const placeholder = det.querySelector(':scope > .month-lazy-placeholder');
+            if (placeholder) {
+              const idx = parseInt(placeholder.dataset.monthIndex, 10);
+              if (!Number.isNaN(idx)) {
+                try { loadFullMonthContent(det, idx, placeholder); } catch (_) {}
+              }
+            }
+          }
+          // expand
+          target.style.height = '0px';
+          // Two RAFs ensure the 0px style is committed before measuring for all cycles
+          requestAnimationFrame(() => {
+            void target.offsetHeight;
+            requestAnimationFrame(() => {
+              target.style.height = target.scrollHeight + 'px';
+            });
+          });
+          // After transition, set to auto so content inside can grow naturally
+          const onEnd = (e) => {
+            if (e.propertyName === 'height') {
+              target.style.height = 'auto';
+              target.removeEventListener('transitionend', onEnd);
+            }
+          };
+          target.addEventListener('transitionend', onEnd);
+        }
+      });
+
+      // CLOSE animation (intercept default toggle and collapse smoothly)
+      const summary = det.querySelector(':scope > summary');
+      if (summary) {
+        summary.addEventListener('click', (ev) => {
+          const isMonth = det.matches('details.month');
+          if (isMonth) {
+            // Intercept both open and close to guarantee animation on every cycle
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (!det.open) {
+              // Ensure month content is loaded before measuring height (prevents choppy first open)
+              const placeholder = det.querySelector(':scope > .month-lazy-placeholder');
+              if (placeholder) {
+                const idx = parseInt(placeholder.dataset.monthIndex, 10);
+                if (!Number.isNaN(idx)) {
+                  try { loadFullMonthContent(det, idx, placeholder); } catch (_) {}
+                }
+              }
+              det.open = true;
+              const target = ensureAccBody(det);
+              target.style.height = '0px';
+              // Double RAF to guarantee 0px is committed before measuring and animating
+              requestAnimationFrame(() => {
+                void target.offsetHeight;
+                requestAnimationFrame(() => {
+                  target.style.height = target.scrollHeight + 'px';
+                });
+              });
+              const onEnd = (e) => {
+                if (e.propertyName !== 'height') return;
+                target.removeEventListener('transitionend', onEnd);
+                target.style.height = 'auto';
+              };
+              target.addEventListener('transitionend', onEnd);
+              return;
+            }
+            // Close month smoothly
+            if (det.__animatingClose) return;
+            det.__animatingClose = true;
+            const target = ensureAccBody(det);
+            const h = target.scrollHeight;
+            target.style.height = h + 'px';
+            void target.offsetHeight;
+            target.style.height = '0px';
+            const onEnd = (e) => {
+              if (e.propertyName !== 'height') return;
+              target.removeEventListener('transitionend', onEnd);
+              det.open = false;
+              det.__animatingClose = false;
+            };
+            target.addEventListener('transitionend', onEnd);
+            return;
+          }
+          // DAY: intercept only close (open handled via toggle)
+          if (!det.open) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (det.__animatingClose) return;
+          det.__animatingClose = true;
+          const target = det.querySelector(':scope > .acc-body');
+          if (!target) { det.open = false; det.__animatingClose = false; return; }
+          const h = target.scrollHeight;
+          target.style.height = h + 'px';
+          void target.offsetHeight;
+          target.style.height = '0px';
+          const onEnd = (e) => {
+            if (e.propertyName !== 'height') return;
+            target.removeEventListener('transitionend', onEnd);
+            det.open = false;
+            det.__animatingClose = false;
+          };
+          target.addEventListener('transitionend', onEnd);
+        }, true);
+      }
+    });
+  }
+
+  // Ensure wrapper exists around details content and has transition styles
+  function ensureAccBody(det) {
+    let body = det.querySelector(':scope > .acc-body');
+    if (!body) {
+      body = document.createElement('div');
+      body.className = 'acc-body';
+      const children = Array.from(det.children).filter((el) => el.tagName.toLowerCase() !== 'summary');
+      children.forEach((el) => body.appendChild(el));
+      det.appendChild(body);
+      body.style.overflow = 'hidden';
+      body.style.willChange = 'height';
+      body.style.transition = 'height .28s cubic-bezier(.22,.61,.36,1)';
+      body.style.height = det.open ? 'auto' : '0px';
+    }
+    return body;
   }
   
   // Fast path rendering using cached current month data
@@ -1385,7 +1585,7 @@ export function initAccordion(config) {
     const placeholder = document.createElement('div');
     placeholder.className = 'month-lazy-placeholder';
     placeholder.dataset.monthIndex = month;
-    placeholder.innerHTML = '<div class="lazy-loading">Expandir para carregar...</div>';
+    placeholder.innerHTML = '<div class="lazy-loading" aria-hidden="true"></div>';
     det.appendChild(placeholder);
     
     return det;
@@ -1554,8 +1754,9 @@ export function initAccordion(config) {
         dDet.appendChild(det);
       });
       
-      // Planned operations
-      const visibleTx = dayTx.filter(tx => !isBudgetTriggerTx(tx));
+        // Planned operations
+      const visibleTx = dayTx.filter(tx => !isBudgetTriggerTransaction(tx));
+      dDet.dataset.has = String(visibleTx.length > 0);
       const plannedOps = visibleTx.filter(t => t.planned);
       if (plannedOps.length > 0 && typeof makeLine === 'function') {
         const plannedContainer = document.createElement('div');

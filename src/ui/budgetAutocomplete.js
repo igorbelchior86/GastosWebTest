@@ -101,11 +101,17 @@ export function setupBudgetAutocomplete(ctx = {}) {
     return budgets.map(b => recomputeBudget({ ...b }, txs) || b);
   }
 
-  function refreshAndOpen() {
+  function refreshAndOpen(initialQuery = '') {
     if (!isBudgetsEnabled()) return;
     try {
       const items = listActiveBudgets();
-      openWith(items);
+      const q = String(initialQuery || '').trim();
+      if (q) {
+        const filtered = filterBudgets(items, q);
+        if (filtered.length) openWith(filtered); else close();
+      } else {
+        openWith(items);
+      }
     } catch (_) {}
   }
 
@@ -150,12 +156,22 @@ export function setupBudgetAutocomplete(ctx = {}) {
   descInput.addEventListener('focus', () => {
     // Do not open if a budget pill is already selected
     if (window.__gastos && window.__gastos.pendingBudgetTag) return;
-    refreshAndOpen();
+    refreshAndOpen(descInput.value);
   });
   descInput.addEventListener('input', () => {
     if (window.__gastos && window.__gastos.pendingBudgetTag) return; // keep dropdown closed while pill is active
-    if (!open) return;
-    positionPanel();
+    const q = String(descInput.value || '').trim();
+    // When user types, filter items. If none relate, close. If some relate, (re)open with filtered.
+    try {
+      const items = listActiveBudgets();
+      if (!q) { if (open) positionPanel(); else openWith(items); return; }
+      const filtered = filterBudgets(items, q);
+      if (filtered.length > 0) {
+        openWith(filtered);
+      } else {
+        close();
+      }
+    } catch (_) { /* ignore */ }
   });
   window.addEventListener('resize', () => { if (open) positionPanel(); });
   txModal.addEventListener('click', (e) => {
@@ -163,4 +179,28 @@ export function setupBudgetAutocomplete(ctx = {}) {
     if (e.target === descInput) return;
     close();
   });
+
+  // --- matching helpers ---
+  const norm = (s) => (s == null ? '' : String(s))
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  function related(query, tag) {
+    const qn = norm(query);
+    const tn = norm(tag).replace(/^#+/, '');
+    if (!qn || !tn) return false;
+    // heuristics: query contains tag, tag contains query, or query contains #tag
+    if (qn.includes(tn)) return true;
+    if (tn.includes(qn) && qn.length >= 2) return true; // partial typing
+    if (qn.includes('#' + tn)) return true;
+    // also match last word token against tag start
+    const parts = qn.split(/\s+/);
+    const last = parts[parts.length - 1];
+    if (tn.startsWith(last) && last.length >= 2) return true;
+    return false;
+  }
+  function filterBudgets(items, query) {
+    try { return (items || []).filter(b => related(query, b?.tag)); } catch (_) { return []; }
+  }
 }

@@ -81,7 +81,8 @@ export function setupPlannedModal() {
         const iso = d.toISOString().slice(0, 10);
         const list = txByDate(iso) || [];
         list.forEach((t) => {
-          if (t && t.planned === true) add(iso, t);
+          // Não listar planejadas que são gatilho/ligadas a orçamentos (possuem budgetTag)
+          if (t && t.planned === true && !t.budgetTag) add(iso, t);
         });
       }
     } else {
@@ -91,7 +92,7 @@ export function setupPlannedModal() {
       const end = new Date(todayDate);
       end.setDate(end.getDate() + daysAhead);
       const between = (iso) => iso >= startISO && iso <= end.toISOString().slice(0, 10);
-      txs.forEach((t) => { if (t && t.planned && t.opDate && between(t.opDate)) add(t.opDate, t); });
+      txs.forEach((t) => { if (t && t.planned && !t.budgetTag && t.opDate && between(t.opDate)) add(t.opDate, t); });
     }
 
     const sortedDates = Object.keys(plannedByDate).sort();
@@ -103,12 +104,21 @@ export function setupPlannedModal() {
       return;
     }
     const lineFactory = getLineFactory();
+    const formatDayMonthShort = (iso) => {
+      if (!iso) return '';
+      try {
+        const d = new Date(`${iso}T00:00:00`);
+        const dd = String(d.getDate()).padStart(2, '0');
+        let mon = d.toLocaleDateString('pt-BR', { month: 'short' }) || '';
+        mon = mon.replace('.', '');
+        mon = mon ? mon.charAt(0).toUpperCase() + mon.slice(1) : '';
+        return `${dd} de ${mon}`;
+      } catch (_) { return iso; }
+    };
     for (const date of sortedDates) {
       const group = plannedByDate[date].sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
-      const dateObj = new Date(date + 'T00:00');
-      const dateLabel = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
       const groupHeader = document.createElement('h3');
-      groupHeader.textContent = `${dateLabel.charAt(0).toUpperCase()}${dateLabel.slice(1)}`;
+      groupHeader.textContent = formatDayMonthShort(date);
       plannedList.appendChild(groupHeader);
       const list = document.createElement('ul');
       list.className = 'planned-list';

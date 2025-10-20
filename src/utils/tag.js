@@ -7,7 +7,11 @@
  * via Unicode letter classes.
  */
 
-const HASHTAG_REGEX = /#([\p{L}\p{N}_][\p{L}\p{N}_-]*)/u;
+// Accept two forms:
+// 1) Simple hashtag: #mercado, #luz_agua (letters, numbers, underscore, dash)
+// 2) Bracketed tag to allow spaces: #[Luz e água], #[Internet 1Gb]
+// The second form captures everything until the closing bracket.
+const HASHTAG_REGEX = /#(?:\[([^\]\n]+)\]|([\p{L}\p{N}_][\p{L}\p{N}_-]*))/u;
 
 /**
  * Extract the first hashtag found in the provided text.
@@ -18,6 +22,13 @@ const HASHTAG_REGEX = /#([\p{L}\p{N}_][\p{L}\p{N}_-]*)/u;
 export function extractFirstHashtag(text) {
   if (typeof text !== 'string' || !text.includes('#')) return null;
   const match = text.match(HASHTAG_REGEX);
-  if (!match || !match[0]) return null;
-  return match[0];
+  if (!match) return null;
+  // If bracketed form matched, prefer group 1; otherwise use the whole match (group 0)
+  if (match[1]) {
+    const inner = String(match[1]).trim();
+    if (!inner) return null;
+    return `#${inner}`;
+  }
+  if (match[0]) return match[0];
+  return null;
 }

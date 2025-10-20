@@ -22,6 +22,7 @@ import { initSwipe as initSwipeMod } from './utils/swipe.js';
 import { scrollTodayIntoView as scrollTodayIntoViewMod } from './ui/scroll.js';
 import { hydrateCache as hydrateCacheMod } from './utils/hydrateCache.js';
 import { setupServiceWorker } from './utils/serviceWorker.js';
+import { flushQueue as fbFlushQueue } from './services/firebaseService.js';
 import { setupPlannedModal } from './ui/plannedModal.js';
 import { setupRecurrenceHandlers } from './ui/recurrenceHandlers.js';
 import { runBootstrap } from './ui/bootstrap.js';
@@ -39,7 +40,7 @@ import { applyCurrencyProfile as applyCurrencyProfileMod } from './utils/currenc
 import { initThemeFromStorage } from './utils/theme.js';
 import { hydratePreferences } from './utils/preferenceHydration.js';
 import { initIOSDebug } from './utils/iosDebug.js';
-import { loadBudgets, saveBudgets, findActiveByTag, resetBudgetCache, getBudgetStorageKey } from './services/budgetStorage.js';
+import { loadBudgets, saveBudgets, findActiveByTag, resetBudgetCache, getBudgetStorageKey, reconcileBudgetsWithRemote } from './services/budgetStorage.js';
 import { upsertBudgetFromTransaction } from './services/budgetManager.js';
 import { getReservedTotalForDate as calculateReservedTotal, spentNoPeriodo as calculateSpentNoPeriodo, refreshBudgetCache, recomputeBudget } from './services/budgetCalculations.js';
 import { closeExpiredBudgets, initDayChangeWatcher, ensureRecurringBudgets } from './services/budgetLifecycle.js';
@@ -160,6 +161,8 @@ function runDailyBudgetMaintenance() {
   const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
   try { refreshBudgetCache(txs); } catch (_) {}
   try { rebuildBudgetsByTag(txs); } catch (_) {}
+  // Ensure budgets are persisted to remote so other devices stay in sync
+  try { saveBudgets(loadBudgets()); } catch (_) {}
   // Materialize today's recurring cycle budgets so reservations work off persisted data
   try {
     const { created } = ensureRecurringBudgets(txs, todayISO());
@@ -593,8 +596,13 @@ if (!USE_MOCK) {
     profileListenersRef: {
       get: () => profileListeners,
       set: (val) => { profileListeners = val; }
-    }
-});
+    },
+    // budgets sync
+    loadBudgets,
+    saveBudgets,
+    refreshBudgetCache,
+    rebuildBudgetsByTag,
+  });
   startRealtimeFn = startRealtime;
 
   const readyUser = (window.Auth && window.Auth.currentUser) ? window.Auth.currentUser : null;
@@ -763,7 +771,24 @@ const currency=v=>safeFmtCurrency(v),meses=['Jan','Fev','Mar','Abr','Mai','Jun',
 
 
 
-const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');if(addBtn&&!addBtn.dataset.toastSaveHook){addBtn.dataset.toastSaveHook='1';addBtn.addEventListener('click',()=>{const label=(addBtn.textContent||'').toLowerCase();if(!label.includes('adicion'))return;setTimeout(()=>{if(!Array.isArray(transactions)||!transactions.length)return;let latest=null;for(const t of transactions){if(!latest||(t.ts||'')>(latest.ts||''))latest=t;}if(!latest)return;try{showToast(buildSaveToast(latest),'success');}catch(_){}} ,0);},{capture:true});}
+const desc=$('desc'),val=$('value'),met=$('method'),date=$('opDate'),addBtn=$('addBtn');
+if(addBtn&&!addBtn.dataset.toastSaveHook){
+  addBtn.dataset.toastSaveHook='1';
+  addBtn.addEventListener('click',()=>{
+    const label=(addBtn.textContent||'').toLowerCase();
+    if(!label.includes('adicion'))return;
+    setTimeout(()=>{
+      // Only show auto-save toast if addTx actually succeeded and modal closed
+      try { if(!(window.__gastos && window.__gastos.__lastAddSucceeded)) return; } catch(_) { return; }
+      try { if (txModal && !txModal.classList.contains('hidden')) return; } catch(_) {}
+      try { window.__gastos.__lastAddSucceeded = false; } catch(_) {}
+      if(!Array.isArray(transactions)||!transactions.length)return;
+      let latest=null;for(const t of transactions){if(!latest||(t.ts||'')>(latest.ts||''))latest=t;}
+      if(!latest)return;
+      try{showToast(buildSaveToast(latest),'success');}catch(_){}}
+    ,0);
+  },{capture:true});
+}
 try {
   setupTransactionForm({
     valueInput: val,
@@ -1369,6 +1394,7 @@ try {
     saveBudgets,
     resetBudgetCache,
     maybeRefreshBudgetsCache,
+    flushQueue: fbFlushQueue,
   });
   // Expose the new reset routine globally so existing code can invoke it.
   try { window.performResetAllData = performResetAllData; } catch (_) {}
@@ -1385,6 +1411,9 @@ try {
     };
     window.__gastos.refreshPanorama = () => {
       try { return panorama && typeof panorama.refresh === 'function' ? panorama.refresh() : false; } catch (_) { return false; }
+    };
+    window.__gastos.reconcileBudgets = () => {
+      try { return reconcileBudgetsWithRemote(); } catch (_) { return Promise.resolve(); }
     };
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
@@ -1599,7 +1628,9 @@ const accordionApi = initAccordion({
 // Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
 renderTable();
 // Close past-due budgets on app open
-try { runDailyBudgetMaintenance(); } catch (_) {}
+  try { runDailyBudgetMaintenance(); } catch (_) {}
+  // Kick a reconciliation in the background to align devices after startup
+  try { reconcileBudgetsWithRemote(); } catch (_) {}
 
 
 
@@ -1611,7 +1642,13 @@ const YEAR_SELECTOR_MAX = 3000;
 
 function initStart(){const g=typeof window!=='undefined'?window.__gastos:undefined;if(g&&typeof g.initStart==='function')return g.initStart();}
 
-setupServiceWorker({ USE_MOCK, flushQueue });
+// Use Firebase service flushQueue so profile-scoped dirtyQueue is flushed
+setupServiceWorker({ USE_MOCK, flushQueue: fbFlushQueue });
+
+// Also flush pending profile-scoped writes when the browser comes online
+try {
+  window.addEventListener('online', () => { try { fbFlushQueue(); } catch (_) {} });
+} catch (_) {}
 
 initSwipe(document.body, '.swipe-wrapper', '.swipe-actions', '.op-line', 'opsSwipeInit');
 if (cardList) initSwipe(cardList, '.swipe-wrapper', '.swipe-actions', '.card-line', 'cardsSwipeInit');

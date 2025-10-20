@@ -10,6 +10,8 @@
  */
 
 import { setStartBalance, setStartDate, setStartSet } from './state/appState.js';
+import { PROFILE_CACHE_KEYS } from './utils/profile.js';
+import { cacheClearProfile } from './utils/cache.js';
 
 /**
  * None of these helpers rely on variables defined in the original
@@ -101,6 +103,11 @@ export function buildSaveToast(tx, deps) {
     // than the operation date, mention the invoice month/day.
     if (isCard && renderIso && !tx.planned && (!hasOpDate || renderIso !== tx.opDate)) {
       return `${formattedVal} salva na fatura de ${formatDayMonthShort(renderIso)}`;
+    }
+    // Ad‑hoc budget creation (planned + budgetTag): show the START day where the card appears
+    if (!tx.recurrence && tx.planned && tx.budgetTag) {
+      const startIso = typeof todayISO === 'function' ? todayISO() : (new Date()).toISOString().slice(0,10);
+      return `${formattedVal} salvo em ${formatDayMonthShort(startIso)}`;
     }
     // Non‑recurring transactions default to the operation date or today.
     if (!tx.recurrence) {
@@ -206,6 +213,7 @@ export function createPerformResetAllData(context) {
       saveBudgets,
       resetBudgetCache,
       maybeRefreshBudgetsCache,
+      flushQueue,
     } = context;
     if (askConfirm) {
       // Use the global confirm dialogue for user confirmation.
@@ -236,14 +244,17 @@ export function createPerformResetAllData(context) {
       
       // Update the UI input reflecting the start balance.
       try { syncStart && syncStart(); } catch (_) {}
-      // Persist cleared values to the local cache.
-      try { cacheSet && cacheSet('tx', getTransactions()); } catch (_) {}
-      try { cacheSet && cacheSet('cards', getCards()); } catch (_) {}
-      try { cacheSet && cacheSet('startBal', null); } catch (_) {}
-      try { cacheSet && cacheSet('startDate', null); } catch (_) {}
-      try { cacheSet && cacheSet('startSet', false); } catch (_) {}
-      try { cacheSet && cacheSet('dirtyQueue', []); } catch (_) {}
-      try { cacheSet && cacheSet('budgets', []); } catch (_) {}
+      // Limpar completamente o cache do perfil para evitar dados remanescentes
+      try { cacheClearProfile && cacheClearProfile(Array.from(PROFILE_CACHE_KEYS)); } catch (_) {
+        // Fallback para sobrescrita caso não seja possível
+        try { cacheSet && cacheSet('tx', getTransactions()); } catch (_) {}
+        try { cacheSet && cacheSet('cards', getCards()); } catch (_) {}
+        try { cacheSet && cacheSet('startBal', null); } catch (_) {}
+        try { cacheSet && cacheSet('startDate', null); } catch (_) {}
+        try { cacheSet && cacheSet('startSet', false); } catch (_) {}
+        try { cacheSet && cacheSet('dirtyQueue', []); } catch (_) {}
+        try { cacheSet && cacheSet('budgets', []); } catch (_) {}
+      }
       // Persist cleared values to the remote database.
       try { await (save && save('tx', getTransactions())); } catch (_) {}
       try { await (save && save('cards', getCards())); } catch (_) {}
@@ -251,6 +262,8 @@ export function createPerformResetAllData(context) {
       try { await (save && save('startDate', null)); } catch (_) {}
       try { await (save && save('startSet', false)); } catch (_) {}
       try { await (save && save('budgets', [])); } catch (_) {}
+      // Garante que alterações offline sejam enviadas imediatamente
+      try { await (flushQueue && flushQueue()); } catch (_) {}
       try { saveBudgets && saveBudgets([]); resetBudgetCache && resetBudgetCache(); } catch (_) {}
       try { maybeRefreshBudgetsCache && maybeRefreshBudgetsCache([]); } catch (_) {}
       // Refresh derived views.

@@ -1,4 +1,5 @@
 import { cacheGet, cacheSet } from '../utils/cache.js';
+import { save as fbSave, load as fbLoad } from './firebaseService.js';
 import { scopedCacheKey } from '../utils/profile.js';
 
 const BUDGET_STORAGE_KEY = 'budgets';
@@ -152,6 +153,8 @@ export function saveBudgets(nextBudgets) {
   } catch {
     /* ignore storage errors */
   }
+  // Best-effort remote sync (no throw): keeps multiple clients in sync
+  try { fbSave && fbSave('budgets', deduped); } catch (_) {}
   return inMemoryCache.slice();
 }
 
@@ -168,4 +171,34 @@ export function resetBudgetCache() {
 
 export function getBudgetStorageKey() {
   return getScopedKey();
+}
+
+/**
+ * Reconcile local budgets with the remote store using a stable key per
+ * (tag, startDate, endDate, budgetType). Chooses the record with the
+ * latest lastUpdated for each logical key, enforces single-active-per-tag,
+ * then persists the merged result locally and remotely.
+ */
+export async function reconcileBudgetsWithRemote() {
+  let remote = [];
+  try {
+    const raw = await fbLoad('budgets', []);
+    remote = Array.isArray(raw) ? raw : Object.values(raw || {});
+  } catch (_) { remote = []; }
+  const local = loadBudgets();
+  const all = [...local, ...remote].map(normalizeBudget).filter(Boolean);
+  // Merge by semantic key
+  const byKey = new Map();
+  all.forEach((b) => {
+    const key = [b.tag, b.startDate, b.endDate, b.budgetType].join('|');
+    const prev = byKey.get(key);
+    const prevTs = Date.parse(prev?.lastUpdated || 0);
+    const curTs  = Date.parse(b.lastUpdated || 0);
+    if (!prev || curTs >= prevTs) byKey.set(key, b);
+  });
+  const merged = Array.from(byKey.values());
+  // Enforce single active per tag and persist
+  const deduped = enforceSingleActivePerTag(merged);
+  saveBudgets(deduped);
+  return deduped;
 }

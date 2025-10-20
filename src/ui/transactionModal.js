@@ -373,6 +373,10 @@ export async function addTx() {
   };
   // Start of original addTx logic
   try {
+    const normalizeTag = (s) => {
+      if (s == null) return s;
+      try { return String(s).replace(/^#+/, '').trim(); } catch (_) { return s; }
+    };
     // Edit mode
     if (isEditing !== null && isEditing !== undefined) {
       // (mantém lógica de edição original)
@@ -392,7 +396,7 @@ export async function addTx() {
         return;
       }
       const newDesc    = desc && desc.value ? desc.value.trim() : '';
-      const newBudgetTag = (window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc);
+      const newBudgetTag = normalizeTag((window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc));
       let newVal = parseCurrency(val && val.value);
       const activeTypeEl = document.querySelector('.value-toggle button.active');
       const activeType = activeTypeEl && activeTypeEl.dataset ? activeTypeEl.dataset.type : 'expense';
@@ -824,7 +828,7 @@ export async function addTx() {
       const newPostDate = computePostDate(newOpDate, newMethod);
       const newRecurrence  = recurrence && recurrence.value;
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
-      const newBudgetTag = (window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc);
+      const newBudgetTag = normalizeTag((window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc));
       const recurrenceActive = isRecurrenceActive(newRecurrence);
       if (recurrenceActive && isFutureDate(newOpDate)) {
         if (blockMessage('A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.')) {
@@ -905,6 +909,7 @@ export async function addTx() {
       
       // Close modal
       toggleModalFn();
+      try { g.__lastAddSucceeded = true; } catch (_) {}
       
       // No need to manually render - Firebase listener will trigger renderTable automatically
       

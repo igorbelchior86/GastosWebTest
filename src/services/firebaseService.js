@@ -11,6 +11,7 @@
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
 import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js';
 import { scopedDbSegment } from '../utils/profile.js';
+import { cacheGet, cacheSet } from '../utils/cache.js';
 
 let firebaseApp = null;
 let firebaseDb = null;
@@ -116,10 +117,24 @@ export async function save(key, value) {
   if (useMock || !firebaseDb || !PATH) return mockSave(key, value);
   try {
     const remoteKey = scopedDbSegment(key);
-    return set(ref(firebaseDb, `${PATH}/${remoteKey}`), value);
+    const res = await set(ref(firebaseDb, `${PATH}/${remoteKey}`), value);
+    // Success: remove key from profile-scoped dirty queue
+    try {
+      const dq = Array.isArray(cacheGet('dirtyQueue', [])) ? cacheGet('dirtyQueue', []) : [];
+      const next = dq.filter((k) => k !== key);
+      cacheSet('dirtyQueue', next);
+    } catch (_) {}
+    return res;
   } catch (err) {
     console.warn('firebase.save failed, persisting to mock', err);
     await mockSave(key, value);
+    // Mark profile-scoped dirty-queue for realtime merge and background sync
+    try {
+      const dq = Array.isArray(cacheGet('dirtyQueue', [])) ? cacheGet('dirtyQueue', []) : [];
+      if (!dq.includes(key)) cacheSet('dirtyQueue', dq.concat([key]));
+    } catch (_) {}
+    // Try to register a sync with the service worker
+    try { await scheduleBgSync(); } catch (_) {}
     throw err;
   }
 }
