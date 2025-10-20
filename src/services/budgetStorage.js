@@ -101,13 +101,54 @@ export function loadBudgets() {
   return ensureCache(normalized).slice();
 }
 
+function within(iso, start, end) {
+  if (!iso) return false;
+  if (start && iso < start) return false;
+  if (end && iso > end) return false;
+  return true;
+}
+
+function enforceSingleActivePerTag(list) {
+  const today = new Date().toISOString().slice(0, 10);
+  const groups = new Map();
+  (list || []).forEach(b => {
+    if (!b) return;
+    if (!groups.has(b.tag)) groups.set(b.tag, []);
+    groups.get(b.tag).push(b);
+  });
+  const updated = list.slice();
+  groups.forEach((items, tag) => {
+    const actives = items.filter(b => b.status === 'active');
+    if (actives.length <= 1) return;
+    // Choose the single winner to remain active
+    const containing = actives.filter(b => within(today, (b.startDate||'').slice(0,10), (b.endDate||'').slice(0,10)));
+    const pickFrom = containing.length ? containing : actives;
+    // Keep the one with the latest startDate
+    const winner = pickFrom.reduce((best, cur) => {
+      const bs = (best?.startDate || '').slice(0,10);
+      const cs = (cur?.startDate || '').slice(0,10);
+      return (cs > bs) ? cur : best;
+    });
+    const idsToClose = new Set(actives.filter(b => b !== winner).map(b => b.id));
+    for (let i = 0; i < updated.length; i++) {
+      const b = updated[i];
+      if (!b || b.tag !== tag) continue;
+      if (idsToClose.has(b.id) && b.status === 'active') {
+        updated[i] = { ...b, status: 'closed' };
+      }
+    }
+  });
+  return updated;
+}
+
 export function saveBudgets(nextBudgets) {
   const serialized = Array.isArray(nextBudgets)
     ? nextBudgets.map(normalizeBudget).filter(Boolean)
     : [];
-  ensureCache(serialized);
+  const deduped = enforceSingleActivePerTag(serialized);
+  ensureCache(deduped);
   try {
-    cacheSet(BUDGET_STORAGE_KEY, serialized);
+    cacheSet(BUDGET_STORAGE_KEY, deduped);
   } catch {
     /* ignore storage errors */
   }

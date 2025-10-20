@@ -51,6 +51,19 @@ export function showToast(msg, type = 'error', duration = 3000, documentRef = do
   }
 }
 
+// Format ISO date (YYYY-MM-DD) to "DD de Mon" (pt-BR, month short, capitalized, no dot)
+function formatDayMonthShort(iso) {
+  try {
+    if (!iso) return '';
+    const d = new Date(`${iso}T00:00:00`);
+    const dd = String(d.getDate()).padStart(2, '0');
+    let mon = d.toLocaleDateString('pt-BR', { month: 'short' }) || '';
+    mon = mon.replace('.', '');
+    mon = mon ? mon.charAt(0).toUpperCase() + mon.slice(1) : '';
+    return `${dd} de ${mon}`;
+  } catch (_) { return iso; }
+}
+
 /**
  * Compute a human‑friendly message describing where a transaction has
  * been saved. The logic mirrors the original implementation in
@@ -87,13 +100,12 @@ export function buildSaveToast(tx, deps) {
     // If it’s a credit card transaction that posts in a different period
     // than the operation date, mention the invoice month/day.
     if (isCard && renderIso && !tx.planned && (!hasOpDate || renderIso !== tx.opDate)) {
-      const [, mm, dd] = renderIso.split('-');
-      return `${formattedVal} salva na fatura de ${dd}/${mm}`;
+      return `${formattedVal} salva na fatura de ${formatDayMonthShort(renderIso)}`;
     }
     // Non‑recurring transactions default to the operation date or today.
     if (!tx.recurrence) {
       const iso = hasOpDate ? tx.opDate : (typeof todayISO === 'function' ? todayISO() : '');
-      return `${formattedVal} salvo em ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+      return `${formattedVal} salvo em ${formatDayMonthShort(iso)}`;
     }
     // Recurring transactions get a descriptor based on their recurrence code.
     const recurrenceLabels = {
@@ -403,8 +415,7 @@ export function createTogglePlanned(context) {
           setTransactions && setTransactions((current || []).concat([execTx]));
         }
         if (execTx.method !== 'Dinheiro' && execTx.postDate) {
-          const [, mm, dd] = execTx.postDate.split('-');
-          toastMsg = `Movida para fatura de ${dd}/${mm}`;
+          toastMsg = `Movida para fatura de ${formatDayMonthShort(execTx.postDate)}`;
         }
       }
     } else {
@@ -427,8 +438,7 @@ export function createTogglePlanned(context) {
       if (!master.planned && master.method !== 'Dinheiro') {
         master.postDate = typeof post === 'function' ? post(master.opDate, master.method) : master.opDate;
         if (master.postDate) {
-          const [, mm, dd] = master.postDate.split('-');
-          toastMsg = `Movida para fatura de ${dd}/${mm}`;
+          toastMsg = `Movida para fatura de ${formatDayMonthShort(master.postDate)}`;
         }
       }
     }

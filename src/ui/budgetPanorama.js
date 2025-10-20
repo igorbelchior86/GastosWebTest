@@ -1,4 +1,4 @@
-import { loadBudgets } from '../services/budgetStorage.js';
+import { loadBudgets, saveBudgets } from '../services/budgetStorage.js';
 import { recomputeBudget } from '../services/budgetCalculations.js';
 
 export function setupBudgetPanorama(ctx = {}) {
@@ -9,6 +9,8 @@ export function setupBudgetPanorama(ctx = {}) {
     todayISO = () => (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0, 10)),
     showBudgetHistory = () => {},
     updateModalOpenState = () => {},
+    // Optional: share the same day-expansion logic used by the accordion
+    txByDate: txByDateFromCtx = null,
   } = ctx;
 
   ensureStyles();
@@ -64,6 +66,7 @@ export function setupBudgetPanorama(ctx = {}) {
   const barsWrapper = modal.querySelector('.bars');
   const chartArea = modal.querySelector('.chart-area');
   const yearlyLabels = modal.querySelector('.yearly-labels');
+  const getTxByDate = () => (txByDateFromCtx || window.__gastos?.txByDate || null);
 
   let viewMode = 'monthly';
   let renderedMode = null; // controla o estado atual para aplicar animação só quando alternar
@@ -87,6 +90,13 @@ export function setupBudgetPanorama(ctx = {}) {
     try { updateModalOpenState(); } catch (_) {}
     try { window.__gastos?.emitTelemetry?.('panorama_open', { origin: 'header' }); } catch (_) {}
     return true;
+  }
+
+  function refreshIfOpen() {
+    // Re-render if the sheet is visible
+    if (!modal.classList.contains('hidden')) {
+      render();
+    }
   }
 
   function hide() {
@@ -150,7 +160,8 @@ export function setupBudgetPanorama(ctx = {}) {
       animateTo('monthly');
     }
 
-    const budgets = loadBudgets()
+    // Normalize budgets to enforce single active per tag before rendering
+    const budgets = saveBudgets(loadBudgets())
       .filter((b) => b && b.status === 'active')
       .map((b) => recomputeBudget({ ...b }, txs) || b)
       .sort((a, b) => String(a.endDate || '').localeCompare(String(b.endDate || '')));
@@ -334,8 +345,22 @@ export function setupBudgetPanorama(ctx = {}) {
     const monthStart = `${year}-${month}-01`;
     const monthEnd = (() => { try { return new Date(Number(year), Number(month), 0).toISOString().slice(0,10); } catch(_) { return `${year}-${month}-28`; } })();
     const within = (iso, start, end) => (iso && (!start || iso >= start) && (!end || iso <= end));
-
-    const list = Array.isArray(txs) ? txs : [];
+    const list = (() => {
+      const tbd = getTxByDate();
+      if (typeof tbd === 'function') {
+        // Expand day-by-day using the same logic as the accordion
+        const expanded = [];
+        const y = Number(year), m = Number(month);
+        const last = new Date(y, m, 0).getDate();
+        for (let d = 1; d <= last; d++) {
+          const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dayList = tbd(iso) || [];
+          expanded.push(...dayList);
+        }
+        return expanded;
+      }
+      return Array.isArray(txs) ? txs : [];
+    })();
     let income = 0;
     // base expenses outside of budgets
     let outOfBudgetSpent = 0;
@@ -423,15 +448,35 @@ export function setupBudgetPanorama(ctx = {}) {
       series.push({ key, label, income: 0, expense: 0 });
     }
     const buckets = new Map(series.map(item => [item.key, item]));
-    (txs || []).forEach((tx) => {
-      if (!tx || tx.planned) return;
-      const key = (tx.opDate || '').slice(0, 7);
-      const bucket = buckets.get(key);
-      if (!bucket) return;
-      const val = Number(tx.val) || 0;
-      if (val > 0) bucket.income += val;
-      else bucket.expense += Math.abs(val);
-    });
+    const tbd = getTxByDate();
+    if (typeof tbd === 'function') {
+      // Expand month-by-month using txByDate
+      series.forEach(({ key }) => {
+        const [yy, mm] = key.split('-').map(Number);
+        const last = new Date(yy, mm, 0).getDate();
+        for (let d = 1; d <= last; d++) {
+          const iso = `${yy}-${String(mm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const dayList = tbd(iso) || [];
+          dayList.forEach(tx => {
+            if (!tx || tx.planned) return;
+            const val = Number(tx.val) || 0;
+            const bucket = buckets.get(key);
+            if (!bucket) return;
+            if (val > 0) bucket.income += val; else bucket.expense += Math.abs(val);
+          });
+        }
+      });
+    } else {
+      (txs || []).forEach((tx) => {
+        if (!tx || tx.planned) return;
+        const key = (tx.opDate || '').slice(0, 7);
+        const bucket = buckets.get(key);
+        if (!bucket) return;
+        const val = Number(tx.val) || 0;
+        if (val > 0) bucket.income += val;
+        else bucket.expense += Math.abs(val);
+      });
+    }
     return series;
   }
 
@@ -491,7 +536,7 @@ export function setupBudgetPanorama(ctx = {}) {
     try { return safeFmtCurrency(Number(v) || 0); } catch (_) { return String(v); }
   };
 
-  return { handleOpen, hide };
+  return { handleOpen, hide, refresh: refreshIfOpen };
 }
 
 function ensureStyles() {
@@ -536,7 +581,8 @@ function ensureStyles() {
     .panorama-content .widget .yearly-canvas.hidden{display:none}
     .panorama-content .widget .mode-hint{display:none}
     .panorama-content .budgets h4{margin:0;font-size:14px;opacity:.8;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
-    .panorama-content .budgets__list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto}
+    /* Unify scrolling: list should not have its own scroll */
+    .panorama-content .budgets__list{display:flex;flex-direction:column;gap:8px}
     /* Slightly tighter spacing only inside the Panorama modal */
     .panorama-content .op-line.budget-card{ margin:6px 0 6px; }
     .panorama-content .budgets .empty{font-size:13px;text-align:center;margin-top:12px;opacity:.8}

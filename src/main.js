@@ -1383,6 +1383,9 @@ try {
     window.__gastos.openPanorama = () => {
       try { return panorama && typeof panorama.handleOpen === 'function' ? panorama.handleOpen() : false; } catch (_) { return false; }
     };
+    window.__gastos.refreshPanorama = () => {
+      try { return panorama && typeof panorama.refresh === 'function' ? panorama.refresh() : false; } catch (_) { return false; }
+    };
   } catch (_) {}
   // Rebind the scroll animation helper. Use getters/setters so that
   // assignments inside the helper update module‑level variables.
@@ -1565,6 +1568,15 @@ const { txByDate, calculateDateRange } = initTxUtils({
   VIEW_YEAR,
   getViewYear: () => VIEW_YEAR
 });
+
+// Expose the exact helpers the accordion uses so the Planned modal can
+// mirror its source-of-truth expansion logic.
+try {
+  if (window.__gastos) {
+    window.__gastos.txByDate = txByDate;
+    window.__gastos.calculateDateRange = calculateDateRange;
+  }
+} catch (_) {}
 
 const accordionApi = initAccordion({
   acc: document.getElementById('accordion'),

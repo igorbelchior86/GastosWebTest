@@ -619,7 +619,17 @@ export async function addTx() {
       let toastMsg;
       if (!recValue) {
         const opDateVal = date && date.value;
-        toastMsg = `Edição: ${formattedVal} em ${opDateVal.slice(8,10)}/${opDateVal.slice(5,7)}`;
+        const fmtDM = (() => {
+          try {
+            const d = new Date(`${opDateVal}T00:00:00`);
+            const dd = String(d.getDate()).padStart(2, '0');
+            let mon = d.toLocaleDateString('pt-BR', { month: 'short' }) || '';
+            mon = mon.replace('.', '');
+            mon = mon ? mon.charAt(0).toUpperCase() + mon.slice(1) : '';
+            return `${dd} de ${mon}`;
+          } catch (_) { return `${opDateVal?.slice(8,10)}/${opDateVal?.slice(5,7)}`; }
+        })();
+        toastMsg = `Edição: ${formattedVal} em ${fmtDM}`;
       } else {
         const recText = recurrence && recurrence.options ? recurrence.options[recurrence.selectedIndex].text.toLowerCase() : '';
         toastMsg = `Edição: ${formattedVal} (${recText})`;

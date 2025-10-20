@@ -2760,6 +2760,8 @@ html[data-theme="light"] .invoice .invoice-group-date{ color: #111; }
   min-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
   max-height: calc(100vh - (80px + constant(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
   max-height: calc(100vh - (80px + env(safe-area-inset-top)) - var(--modal-bottom-gap, 0px) - 24px);
+  /* Unify scrolling within sheets: the sheet itself is the sole scroller */
+  overflow: auto;
 }
 
 #settingsModal .modal-content {

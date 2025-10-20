@@ -8,7 +8,7 @@ import { formatToISO, todayISO, occursOn, weekdayName } from '../utils/date.js';
 import { postDateForCard } from '../utils/date.js';
 import { getMonthCache, setMonthCache, getCurrentMonth, isMonthStale } from '../utils/monthlyCache.js';
 import { syncCurrentMonth, smartSync } from '../utils/deltaSync.js';
-import { loadBudgets } from '../services/budgetStorage.js';
+import { loadBudgets, saveBudgets } from '../services/budgetStorage.js';
 import { recomputeBudget } from '../services/budgetCalculations.js';
 
 /**
@@ -685,7 +685,7 @@ export function initAccordion(config) {
     const balanceMap = buildRunningBalanceMap();
     const txs = getTransactions ? getTransactions() : transactions;
     const budgetsFeature = resolveBudgetsFeatureEnabled();
-    const activeBudgets = budgetsFeature ? loadBudgets().filter((b) => b && b.status === 'active') : [];
+    const activeBudgets = budgetsFeature ? (function(){ try { return (saveBudgets(loadBudgets()) || []).filter((b) => b && b.status === 'active'); } catch(_) { return (loadBudgets() || []).filter((b) => b && b.status === 'active'); } })() : [];
     const budgetsByStart = budgetsFeature ? buildBudgetDisplayMap(activeBudgets, txs) : new Map();
     const budgetTriggerSet = budgetsFeature ? new WeakSet() : null;
     const budgetTriggerIds = budgetsFeature ? new Set() : null;

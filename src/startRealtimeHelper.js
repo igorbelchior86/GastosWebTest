@@ -211,6 +211,13 @@ export function createStartRealtime(ctx) {
           }
           sortTransactions && sortTransactions();
           renderTable && renderTable();
+          // If Panorama is open, refresh it to mirror accordion calculations
+          try {
+            const pano = typeof document !== 'undefined' ? document.getElementById('panoramaModal') : null;
+            if (pano && !pano.classList.contains('hidden')) {
+              try { window.__gastos?.refreshPanorama?.(); } catch (_) {}
+            }
+          } catch (_) {}
           if (plannedModal && !plannedModal.classList.contains('hidden')) {
             if (typeof renderPlannedModal === 'function') {
               try { renderPlannedModal(); } catch (_) {}
