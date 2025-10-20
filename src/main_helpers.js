@@ -264,7 +264,10 @@ export function createPerformResetAllData(context) {
       try { await (save && save('budgets', [])); } catch (_) {}
       // Garante que alterações offline sejam enviadas imediatamente
       try { await (flushQueue && flushQueue()); } catch (_) {}
+      // Limpa todos os orçamentos localmente e remotamente (com fila offline se necessário)
       try { saveBudgets && saveBudgets([]); resetBudgetCache && resetBudgetCache(); } catch (_) {}
+      // Tente novamente a fila após atualizar orçamentos — importante para sincronizar 'budgets'
+      try { await (flushQueue && flushQueue()); } catch (_) {}
       try { maybeRefreshBudgetsCache && maybeRefreshBudgetsCache([]); } catch (_) {}
       // Refresh derived views.
       try { refreshMethods && refreshMethods(); } catch (_) {}

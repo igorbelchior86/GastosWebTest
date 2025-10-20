@@ -196,10 +196,11 @@ export async function startListeners(handlers = {}) {
   };
 }
 
-// Offline queue management stored in localStorage
+// Offline queue management stored in localStorage (profile‑scoped)
 function readDirtyQueue() {
   try {
-    return JSON.parse(localStorage.getItem('dirtyQueue') || '[]');
+    const arr = cacheGet('dirtyQueue', []);
+    return Array.isArray(arr) ? arr : [];
   } catch {
     return [];
   }
@@ -207,7 +208,7 @@ function readDirtyQueue() {
 
 function writeDirtyQueue(arr) {
   try {
-    localStorage.setItem('dirtyQueue', JSON.stringify(arr || []));
+    cacheSet('dirtyQueue', Array.isArray(arr) ? arr : []);
   } catch {
     /* ignore */
   }
@@ -220,7 +221,9 @@ function writeDirtyQueue(arr) {
  * @param {string} kind one of 'tx','cards','startBal','startSet'
  */
 export function markDirty(kind) {
-  const allowed = ['tx','cards','startBal','startSet'];
+  // Include budgets so resets while offline are synced, and keep
+  // startDate for completeness even if rarely queued explicitly.
+  const allowed = ['tx','cards','startBal','startDate','startSet','budgets'];
   if (!allowed.includes(kind)) return;
   const q = readDirtyQueue();
   if (!q.includes(kind)) q.push(kind);

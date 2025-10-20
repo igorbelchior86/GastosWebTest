@@ -430,6 +430,7 @@ if (!USE_MOCK) {
       if (k === 'cards') cacheSet('cards', v);
       if (k === 'startBal') cacheSet('startBal', v);
       if (k === 'startSet') cacheSet('startSet', v);
+      if (k === 'budgets') cacheSet('budgets', v);
       return; // no remote write while offline
     }
     const remoteKey = scopedDbSegment(k);
