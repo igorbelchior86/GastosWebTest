@@ -17,6 +17,10 @@ export function setupBudgetAutocomplete(ctx = {}) {
   panel.className = 'budget-autocomplete hidden';
   panel.setAttribute('role', 'listbox');
   panel.addEventListener('mousedown', (e) => e.preventDefault());
+  // Prevent scroll gestures from bubbling to the sheet; keep scrolling inside the panel
+  panel.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
+  panel.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true });
+  panel.addEventListener('touchmove', (e) => { e.stopPropagation(); }, { passive: false });
   txModal.appendChild(panel);
 
   let open = false;
@@ -120,7 +124,8 @@ export function setupBudgetAutocomplete(ctx = {}) {
     const st = document.createElement('style');
     st.id = 'budget-ac-styles';
     st.textContent = `
-      .budget-autocomplete{position:absolute;z-index:9999;box-sizing:border-box;background:#2b2b2e;border:1px solid #3e3e40;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,0.28);padding:6px;max-height:220px;overflow:auto}
+      .budget-autocomplete{position:absolute;z-index:9999;box-sizing:border-box;background:#2b2b2e;border:1px solid #3e3e40;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,0.28);padding:6px;max-height:40vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none;-ms-overflow-style:none}
+      .budget-autocomplete::-webkit-scrollbar{width:0;height:0;display:none}
       .budget-autocomplete.hidden{display:none}
       .budget-ac-item{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:10px;color:#fff;cursor:pointer}
       .budget-ac-item + .budget-ac-item{border-top:1px solid rgba(255,255,255,0.08); margin-top:4px;}

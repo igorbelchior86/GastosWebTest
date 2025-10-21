@@ -3350,7 +3350,7 @@ html[data-theme="light"] .month-lazy-placeholder .lazy-loading{
                    rgba(255,255,255,.05) 0%,
                    rgba(255,255,255,0) 70%),
                  rgba(42,42,44,.18);
-  --sheet-border: 1px solid rgba(255,255,255,0.06);
+  --sheet-border: 1px solid rgba(255,255,255,0.12);
   --sheet-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 10px 24px rgba(0,0,0,0.28);
   --sheet-radius: var(--txmodal-radius);
 }
