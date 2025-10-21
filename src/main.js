@@ -2,7 +2,7 @@ import { fmtCurrency, fmtNumber, parseCurrency, escHtml } from './utils/format.j
 import { normalizeStartBalance } from './utils/startBalance.js';
 import { formatToISO as utilFormatToISO,todayISO as utilTodayISO,addYearsIso as utilAddYearsIso,isSameDayOfMonth as utilIsSameDayOfMonth,occursOn as utilOccursOn,postDateForCard } from './utils/date.js';
 import { initTxUtils } from './ui/transactionUtils.js';
-import { setupInvoiceHandlers,openPayInvoiceModal as openPayInvoiceModalMod,addTx as addTxMod } from './ui/transactionModal.js';
+import { setupInvoiceHandlers,openPayInvoiceModal as openPayInvoiceModalMod,addTx as addTxMod, setupPaidStatusControl } from './ui/transactionModal.js';
 import { DEFAULT_PROFILE,LEGACY_PROFILE_ID,PROFILE_DATA_KEYS,PROFILE_CACHE_KEYS,getRuntimeProfile,getCurrencyName,getCurrentProfileId,scopedCacheKey,scopedDbSegment } from './utils/profile.js';
 import { cacheGet, cacheSet, cacheRemove, cacheClearProfile } from './utils/cache.js';
 import { appState,setStartBalance,setStartDate,setStartSet,setBootHydrated,setTransactions,getTransactions,setCards,getCards,subscribeState,setMonthlyTotals,setBudgetsByTag } from './state/appState.js';
@@ -1035,6 +1035,7 @@ try {
 } catch (e) { console.error('initOfflineQueue failed', e); }
 
 setupInvoiceHandlers();
+try { setupPaidStatusControl(); } catch (_) {}
 
 setupPlannedModal();
 setupRecurrenceHandlers();

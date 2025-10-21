@@ -90,6 +90,38 @@ export function setupInvoiceHandlers() {
 }
 
 /**
+ * Setup the paid/planned status segmented control for the Add Operation modal.
+ * - Defaults to Paga for today/past
+ * - Forces Planejada and disables the control for future dates
+ */
+export function setupPaidStatusControl() {
+  try {
+    const group = document.querySelector('.paid-toggle');
+    const date = document.getElementById('opDate');
+    if (!group || !date) return;
+    const buttons = Array.from(group.querySelectorAll('.seg-option'));
+    const setActive = (paid) => {
+      buttons.forEach(b => b.classList.remove('active'));
+      const target = buttons.find(b => b.dataset.paid === (paid ? '1' : '0'));
+      if (target) target.classList.add('active');
+      try { group.dataset.state = paid ? 'paid' : 'planned'; } catch (_) {}
+      try { window.__gastos.markAsPaid = !!paid; } catch (_) {}
+    };
+    const todayFn = () => (window.todayISO ? window.todayISO() : new Date().toISOString().slice(0,10));
+    const syncForDate = () => {
+      const iso = date.value;
+      const isFuture = !!(iso && iso > todayFn());
+      if (isFuture) { group.classList.add('disabled'); setActive(false); }
+      else { group.classList.remove('disabled'); if (!buttons.some(b => b.classList.contains('active'))) setActive(true); }
+    };
+    buttons.forEach(btn => btn.addEventListener('click', () => { if (!group.classList.contains('disabled')) setActive(btn.dataset.paid === '1'); }));
+    date.addEventListener('change', syncForDate);
+    // Initial state on load
+    syncForDate();
+  } catch (_) {}
+}
+
+/**
  * Opens the payment modal for credit card invoices. This function mirrors
  * the original `openPayInvoiceModal` from main.js but accesses all
  * dependencies via `window.__gastos`. It sets the global flags
@@ -122,6 +154,7 @@ export function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjus
     addBtn,
     todayISO,
   } = g;
+  // Ensure paid status control is initialised for standard mode as well
   // Open modal first to avoid reset wiping the prefill
   const wasHidden = txModal && txModal.classList.contains('hidden');
   if (wasHidden && typeof toggleTxModal === 'function') toggleTxModal();
@@ -132,6 +165,18 @@ export function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjus
   // Prefill form fields
   const today = typeof todayISO === 'function' ? todayISO() : (new Date()).toISOString().slice(0,10);
   if (desc) desc.value = `Pagamento fatura – ${cardName}`;
+  // In invoice mode, treat as paid by nature; ensure toggle (if visible) is set to 'Paga'
+  try {
+    const group = document.querySelector('.paid-toggle');
+    if (group) {
+      group.classList.remove('disabled');
+      const all = Array.from(group.querySelectorAll('.seg-option'));
+      all.forEach(b => b.classList.remove('active'));
+      const paidBtn = all.find(b => b.dataset.paid === '1');
+      if (paidBtn) paidBtn.classList.add('active');
+      try { group.dataset.state = 'paid'; } catch (_) {}
+    }
+  } catch (_) {}
   // Ensure the value toggle reflects expense and keeps the formatted sign
   try {
     document.querySelectorAll('.value-toggle button').forEach(b => b.classList.remove('active'));
@@ -144,6 +189,8 @@ export function openPayInvoiceModal(cardName, dueISO, remaining, totalAbs, adjus
   // Lock method to Dinheiro
   if (hiddenSelect) hiddenSelect.value = 'Dinheiro';
   const methodSwitch = document.querySelector('.method-switch');
+
+  // Paid toggle is wired by setupPaidStatusControl() in normal mode
   if (methodSwitch) methodSwitch.dataset.selected = 'Dinheiro';
   if (methodButtons) methodButtons.forEach(b => { b.classList.toggle('active', b.dataset.method === 'Dinheiro'); });
   // Show parcel option (off by default)
@@ -395,7 +442,7 @@ export async function addTx() {
         g.pendingEditMode = pendingEditMode;
         return;
       }
-      const newDesc    = desc && desc.value ? desc.value.trim() : '';
+  const newDesc    = desc && desc.value ? desc.value.trim() : '';
       const newBudgetTag = normalizeTag((window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc));
       let newVal = parseCurrency(val && val.value);
       const activeTypeEl = document.querySelector('.value-toggle button.active');
@@ -853,6 +900,15 @@ export async function addTx() {
           }
         } catch (_) { /* ignore */ }
       }
+      // Determine planned/paga using the new status toggle
+      function isMarkAsPaid() {
+        try {
+          if (newOpDate && newOpDate > todayFn()) return false;
+          const group = document.querySelector('.paid-toggle');
+          const active = group ? group.querySelector('.seg-option.active') : null;
+          return active ? active.dataset.paid === '1' : true;
+        } catch (_) { return !(newOpDate > todayFn()); }
+      }
       const newTx = {
         id: Date.now(),
         desc: newDesc,
@@ -862,7 +918,7 @@ export async function addTx() {
         postDate: newPostDate,
         recurrence: newRecurrence || '',
         installments: newInstallments,
-        planned: newOpDate > todayFn(),
+        planned: !isMarkAsPaid(),
         ts: new Date().toISOString(),
         modifiedAt: new Date().toISOString(),
         budgetTag: newBudgetTag
@@ -913,7 +969,7 @@ export async function addTx() {
       
       // No need to manually render - Firebase listener will trigger renderTable automatically
       
-      showToastFn('Operação adicionada', 'success');
+      showToastFn(newTx.planned ? 'Operação salva (planejada)' : 'Operação adicionada', 'success');
       // Write back state
       g.isEditing = isEditing;
       g.pendingEditMode = pendingEditMode;

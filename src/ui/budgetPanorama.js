@@ -555,7 +555,9 @@ function ensureStyles() {
   const st = document.createElement('style');
   st.id = 'panorama-styles';
   st.textContent = `
-    .panorama-content{ color: var(--txt-main, #EDEDEF); }
+    /* Prevent horizontal scroll in iOS PWA */
+    #panoramaModal, #panoramaModal .bottom-modal-box, #panoramaModal .modal-content { overflow-x: hidden; }
+    .panorama-content{ color: var(--txt-main, #EDEDEF); overflow-x: hidden; }
     .panorama-content .widget{border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;cursor:pointer}
     .panorama-content .sheet-header{ margin-bottom: 6px; }
     .panorama-content .widget:active{opacity:.96}
@@ -566,7 +568,7 @@ function ensureStyles() {
     .panorama-content .widget .view-toggle{margin-left:auto;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.06);color:#EDEDEF;cursor:pointer}
     .panorama-content .widget .view-toggle:active{transform:scale(0.98)}
     .panorama-content .widget .widget-hairline{height:1px;background:rgba(255,255,255,0.08);border-radius:1px;margin:4px 0 4px}
-    .panorama-content .widget .chart-area{position:relative;height:180px}
+    .panorama-content .widget .chart-area{position:relative;height:180px; overflow:hidden}
     .panorama-content .widget .bars.chart{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:flex-end;padding:16px 10px 14px;gap:24px}
     /* Yearly view overlays in the same fixed area without any box styling */
     .panorama-content .widget .yearly-canvas{position:absolute;left:0;right:0;top:0;bottom:24px;background:transparent !important;padding:0 !important;border-radius:0 !important}

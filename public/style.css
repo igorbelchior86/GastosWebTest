@@ -3345,14 +3345,19 @@ html[data-theme="light"] .month-lazy-placeholder .lazy-loading{
 
 /* ===================== Premium look for Transaction Modal (visual-only) ===================== */
 #txModal .bottom-modal-box {
-  /* Match Panorama but a hair lighter for parity with its perceived translucency */
-  --sheet-bg: radial-gradient(circle at top left,
-                   rgba(255,255,255,.05) 0%,
-                   rgba(255,255,255,0) 70%),
-                 rgba(42,42,44,.18);
-  --sheet-border: 1px solid rgba(255,255,255,0.12);
-  --sheet-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 10px 24px rgba(0,0,0,0.28);
-  --sheet-radius: var(--txmodal-radius);
+  /* Match Panorama look & translucency */
+  --sheet-bg: var(--glass-bg-light);
+  --sheet-border: 1px solid rgba(255,255,255,0.08);
+  --sheet-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,0.45);
+  --sheet-radius: 20px;
+}
+
+/* Planned modal: match Panorama perceived translucency (light glass) */
+#plannedModal .bottom-modal-box {
+  --sheet-bg: var(--glass-bg-light);
+  --sheet-border: 1px solid rgba(255,255,255,0.08);
+  --sheet-shadow: inset 0 0 0 1px #FFFFFF1A, 0 6px 20px rgba(0,0,0,0.45);
+  --sheet-radius: 20px;
 }
 
 /* Field cards */
@@ -3418,6 +3423,25 @@ html[data-theme="light"] #txModal .value-toggle { border: 0; }
 .segmented .seg-option.active { background: var(--tx-pill-active); color: #fff; box-shadow: inset 0 0 0 1px var(--txmodal-border); }
 html[data-theme="light"] .segmented .seg-option { color: #111; }
 html[data-theme="light"] .segmented .seg-option.active { color: #111; }
+/* Disabled state for paid-toggle */
+.segmented.disabled { opacity: .6; pointer-events: none; }
+
+/* Paid toggle highlight animation (match method-switch) */
+#txModal .paid-toggle { position: relative; overflow: hidden; }
+#txModal .paid-toggle .switch-highlight {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 50%;
+  background: var(--tx-pill-active); box-shadow: inset 0 0 0 1px var(--txmodal-border);
+  border-radius: inherit; will-change: transform;
+  transition: transform .3s cubic-bezier(.5,1.5,.5,1);
+  z-index: 0;
+}
+#txModal .paid-toggle .seg-option { position: relative; z-index: 1; }
+#txModal .paid-toggle[data-state="planned"] .switch-highlight { transform: translateX(100%); }
+/* Remove the small pill on active state for paid-toggle: rely only on sliding highlight */
+#txModal .paid-toggle .seg-option { color: var(--txt-main); }
+#txModal .paid-toggle .seg-option.active { background: transparent; box-shadow: none; color: var(--txt-main); }
+html[data-theme="light"] #txModal .paid-toggle .seg-option { color: #111; }
+html[data-theme="light"] #txModal .paid-toggle .seg-option.active { color: #111; }
 
 #txModal .paid-field { margin-top: 6px; }
 #txModal .field-label { display: block; font-weight: 700; font-size: .95rem; color: var(--txt-main); margin: 2px 0 6px; opacity: .9; }
@@ -3544,6 +3568,8 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
   color: #fff;
   font-size: 1rem;
   cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 #cardSelector input[type="radio"] {
   appearance: none;
@@ -3562,6 +3588,18 @@ select,input[type="date"]{-webkit-appearance:none;-moz-appearance:none;appearanc
   background-color: var(--blue);
   border-color: var(--blue);
 }
+/* Inner dot and stronger label highlight on selection */
+#cardSelector input[type="radio"]:checked::after{
+  content:""; position:absolute; inset:4px; background:#fff; border-radius:50%;
+}
+#cardSelector label:has(input[type="radio"]:checked){
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.22);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+html[data-theme="light"] #cardSelector label{ background:#f3f4f6; color:#111; border-color: rgba(0,0,0,0.08); }
+html[data-theme="light"] #cardSelector label:has(input[type="radio"]:checked){ background:#ffffff; border-color: rgba(0,0,0,0.28); box-shadow: 0 8px 18px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.06); }
+html[data-theme="light"] #cardSelector input[type="radio"]:checked{ background-color:#16a34a; border-color:#16a34a; }
 
 /* Field sizing */
 .bottom-modal-box input#value {

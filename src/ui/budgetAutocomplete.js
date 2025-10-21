@@ -40,9 +40,10 @@ export function setupBudgetAutocomplete(ctx = {}) {
       const start = formatDayMonthShort((b.startDate || '').slice(0,10));
       const end = formatDayMonthShort((b.endDate || '').slice(0,10));
       const remaining = safeFmt(Math.max(0, Number(b.initialValue || 0) - Number(b.spentValue || 0)));
+      const tagLabel = formatTagLabel(b.tag);
       el.innerHTML = `
         <div class="row top">
-          <span class="tag">${b.tag}</span>
+          <span class="tag">${tagLabel}</span>
           <span class="remaining">Restam: ${remaining}</span>
         </div>
         <div class="row sub">${start} a ${end}</div>
@@ -156,6 +157,13 @@ export function setupBudgetAutocomplete(ctx = {}) {
       mon = mon.charAt(0).toUpperCase() + mon.slice(1);
       return `${day} de ${mon}`;
     } catch (_) { return iso; }
+  }
+
+  function formatTagLabel(tag) {
+    if (!tag) return '';
+    const clean = String(tag).replace(/^#+/, '').trim();
+    if (!clean) return '';
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
   descInput.addEventListener('focus', () => {
