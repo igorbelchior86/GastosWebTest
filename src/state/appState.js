@@ -217,6 +217,7 @@ export function addTransaction(tx, options = {}) {
   if (options.recompute !== false) {
     try { window.__gastos?.computeMonthlyTotals?.(state.transactions); } catch (_) {}
     try { window.__gastos?.rebuildBudgetsByTag?.(state.transactions); } catch (_) {}
+    try { window.__gastos?.computeDailyBalances?.(state.transactions, state.startBalance, state.startDate); } catch (_) {}
   }
   if (options.emit !== false) emit(['transactions']);
   return tx;
@@ -240,6 +241,7 @@ export function updateTransaction(id, patch = {}, options = {}) {
     if (options.recompute !== false) {
       try { window.__gastos?.computeMonthlyTotals?.(state.transactions); } catch (_) {}
       try { window.__gastos?.rebuildBudgetsByTag?.(state.transactions); } catch (_) {}
+      try { window.__gastos?.computeDailyBalances?.(state.transactions, state.startBalance, state.startDate); } catch (_) {}
     }
     if (options.emit !== false) emit(['transactions']);
   }
@@ -256,6 +258,7 @@ export function removeTransaction(id, options = {}) {
     if (options.recompute !== false) {
       try { window.__gastos?.computeMonthlyTotals?.(state.transactions); } catch (_) {}
       try { window.__gastos?.rebuildBudgetsByTag?.(state.transactions); } catch (_) {}
+      try { window.__gastos?.computeDailyBalances?.(state.transactions, state.startBalance, state.startDate); } catch (_) {}
     }
     if (options.emit !== false) emit(['transactions']);
   }

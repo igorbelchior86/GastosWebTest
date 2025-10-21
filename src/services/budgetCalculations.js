@@ -146,9 +146,11 @@ export function getReservedTotalForDate(dateISO, transactions) {
     return Math.max(initial - spent, 0);
   };
 
-  // Sum only ad-hoc budgets via storage (recurring handled synthetically below)
+  // Sum persisted budgets (ad-hoc AND recurring) whose window includes target.
+  // We track counted starts to avoid double counting later when walking masters.
+  const countedStarts = new Set(); // key = `${tag}|${start}`
   let total = budgets.reduce((acc, budget) => {
-    if (!budget || budget.status !== 'active' || budget.budgetType !== 'ad-hoc') return acc;
+    if (!budget || budget.status !== 'active') return acc;
     const start = normalizeISODate(budget.startDate);
     const end = normalizeISODate(budget.endDate);
     if (!isWithinRange(target, start, end)) return acc;
@@ -157,8 +159,10 @@ export function getReservedTotalForDate(dateISO, transactions) {
       excludeISO: budget.triggerTxIso || null,
     });
     if (shouldDebug) {
-      dbg.persisted.push({ tag: budget.tag, start, end, type: 'ad-hoc', initial: budget.initialValue, reservedAsOf });
+      dbg.persisted.push({ tag: budget.tag, start, end, type: budget.budgetType || 'ad-hoc', initial: budget.initialValue, reservedAsOf });
     }
+    const key = `${budget.tag}|${start}`;
+    countedStarts.add(key);
     return acc + reservedAsOf;
   }, 0);
 
@@ -207,18 +211,13 @@ export function getReservedTotalForDate(dateISO, transactions) {
           if (shouldDebug) { dbg.synthetic.push({ tag, start, end: next, initial, reservedAsOf: reserved }); }
           total += reserved;
         } else {
-          // If persisted exists for this cycle, add its computed reserved via budgets
-          const add = (budgets || []).reduce((sum, b) => {
-            if (!b || b.status !== 'active' || b.tag !== tag) return sum;
-            const s = normalizeISODate(b.startDate);
-            if (s !== start) return sum;
-            const reservedAsOf = computeReservedAsOf(b.tag, b.startDate, b.endDate, b.initialValue, {
-              excludeTxId: b.triggerTxId != null ? String(b.triggerTxId) : null,
-              excludeISO: b.triggerTxIso || null,
-            });
-            return sum + reservedAsOf;
-          }, 0);
-          if (add) { total += add; if (shouldDebug) dbg.persisted.push({ tag, start, from: 'recurring', reservedAsOf: add }); }
+          // Persisted exists for this cycle. We already counted it above.
+          // Guard against double counting when a master exists.
+          const key = `${tag}|${start}`;
+          if (shouldDebug && countedStarts.has(key)) {
+            dbg.persisted.push({ tag, start, from: 'persisted:skipped-dup' });
+          }
+          // no-op
         }
         // move to previous cycle
         start = prevFrom(start, m.recurrence);

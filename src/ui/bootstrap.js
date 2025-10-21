@@ -154,6 +154,12 @@ export function runBootstrap() {
     setStartBalance(numberValue);
     cacheSet('startBal', state.startBalance);
     syncStartInputFromState();
+    // Define a data de início local para ancorar o saldo "em conta"
+    try {
+      const isoToday = todayISO();
+      appState.setStartDate(isoToday, { emit: false });
+      cacheSet('startDate', isoToday);
+    } catch (_) {}
     // Persist start balance and mark the start flow as completed (startSet=true)
     try {
       await save('startBal', state.startBalance);

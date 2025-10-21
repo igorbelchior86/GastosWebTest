@@ -46,6 +46,7 @@ import { getReservedTotalForDate as calculateReservedTotal, spentNoPeriodo as ca
 import { closeExpiredBudgets, initDayChangeWatcher, ensureRecurringBudgets } from './services/budgetLifecycle.js';
 import { extractFirstHashtag } from './utils/tag.js';
 import { isBudgetsEnabled, isPanoramaEnabled, getFeatureFlagsApi } from './config/features.js';
+import { computeDailyBalances as computeDailyBalancesHelper } from './utils/dailyBalances.js';
 
 //
 import { setupMainEventHandlers } from './uiEventHandlers.js';
@@ -943,6 +944,18 @@ if (!globalGastos.computeMonthlyTotals) {
     try { return computeMonthlyTotals(list); } catch (_) { return {}; }
   };
 }
+if (!globalGastos.computeDailyBalances) {
+  globalGastos.computeDailyBalances = (list, sb, sd) => {
+    try {
+      return computeDailyBalancesHelper(
+        list || transactions,
+        sb ?? state.startBalance,
+        sd ?? state.startDate,
+        { ignoreInvoiceMeta: true, useTxByDate: true }
+      );
+    } catch (_) { return {}; }
+  };
+}
 if (!globalGastos.rebuildBudgetsByTag) {
   globalGastos.rebuildBudgetsByTag = (list) => {
     try { return rebuildBudgetsByTag(list); } catch (_) { return {}; }
@@ -1559,6 +1572,14 @@ document.addEventListener('click',e=>{
 
 function renderTable(){
   const hydrating=isHydrating();
+  // Ensure dual daily balances (projected vs available) are computed
+  // before rendering so the day-headers can use them instead of the
+  // legacy single running balance fallback.
+  try {
+    const txs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
+    const res = computeDailyBalancesHelper(txs, state.startBalance, state.startDate, { ignoreInvoiceMeta: true });
+    try { if (window.__gastos) window.__gastos.dailyBalances = res.byDay; } catch (_) {}
+  } catch (_) {}
   clearTableContent();
   const acc=document.getElementById('accordion');
   

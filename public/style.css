@@ -1983,27 +1983,57 @@ summary.day-summary::before{
 }
 
 .details.day[open] > summary.day-summary,
-summary.day-summary.active{border:2px solid var(--green);background:rgba(42,42,44,.9);} 
+summary.day-summary.active{
+  /* Neutral open state: no neon border or glow */
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--glass-bg);
+}
 
 /* Indicador rotacionado */
 details.day[open] > summary.day-summary::before{transform:rotate(90deg);} 
 details.day:not([data-has="true"]) > summary.day-summary::before{visibility:hidden;}
 summary.day-summary > span:first-child{font-weight:400!important;letter-spacing:-.2px;font-size:12pt;color:#E0FFE0;}
-summary.day-summary .day-balance, summary.day-summary > span:last-child{font-family:'SF Pro Display',sans-serif;font-weight:600;font-size:12pt;color:#E0FFE0;white-space:nowrap;}
+summary.day-summary .right-col{ position:relative; display:flex; align-items:center; height:100%; margin-left:auto; }
+summary.day-summary .day-balance{font-family:'SF Pro Display',sans-serif;font-weight:600;font-size:12pt;color:var(--txt-main);white-space:nowrap;}
+/* Premium negative color for projected balance */
+summary.day-summary .day-balance.neg{ color: var(--red) !important; }
+/* Light theme: use a slightly deeper red for readability */
+html[data-theme="light"] summary.day-summary .day-balance.neg{ color:#DC2626 !important; }
+/* Light theme accessibility: add a subtle high‑contrast pill for negative values
+   so it pops even for users with color‑vision deficiencies. */
+html[data-theme="light"] summary.day-summary .day-balance.neg{
+  color: #B91C1C !important;            /* deeper red for contrast */
+  background: #FEE2E2;                  /* red‑50 */
+  border: 1px solid #FECACA;            /* red‑200 */
+  border-radius: 999px;
+  padding: 2px 8px;
+  line-height: 1.2;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+summary.day-summary .day-sub{position:absolute; right:0; bottom:6px; font-size:11px;color:var(--timestamp); opacity:.9; white-space:nowrap;}
 
 details.day{border:none!important;border-radius:0!important;padding-left:8px!important;margin:12px 0!important;background:transparent!important;}
 details.day.today summary.day-summary{width:calc(100% - 24px)!important;margin:4px 12px 4px 0!important;padding:8px 12px!important;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.06) 100%)!important;border:4px solid #fff;border-radius:12px!important;box-shadow:0 0 12px 2px rgba(255,255,255,.4);} 
-details.day.negative summary.day-summary{width:calc(100% - 24px)!important;margin:4px 12px 4px 0!important;padding:8px 12px!important;background:var(--glass-bg)!important;box-shadow:0 0 8px 0 rgba(255,64,64,.6)!important;border:2px solid rgba(255,64,64,.5);border-radius:6px!important;}
+/* Neutralize negative-day highlight: keep standard card visuals */
+details.day.negative summary.day-summary{
+  width: calc(100% - 24px) !important;
+  margin: 4px 12px 4px 0 !important;
+  padding: 8px 12px !important;
+  background: var(--glass-bg) !important;
+  box-shadow: none !important;      /* remove red glow */
+  border: none !important;          /* remove red border */
+  border-radius: 6px !important;    /* keep soft rounding */
+}
 
 /* Light theme: mirror the red negative highlight for day headers */
+/* Light theme: also neutralize negative-day highlight */
 html[data-theme="light"] details.day.negative summary.day-summary{
   width: calc(100% - 24px) !important;
   margin: 4px 12px 4px 0 !important;
   padding: 8px 12px !important;
   background: var(--bg-card) !important;
-  /* stronger blood-red highlight for negative days on light bg */
-  box-shadow: 0 0 10px 0 rgba(153, 27, 27, 0.50) !important; /* #991b1b @ 50% */
-  border: 2px solid #991b1b !important;
+  box-shadow: none !important;   /* remove red glow */
+  border: none !important;       /* remove red border */
   border-radius: 6px !important;
 }
 
@@ -2076,9 +2106,10 @@ html[data-theme="light"] details.day[open] > summary.day-summary::before{
 /* Replicate the dark-mode 'open' glow for day headers but toned for light bg */
 html[data-theme="light"] details.day[open] > summary.day-summary,
 html[data-theme="light"] summary.day-summary.active{
-  border: 2px solid rgba(31,111,72,0.14) !important;
+  /* Neutral open state in light theme */
+  border: 1px solid rgba(0,0,0,0.08) !important;
   background: var(--bg-card) !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08), 0 0 22px rgba(31,111,72,0.12) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important;
 }
 
 /* Slightly stronger glow when the open summary is hovered (keeps interaction feedback) */
@@ -4238,7 +4269,7 @@ details.day:not([open]) > .invoice{animation:fadeSlideOut .5s ease-in;}
 
 .day-title{font-weight:400;letter-spacing:-.2px;}
 .day-value{font-weight:600;}
-summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55), 0 0 12px #00FF0080;}
+summary.day-summary:hover{box-shadow:0 8px 24px rgba(0,0,0,.55);} 
 
 
 /* Modal Cartões: keep original card-list layout with swipe underneath */

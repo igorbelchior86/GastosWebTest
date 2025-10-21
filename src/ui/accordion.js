@@ -922,7 +922,19 @@ export function initAccordion(config) {
         if (iso === todayISO()) dDet.classList.add('today');
         const dSum = document.createElement('summary');
         dSum.className = 'day-summary';
-        const saldoFormatado = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 70px; height: 14px;"></span>' : safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // Prefer dual balances (projected vs available) if computed; fallback to legacy dayBalance
+        let projBalance = dayBalance;
+        let contaBalance = dayBalance;
+        try {
+          const db = (window.__gastos && window.__gastos.dailyBalances) || null;
+          if (db && db[iso]) {
+            const pb = Number(db[iso].projetado);
+            const cb = Number(db[iso].emConta);
+            if (Number.isFinite(pb)) projBalance = pb;
+            if (Number.isFinite(cb)) contaBalance = cb;
+          }
+        } catch (_) {}
+        const saldoFormatado = isSkeletonMode ? '<span class="skeleton skeleton-pill" style="width: 70px; height: 14px;"></span>' : safeFmtCurrency(projBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
         const hasCardDue = currentCards.some(card => card.due === d);
         const hasSalary = dayTx.some(t => SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w)));
@@ -930,8 +942,12 @@ export function initAccordion(config) {
         if (hasCardDue) labelParts.push('<span class="icon-invoice"></span>');
         if (hasSalary) labelParts.push('<span class="icon-salary"></span>');
         const labelWithDue = labelParts.join('');
-        dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
-        if (dayBalance < 0) dDet.classList.add('negative');
+        const startDt = (function(){ try { return (window.__gastos && window.__gastos.state && window.__gastos.state.startDate) || null; } catch(_) { return null; } })();
+        const showConta = !startDt || iso >= startDt;
+        const subSmall = isSkeletonMode ? '' : (showConta ? `<span class=\"day-sub\">Em conta: ${safeFmtCurrency(contaBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>` : '');
+        const balanceClass = (projBalance < 0) ? 'neg' : (projBalance > 0 ? 'pos' : 'zero');
+        dSum.innerHTML = `<span>${labelWithDue}</span><span class=\"right-col\"><span class=\"day-balance ${balanceClass}\">${saldoFormatado}</span>${subSmall}</span>`;
+        // Remove negative-day highlight by not tagging the element
         dDet.appendChild(dSum);
 
         if (budgetsFeature) {
@@ -1626,6 +1642,8 @@ export function initAccordion(config) {
         return true;
       });
     };
+    // Backward‑compat alias to match other render paths
+    const isBudgetTriggerTransaction = (tx) => isBudgetTriggerTx(tx);
     
     const openKeys = []; // No preserved open state for lazy loaded content
     const isSkeletonMode = false;
@@ -1707,7 +1725,19 @@ export function initAccordion(config) {
       
       const dSum = document.createElement('summary');
       dSum.className = 'day-summary';
-      const saldoFormatado = safeFmtCurrency(dayBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      // Prefer dual balances (projected vs available) if computed; fallback to legacy dayBalance
+      let projBalance = dayBalance;
+      let contaBalance = dayBalance;
+      try {
+        const db = (window.__gastos && window.__gastos.dailyBalances) || null;
+        if (db && db[iso]) {
+          const pb = Number(db[iso].projetado);
+          const cb = Number(db[iso].emConta);
+          if (Number.isFinite(pb)) projBalance = pb;
+          if (Number.isFinite(cb)) contaBalance = cb;
+        }
+      } catch (_) {}
+      const saldoFormatado = safeFmtCurrency(projBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const baseLabel = `${String(d).padStart(2,'0')} - ${dow.charAt(0).toUpperCase() + dow.slice(1)}`;
       const hasCardDue = currentCards.some(card => card.due === d);
       const hasSalary = dayTx.some(t => SALARY_WORDS.some(w => t.desc.toLowerCase().includes(w)));
@@ -1715,8 +1745,12 @@ export function initAccordion(config) {
       if (hasCardDue) labelParts.push('<span class="icon-invoice"></span>');
       if (hasSalary) labelParts.push('<span class="icon-salary"></span>');
       const labelWithDue = labelParts.join('');
-      dSum.innerHTML = `<span>${labelWithDue}</span><span class="day-balance" style="margin-left:auto">${saldoFormatado}</span>`;
-      if (dayBalance < 0) dDet.classList.add('negative');
+      const startDt = (function(){ try { return (window.__gastos && window.__gastos.state && window.__gastos.state.startDate) || null; } catch(_) { return null; } })();
+      const showConta = !startDt || iso >= startDt;
+      const subSmall = showConta ? `<span class=\"day-sub\">Em conta: ${safeFmtCurrency(contaBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>` : '';
+      const balanceClass = (projBalance < 0) ? 'neg' : (projBalance > 0 ? 'pos' : 'zero');
+      dSum.innerHTML = `<span>${labelWithDue}</span><span class=\"right-col\"><span class=\"day-balance ${balanceClass}\">${saldoFormatado}</span>${subSmall}</span>`;
+      // Remove negative-day highlight by not tagging the element
       dDet.appendChild(dSum);
       
       if (budgetsFeature) {

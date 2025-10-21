@@ -330,17 +330,23 @@ export function createStartRealtime(ctx) {
       listeners.push(onValue(startDateRef, (snap) => {
         const raw = snap.exists() ? snap.val() : null;
         const normalized = normalizeISODate ? normalizeISODate(raw) : raw;
+        // Strategy:
+        // - If remote provides a concrete date and local is empty, adopt it.
+        // - If remote is null/empty, preserve any local startDate set by the user.
+        if (!normalized) {
+          if (markHydrationTargetReady) markHydrationTargetReady('startDate');
+          return; // keep local value
+        }
         if (normalized === state.startDate) {
           if (markHydrationTargetReady) markHydrationTargetReady('startDate');
           return;
         }
         try {
-          // DO NOT apply startDate from Firebase - only set it if explicitly nil
-          // This allows retroactive transactions to work without forcing today's date
-          state.startDate = null;
-          try { cacheSet && cacheSet('startDate', null); } catch (_) {}
-          ensureStartSetFromBalance && ensureStartSetFromBalance({ persist: false, refresh: false });
-          initStart && initStart();
+          if (!state.startDate) {
+            state.startDate = normalized;
+            try { cacheSet && cacheSet('startDate', normalized); } catch (_) {}
+            initStart && initStart();
+          }
           // Don't call renderTable here - let the transaction listener handle it
         } finally {
           if (markHydrationTargetReady) markHydrationTargetReady('startDate');
