@@ -4715,3 +4715,49 @@ html[data-theme="dark"] .year-indicator {
 }
 /* Monochrome SVG icons using CSS mask (matches app icon style) */
 /* Drop pseudo-element mask approach: use existing icon classes */
+
+/* ===================== PREMIUM MODAL ANIMATIONS ===================== */
+@keyframes modalEnterPremium {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    backdrop-filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    backdrop-filter: blur(20px) saturate(160%);
+  }
+}
+
+@keyframes modalExitPremium {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    backdrop-filter: blur(20px) saturate(160%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+    backdrop-filter: blur(0px);
+  }
+}
+
+/* Aplicar animações ao abrir/fechar modais */
+.bottom-modal-box:not(.hidden) {
+  animation: modalEnterPremium 0.45s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.bottom-modal-box.hidden {
+  animation: modalExitPremium 0.35s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* Respeitar preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  .bottom-modal-box:not(.hidden),
+  .bottom-modal-box.hidden {
+    animation: none !important;
+    transform: scale(1) translateY(0) !important;
+    opacity: 1 !important;
+  }
+}
