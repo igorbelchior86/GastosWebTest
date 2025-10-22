@@ -252,11 +252,25 @@ export function initAccordion(config) {
         };
         results.push(synthetic);
         // Mark a concrete transaction on this day as the trigger so lists can hide it
+        // Prefer the most significant transaction (largest absolute value) when
+        // multiple transactions share the same budget tag on the same day. This
+        // avoids tiny rounding/test transactions being chosen as the trigger and
+        // therefore hidden from the executed list.
         if (triggerSet && Array.isArray(dayTx)) {
-          const trig = dayTx.find(t => t && t.budgetTag === tag);
-          if (trig) {
-            try { triggerSet.add(trig); } catch (_) {}
-          }
+          try {
+            const candidates = (dayTx || []).filter(t => t && t.budgetTag === tag);
+            let trig = null;
+            if (candidates.length === 1) {
+              trig = candidates[0];
+            } else if (candidates.length > 1) {
+              trig = candidates.reduce((best, cur) => {
+                const a = Math.abs(Number(best && best.val) || 0);
+                const b = Math.abs(Number(cur && cur.val) || 0);
+                return b > a ? cur : best;
+              }, candidates[0]);
+            }
+            if (trig) triggerSet.add(trig);
+          } catch (_) {}
         }
         if (budgetTriggerIds) budgetTriggerIds.add(String(master.id));
         if (budgetTriggersByIso) {

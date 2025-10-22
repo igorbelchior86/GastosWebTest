@@ -316,7 +316,7 @@ export function setupBudgetPanorama(ctx = {}) {
       try { return parseFloat(getComputedStyle(area).height) || 160; } catch (_) { return (area?.clientHeight || 160); }
     })();
     const bottomPad = 12; // baseline + label area (matches CSS)
-    const topPad = 20;    // tighter clearance under title
+    const topPad = 28;    // extra clearance so value label nunca corta
     const val = Math.max(0, Number(value || 0));
     const m = Math.max(1, Number(max || 1));
     const inner = Math.max(8, chartHeight - bottomPad - topPad);
@@ -335,9 +335,9 @@ export function setupBudgetPanorama(ctx = {}) {
         valEl.textContent = (opts && opts.format) ? opts.format(val) : String(val);
       } catch (_) { valEl.textContent = String(val); }
       // Compute offset using computed styles (works even when element is hidden)
-      let gap = 10;
+      let gap = 12; // harmoniza com CSS e dá mais respiro
       try { const cs = getComputedStyle(colEl); gap = parseFloat(cs.rowGap) || gap; } catch (_) {}
-      let labelH = 16, labelMb = 6;
+      let labelH = 16, labelMb = 8;
       try {
         const ls = getComputedStyle(labelEl);
         const fs = parseFloat(ls.fontSize) || 16;
@@ -345,7 +345,7 @@ export function setupBudgetPanorama(ctx = {}) {
         labelH = Number.isFinite(lh) ? lh : Math.round(fs * 1.25);
         labelMb = parseFloat(ls.marginBottom) || 6;
       } catch (_) {}
-      const offset = h + gap + labelH + labelMb + 6;
+      const offset = h + gap + labelH + labelMb + 8; // +2px para telas com DP alto
       valEl.style.top = '';
       valEl.style.bottom = `${offset}px`;
       valEl.style.pointerEvents = 'none';
@@ -504,12 +504,12 @@ export function setupBudgetPanorama(ctx = {}) {
     }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     const width = displayWidth;
-    const height = displayHeight - 24; // reserve bottom strip for HTML labels
+    const height = displayHeight - 8; // ultra‑tight bottom gap
     ctx.clearRect(0, 0, width, height);
     // Horizontal padding matches labels padding; vertical paddings are tighter to bring bars closer to labels
-    const hPad = 24;
-    const topPad = 10;
-    const bottomPad = 8;
+    const hPad = 16;
+    const topPad = 4;
+    const bottomPad = 0;
     const n = data.length;
     const colW = (width - hPad * 2) / n;
     const barWidth = Math.max(8, Math.min(28, colW * 0.35));
@@ -571,8 +571,8 @@ function ensureStyles() {
     .panorama-content .widget .chart-area{position:relative;height:180px; overflow:hidden}
     .panorama-content .widget .bars.chart{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:flex-end;padding:16px 10px 14px;gap:24px}
     /* Yearly view overlays in the same fixed area without any box styling */
-    .panorama-content .widget .yearly-canvas{position:absolute;left:0;right:0;top:0;bottom:24px;background:transparent !important;padding:0 !important;border-radius:0 !important}
-    .panorama-content .widget .yearly-labels{position:absolute;left:0;right:0;bottom:0;height:24px;display:grid;grid-template-columns:repeat(6,1fr);align-items:center;font-size:11px;color:rgba(255,255,255,0.75);text-align:center;letter-spacing:.02em;padding:0 24px;box-sizing:border-box}
+    .panorama-content .widget .yearly-canvas{position:absolute;left:0;right:0;top:0;bottom:6px;background:transparent !important;padding:0 !important;border-radius:0 !important}
+    .panorama-content .widget .yearly-labels{position:absolute;left:0;right:0;bottom:0;height:10px;display:grid;grid-template-columns:repeat(6,1fr);align-items:center;font-size:10px;color:rgba(255,255,255,0.80);text-align:center;letter-spacing:.02em;padding:0 8px;box-sizing:border-box}
     .panorama-content .widget .yearly-labels .mcell{white-space:nowrap}
     .panorama-content .widget .swap{transition:opacity .24s ease, transform .24s ease; will-change:opacity,transform}
     .panorama-content .widget .is-hidden{opacity:0; pointer-events:none; transform:translateY(6px) scale(.995)}

@@ -117,7 +117,17 @@ export async function save(key, value) {
   if (useMock || !firebaseDb || !PATH) return mockSave(key, value);
   try {
     const remoteKey = scopedDbSegment(key);
-    const res = await set(ref(firebaseDb, `${PATH}/${remoteKey}`), value);
+    // Defensive: Firebase RTDB rejects undefined values inside the payload.
+    // JSON round‑trip the value to strip undefined properties from objects and
+    // convert undefined array entries to null. If serialization fails, fall
+    // back to the original value and let the underlying SDK validate it.
+    let payload = value;
+    try {
+      payload = JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      payload = value;
+    }
+    const res = await set(ref(firebaseDb, `${PATH}/${remoteKey}`), payload);
     // Success: remove key from profile-scoped dirty queue
     try {
       const dq = Array.isArray(cacheGet('dirtyQueue', [])) ? cacheGet('dirtyQueue', []) : [];

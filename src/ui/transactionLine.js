@@ -332,6 +332,8 @@ export function initTransactionLine(deps) {
 
       /* Second line */
       .sub-row{ display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#B3B3B3; margin-top:4px; }
+      /* Ensure timestamp and tag are vertically centered */
+      .sub-row .timestamp{ display:inline-flex; align-items:center; height:20px; line-height:20px; font-size:13px; color:inherit; }
       html[data-theme="light"] .sub-row{ color:#6b7280; }
 
       /* Round bullet divider between title and icon (spacing via flex gap) */
