@@ -21,7 +21,9 @@ export function setupBudgetAutocomplete(ctx = {}) {
   panel.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
   panel.addEventListener('touchstart', (e) => { e.stopPropagation(); }, { passive: true });
   panel.addEventListener('touchmove', (e) => { e.stopPropagation(); }, { passive: false });
-  txModal.appendChild(panel);
+  // Anchor the panel to the scrollable content so it moves with the field
+  const scrollHost = txModal.querySelector('.modal-content') || txModal;
+  scrollHost.appendChild(panel);
 
   let open = false;
 
@@ -83,7 +85,8 @@ export function setupBudgetAutocomplete(ctx = {}) {
   function positionPanel() {
     if (!descInput) return;
     const r = descInput.getBoundingClientRect();
-    const host = txModal.getBoundingClientRect();
+    const hostEl = txModal.querySelector('.modal-content') || txModal;
+    const host = hostEl.getBoundingClientRect();
     const top = r.bottom - host.top + 6;
     const left = r.left - host.left;
     panel.style.top = `${top}px`;

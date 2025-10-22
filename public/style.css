@@ -310,6 +310,11 @@ html[data-theme="light"] #backdrop-base {
   background-color: var(--bg-main) !important;
 }
 
+/* Planned modal: disable horizontal scrolling only in this sheet */
+#plannedModal, #plannedModal .bottom-modal-box, #plannedModal .modal-content {
+  overflow-x: hidden !important;
+}
+
 /* Light theme: reduce bottom padding so no visible gap remains */
 html[data-theme="light"] .wrapper {
   padding-bottom: calc(56px + var(--safe-area-bottom));
@@ -1799,6 +1804,9 @@ summary.day-summary .icon-invoice::before{
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
+
+/* Ensure confirm-delete modal always stacks above other sheets (e.g., Panorama) */
+#confirmDeleteModal.bottom-modal { z-index: 2000 !important; }
 
 /* Caixa do modal: vidro escuro com leve textura/gradiente */
 /* For the primary bottom sheet modals (transactions, cards, planned items
@@ -3382,6 +3390,9 @@ html[data-theme="light"] .month-lazy-placeholder .lazy-loading{
   padding: 0;
   display: flex;
   flex-direction: column;
+  position: relative;        /* anchor budget autocomplete panel */
+  overflow-x: visible;       /* allow dropdown to overflow horizontally */
+  overflow-y: auto;          /* preserve vertical scrolling inside modal */
 }
 
 /* ===================== Premium look for Transaction Modal (visual-only) ===================== */
@@ -4036,6 +4047,13 @@ html[data-theme="light"] #cardModal .card-label{ color:#4b5563; }
 html[data-theme="light"] #cardModal .card-value{ color:#111; }
 html[data-theme="light"] #cardModal .card-content b{ color:#111; }
 
+/* Dark theme: empty state text inside Card modal */
+#cardModal .card-empty{
+  color: rgba(255,255,255,0.85);
+  text-align: center;
+  margin: 12px 0;
+}
+
 /* ===================== LIGHT THEME — PLANNED MODAL ===================== */
 /* ===================== LIGHT THEME — CONFIRM MOVE MODAL ===================== */
 html[data-theme="light"] #confirmMoveModal .bottom-modal-box{
@@ -4082,6 +4100,23 @@ html[data-theme="light"] #confirmResetModal #confirmResetText{ color:#111 !impor
 html[data-theme="light"] #confirmResetModal #confirmResetYes{ background:#ef4444; color:#fff; border:1px solid rgba(0,0,0,0.06); }
 html[data-theme="light"] #confirmResetModal #confirmResetNo{ background:#fff; color:#6b7280; border:1px solid rgba(0,0,0,0.06); }
 
+/* ===================== LIGHT THEME — CONFIRM DELETE MODAL ===================== */
+html[data-theme="light"] #confirmDeleteModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.88) 60%), rgba(255,255,255,0.88) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.10);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.16);
+}
+html[data-theme="light"] #confirmDeleteModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #confirmDeleteModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #confirmDeleteModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #confirmDeleteModal .modal-drag{ background:#d0d0d0; }
+html[data-theme="light"] #confirmDeleteModal #deleteMessage{ color:#111 !important; text-shadow:none; }
+/* Primary/secondary buttons */
+html[data-theme="light"] #confirmDeleteModal #confirmDeleteYes{ background:#ef4444; color:#fff; border:1px solid rgba(0,0,0,0.06); }
+html[data-theme="light"] #confirmDeleteModal #confirmDeleteNo{ background:#fff; color:#6b7280; border:1px solid rgba(0,0,0,0.06); }
+
 
 /* ===================== LIGHT THEME — DELETE RECURRENCE MODAL ===================== */
 html[data-theme="light"] #deleteRecurrenceModal .bottom-modal-box{
@@ -4121,6 +4156,13 @@ html[data-theme="light"] #plannedModal h2{ color:#111; text-shadow:none; }
 html[data-theme="light"] #plannedModal .modal-close-btn{ color:#111; opacity:.7; }
 html[data-theme="light"] #plannedModal .modal-close-btn:hover{ opacity:1; }
 html[data-theme="light"] #plannedModal .modal-drag{ background:#cfcfcf; }
+/* Light theme overrides for Budget Edit modals */
+html[data-theme="light"] #budgetEditModal .modal-close-btn,
+html[data-theme="light"] #budgetRecurringModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #budgetEditModal .modal-close-btn:hover,
+html[data-theme="light"] #budgetRecurringModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #budgetEditModal .modal-drag,
+html[data-theme="light"] #budgetRecurringModal .modal-drag{ background:#cfcfcf; }
 
 /* Headings and day labels */
 html[data-theme="light"] #plannedModal .subheader,
@@ -4149,6 +4191,19 @@ html[data-theme="light"] #plannedModal .planned-list .op-left input.plan-check:c
   background: var(--blue);
   border-color: var(--blue);
 }
+
+/* ===================== LIGHT THEME — PANORAMA MODAL ===================== */
+html[data-theme="light"] #panoramaModal .bottom-modal-box{
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.80) 60%), rgba(255,255,255,0.80) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+html[data-theme="light"] #panoramaModal h2{ color:#111; text-shadow:none; }
+html[data-theme="light"] #panoramaModal .modal-close-btn{ color:#111; opacity:.7; }
+html[data-theme="light"] #panoramaModal .modal-close-btn:hover{ opacity:1; }
+html[data-theme="light"] #panoramaModal .modal-drag{ background:#cfcfcf; }
 
 /* Values: flat colors (override gradient text) */
 html[data-theme="light"] #plannedModal .planned-list .op-right .value{ color:#111; background:none; -webkit-text-fill-color: initial; font-weight:700; }

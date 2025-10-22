@@ -26,6 +26,12 @@ function ensureStyles(){
       background: var(--tx-field-bg) !important;
     }
     #budgetEditModal ::placeholder { color: rgba(255,255,255,0.65); }
+    /* Slightly smaller date text to avoid overlap with icon */
+    #budgetEditModal input[type="date"]{ font-size: 0.9rem; }
+    #budgetEditModal input[type="date"]::-webkit-datetime-edit{ font-size: 0.9rem; }
+    #budgetEditModal input[type="date"]::-webkit-datetime-edit-year-field,
+    #budgetEditModal input[type="date"]::-webkit-datetime-edit-month-field,
+    #budgetEditModal input[type="date"]::-webkit-datetime-edit-day-field{ font-size: 0.9rem; }
     html[data-theme="light"] #budgetEditModal input[type="text"],
     html[data-theme="light"] #budgetEditModal input[type="date"]{
       background:#f3f4f6 !important; border:1px solid rgba(0,0,0,0.06) !important; color:#111;
@@ -73,6 +79,8 @@ function ensureStyles(){
       box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
     }
     html[data-theme="light"] #budgetRecurringModal .currency-input{ background:#f3f4f6 !important; border:1px solid rgba(0,0,0,0.06) !important; color:#111; box-shadow: inset 0 2px 6px rgba(0,0,0,0.04) !important; }
+    /* Recorrente: light theme for value-input-wrapper input (actual element) */
+    html[data-theme="light"] #budgetRecurringModal .value-input-wrapper input{ background:#f3f4f6 !important; border:1px solid rgba(0,0,0,0.06) !important; color:#111 !important; box-shadow: inset 0 2px 6px rgba(0,0,0,0.04) !important; }
     html[data-theme="light"] #budgetRecurringModal ::placeholder{ color: #6b7280; }
 
     /* Also unify style for ad‑hoc modal input */

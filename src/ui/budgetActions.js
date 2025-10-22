@@ -1,4 +1,5 @@
 import { removeAdHocBudget, closeRecurringBudget, endRecurrence } from '../services/budgetEditor.js';
+import { askConfirmDelete } from './modalHelpers.js';
 
 function ensureStyles(){
   if (document.getElementById('budget-actions-styles')) return;
@@ -63,6 +64,10 @@ export function attachBudgetActions(cardEl, budget, ctx = {}){
       mod.openEditBudgetModal(budget, { afterChange });
     });
     addItem('Excluir', async () => {
+      try {
+        const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
+        if (!ok) return;
+      } catch (_) { /* fallback to proceed */ }
       await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
     });
     addItem('Histórico', async () => {
@@ -74,9 +79,17 @@ export function attachBudgetActions(cardEl, budget, ctx = {}){
       mod.openEditRecurringValueModal(budget);
     });
     addItem('Fechar ciclo', async () => {
+      try {
+        const ok = await askConfirmDelete(`fechar o ciclo do orçamento "${budget.tag}"`);
+        if (!ok) return;
+      } catch (_) {}
       await closeRecurringBudget(budget);
     });
     addItem('Encerrar recorrência', async () => {
+      try {
+        const ok = await askConfirmDelete(`encerrar a recorrência do orçamento "${budget.tag}"`);
+        if (!ok) return;
+      } catch (_) {}
       await endRecurrence(budget, commonCtx);
     });
     addItem('Histórico', async () => {
@@ -134,6 +147,10 @@ export function attachBudgetSwipe(cardEl, budget, ctx = {}){
       mod.openEditBudgetModal(budget, { afterChange: refresh });
     }, 'Editar orçamento'));
     actions.appendChild(mkBtn('icon-delete', async () => {
+      try {
+        const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
+        if (!ok) return;
+      } catch (_) {}
       const { removeAdHocBudget } = await import('../services/budgetEditor.js');
       await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
       refresh();
@@ -144,6 +161,10 @@ export function attachBudgetSwipe(cardEl, budget, ctx = {}){
       mod.openEditRecurringValueModal(budget);
     }, 'Editar valor do ciclo'));
     actions.appendChild(mkBtn('icon-delete', async () => {
+      try {
+        const ok = await askConfirmDelete(`encerrar a recorrência do orçamento "${budget.tag}"`);
+        if (!ok) return;
+      } catch (_) {}
       const { endRecurrence } = await import('../services/budgetEditor.js');
       await endRecurrence(budget, commonCtx); refresh();
     }, 'Encerrar recorrência'));

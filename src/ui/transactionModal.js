@@ -636,9 +636,16 @@ export async function addTx() {
           t.postDate   = computePostDate(newOpDate, newMethod);
           if (recurrence) t.recurrence   = newRecurrence;
           if (installments) t.installments = newInstallments;
-          // Ajusta flag planned caso a data da operação ainda não tenha ocorrido
-          const autoPlanned = t.opDate > todayFn();
-          t.planned      = originalPlanned ? autoPlanned : false;
+          // Ajusta flag planned respeitando o toggle de status do modal
+          try {
+            const group = document.querySelector('.paid-toggle');
+            const active = group ? group.querySelector('.seg-option.active') : null;
+            const markAsPaid = active ? (active.dataset.paid === '1') : true;
+            t.planned = !markAsPaid;
+          } catch (_) {
+            // Fallback: se não houver controle, considerar futura como planejada
+            t.planned = (t.opDate > todayFn());
+          }
           t.modifiedAt   = new Date().toISOString();
           t.budgetTag    = newBudgetTag;
           tryUpsertBudget(t, {
