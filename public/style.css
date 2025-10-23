@@ -310,8 +310,18 @@ html[data-theme="light"] #backdrop-base {
   background-color: var(--bg-main) !important;
 }
 
-/* Planned modal: disable horizontal scrolling only in this sheet */
-#plannedModal, #plannedModal .bottom-modal-box, #plannedModal .modal-content {
+/* Disable horizontal scrolling in ALL modals */
+.bottom-modal,
+.bottom-modal-box,
+.modal-content,
+#txModal,
+#cardModal,
+#plannedModal,
+#settingsModal,
+#confirmModal,
+#yearSelectModal,
+#yearModal,
+#currencyProfileModal {
   overflow-x: hidden !important;
 }
 
