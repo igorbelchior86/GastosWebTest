@@ -265,6 +265,36 @@ const settingsApi = setupSettings(settingsModalEl);
 let isPayInvoiceMode=false,pendingInvoiceCtx=null;
 
 const openPlannedBtn=document.getElementById('openPlannedBtn'),plannedModal=document.getElementById('plannedModal'),closePlannedModal=document.getElementById('closePlannedModal'),plannedList=document.getElementById('plannedList'),headerSeg=document.querySelector('.header-seg');
+
+/**
+ * Close ALL open modals (pseudo-footer priority: these 3 buttons take precedence)
+ */
+function closeAllModals() {
+  console.log('[main.js] closeAllModals() called');
+  const modals = [
+    'txModal',
+    'cardModal',
+    'plannedModal',
+    'settingsModal',
+    'yearModal',
+    'panoramaModal',
+    'currencyProfileModal',
+    'deleteRecurrenceModal',
+    'editRecurrenceModal',
+    'confirmMoveModal',
+    'confirmLogoutModal',
+    'confirmResetModal'
+  ];
+  modals.forEach(id => {
+    const modal = document.getElementById(id);
+    if (modal && !modal.classList.contains('hidden')) {
+      console.log(`[main.js] Closing modal: ${id}`);
+      modal.classList.add('hidden');
+    }
+  });
+  updateModalOpenState && updateModalOpenState();
+}
+
 function renderSettingsModal() {
   return settingsApi.renderSettings();
 }
@@ -392,7 +422,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.4.10(c01)';
+const APP_VERSION = 'v1.4.10(c04)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1713,6 +1743,7 @@ try {
     scrollTodayIntoView,
     openSettings,
     closeSettings,
+    closeAllModals,
     settingsModalEl,
     closeSettingsModalBtn,
     updateModalOpenState,
