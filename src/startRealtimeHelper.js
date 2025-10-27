@@ -70,6 +70,8 @@ export function createStartRealtime(ctx) {
       saveBudgets,
       refreshBudgetCache,
       rebuildBudgetsByTag,
+      // budget materialization
+      rebuildMaterializationCache,
     } = ctx || {};
 
     // Resolve the current PATH for database access. If getPath is
@@ -215,6 +217,8 @@ export function createStartRealtime(ctx) {
           }
           sortTransactions && sortTransactions();
           renderTable && renderTable();
+          // Rebuild materialization cache after transactions update
+          try { rebuildMaterializationCache && rebuildMaterializationCache(getTransactions ? getTransactions() : transactionsRef.get()); } catch (_) {}
           // If Panorama is open, refresh it to mirror accordion calculations
           try {
             const pano = typeof document !== 'undefined' ? document.getElementById('panoramaModal') : null;

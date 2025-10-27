@@ -47,6 +47,8 @@ import { closeExpiredBudgets, initDayChangeWatcher, ensureRecurringBudgets } fro
 import { extractFirstHashtag } from './utils/tag.js';
 import { isBudgetsEnabled, isPanoramaEnabled, getFeatureFlagsApi } from './config/features.js';
 import { computeDailyBalances as computeDailyBalancesHelper } from './utils/dailyBalances.js';
+import { generateBudgetMaterializationTransactions, rebuildMaterializationCache } from './services/budgetMaterialization.js';
+import { injectBudgetMaterializationTransactions } from './utils/materializationInjector.js';
 
 //
 import { setupMainEventHandlers } from './uiEventHandlers.js';
@@ -634,6 +636,8 @@ if (!USE_MOCK) {
     saveBudgets,
     refreshBudgetCache,
     rebuildBudgetsByTag,
+    // budget materialization
+    rebuildMaterializationCache,
   });
   startRealtimeFn = startRealtime;
 
@@ -715,6 +719,9 @@ if (!USE_MOCK) {
     initStart(); renderTable();
   }
   try { computeMonthlyTotals(transactions); rebuildBudgetsByTag(transactions); } catch (_) {}
+
+  // Initialize budget materialization cache after hydration
+  try { rebuildMaterializationCache(transactions); } catch (_) {}
 
   completeHydration();
 }
@@ -1606,7 +1613,12 @@ function renderTable(){
   // before rendering so the day-headers can use them instead of the
   // legacy single running balance fallback.
   try {
-    const txs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
+    let txs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
+    // Apply budget materialization transactions for balance calculations
+    // These are temporary injections that don't persist to storage
+    try {
+      txs = injectBudgetMaterializationTransactions(txs);
+    } catch (_) {}
     const res = computeDailyBalancesHelper(txs, state.startBalance, state.startDate, { ignoreInvoiceMeta: true });
     try { if (window.__gastos) window.__gastos.dailyBalances = res.byDay; } catch (_) {}
   } catch (_) {}
@@ -1640,9 +1652,19 @@ function renderTransactionGroups(groups){accordionApi.renderAccordion();}
 
 
 
+// Create a wrapped getTransactions that includes budget materializations
+const getTransactionsWithMaterializations = () => {
+  try {
+    const txs = typeof getTransactions === 'function' ? getTransactions() : transactions;
+    return injectBudgetMaterializationTransactions(txs);
+  } catch (_) {
+    return typeof getTransactions === 'function' ? getTransactions() : transactions;
+  }
+};
+
 const { txByDate, calculateDateRange } = initTxUtils({
   cards,
-  getTransactions,
+  getTransactions: getTransactionsWithMaterializations,
   transactions,
   post,
   occursOn,
@@ -1678,11 +1700,8 @@ const accordionApi = initAccordion({
   isBudgetsFeatureEnabled: isBudgetsEnabled,
 });
 
-// NOTE: renderTable() is deferred until hydration completes.
-// Calling it here would render 0 transactions since Firebase hasn't loaded yet.
-// The actual initial render is triggered by renderTable() in startRealtimeHelper.js
-// or via subscribeState listeners after data loads.
-
+// Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
+renderTable();
 // Close past-due budgets on app open
   try { runDailyBudgetMaintenance(); } catch (_) {}
   // Kick a reconciliation in the background to align devices after startup
