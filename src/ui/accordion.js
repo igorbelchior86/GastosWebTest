@@ -493,8 +493,9 @@ export function initAccordion(config) {
     const { minDate, maxDate } = calculateDateRange();
     // Use the getTransactions that was passed during initialization
     // (it should already be getTransactionsWithMaterializations if passed from main)
-    const txCount = (typeof getTransactions === 'function' ? getTransactions() : transactions || []).length;
-    console.log(`📊 Balance: Computing for ${txCount} transaction(s), range ${minDate} to ${maxDate}`);
+    const txList = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+    const txCount = txList?.length || 0;
+    console.log(`📊 Balance: Computing for ${txCount} transaction(s), range ${minDate} to ${maxDate}`, 'Details:', txList.map(t => ({ id: t?.id, desc: t?.desc, val: t?.val })));
     // Build a quick lookup of budget trigger transactions to avoid
     // double-counting: the trigger reserves value via reservedAdjustment
     // and should NOT impact cash on the opDate.
@@ -528,7 +529,7 @@ export function initAccordion(config) {
     const startDateObj = parseISO(effectiveMinDate);
     const endDateObj = parseISO(maxDate);
     
-    const txs = typeof getTransactions === 'function' ? getTransactions() : transactions || [];
+    // txList já foi definido acima
     for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
       const iso = formatToISO(current);
       
