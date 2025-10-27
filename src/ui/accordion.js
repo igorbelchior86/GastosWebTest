@@ -368,6 +368,11 @@ export function initAccordion(config) {
     const startIso = normalizeBudgetDate(budget.startDate);
     const endIso   = normalizeBudgetDate(budget.endDate);
     
+    // For synthetic/recurring budgets, use dayTransactions if available; otherwise fall back to allTxs
+    const sourceTxs = (budget.isSynthetic || budget.budgetType === 'recurring') && Array.isArray(dayTransactions) 
+      ? dayTransactions 
+      : allTxs;
+    
     const spentValue = (sourceTxs || []).reduce((sum, tx) => {
       if (!tx || tx.budgetTag !== budget.tag) return sum;
       if (trigId && String(tx.id) === trigId) return sum; // não contar a reserva
