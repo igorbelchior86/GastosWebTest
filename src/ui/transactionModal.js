@@ -413,7 +413,9 @@ export async function addTx() {
     const originalISO = originalTx && originalTx.opDate;
     const isMaster = !!(originalTx && originalTx.recurrence && String(originalTx.recurrence).trim());
     const isChild = !!(originalTx && originalTx.parentId);
-    if ((isMaster || isChild) && originalISO && newISO !== originalISO) {
+    // When in 'single' or 'future' mode, don't validate against originalISO because the user
+    // may be editing a specific occurrence whose date differs from the master's opDate
+    if (!(mode === 'single' || mode === 'future') && (isMaster || isChild) && originalISO && newISO !== originalISO) {
       return 'A data é controlada pela recorrência e não pode ser alterada.';
     }
     return null;
