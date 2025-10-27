@@ -1678,8 +1678,11 @@ const accordionApi = initAccordion({
   isBudgetsFeatureEnabled: isBudgetsEnabled,
 });
 
-// Renderizar o accordion imediatamente (com shimmer nos valores durante hidratação)
-renderTable();
+// NOTE: renderTable() is deferred until hydration completes.
+// Calling it here would render 0 transactions since Firebase hasn't loaded yet.
+// The actual initial render is triggered by renderTable() in startRealtimeHelper.js
+// or via subscribeState listeners after data loads.
+
 // Close past-due budgets on app open
   try { runDailyBudgetMaintenance(); } catch (_) {}
   // Kick a reconciliation in the background to align devices after startup
