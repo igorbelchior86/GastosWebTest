@@ -473,7 +473,9 @@ export async function addTx() {
           }
         : (a, b) => String(a) === String(b);
       const recurrenceActive = isRecurrenceActive(newRecurrence);
-      if (recurrenceActive && isFutureDate(newOpDate)) {
+      // Only validate future date with recurrence if NOT in edit-mode for an existing recurring transaction
+      // When editing via single/future/all mode, the user is editing a specific occurrence, not the master
+      if (recurrenceActive && isFutureDate(newOpDate) && !currentEditMode) {
         const msg = !isRecurrenceActive(t.recurrence)
           ? 'Um orçamento com data futura não pode ser recorrente. Escolha apenas uma das opções.'
           : 'A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.';
@@ -886,7 +888,9 @@ export async function addTx() {
       const newInstallments = parseInt(installments && installments.value, 10) || 1;
       const newBudgetTag = normalizeTag((window.__gastos?.pendingBudgetTag) || extractFirstHashtag(newDesc));
       const recurrenceActive = isRecurrenceActive(newRecurrence);
-      if (recurrenceActive && isFutureDate(newOpDate)) {
+      // Only validate future date with recurrence if NOT in edit-mode for an existing recurring transaction
+      // When editing via single/future/all mode, the user is editing a specific occurrence, not the master
+      if (recurrenceActive && isFutureDate(newOpDate) && !g.pendingEditMode) {
         if (blockMessage('A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.')) {
           return;
         }

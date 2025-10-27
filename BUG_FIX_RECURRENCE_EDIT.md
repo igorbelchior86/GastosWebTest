@@ -83,6 +83,22 @@ Agora o usuário consegue editar transações recorrentes normalmente:
 - `fix: corrige validação de data ao editar recorrência (single/future mode)` - Correção principal
 - `fix: corrige cálculo de saldo com transações recorrentes e timezones (DST boundary)` - Bug anterior de saldo
 
+## Correções Adicionais (Segundo Erro)
+
+### Erro: "A data selecionada é incompatível com recorrências"
+Após corrigir o primeiro erro, o usuário ainda recebia mensagem: **"A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência."**
+
+**Causa:** Havia outra validação que checava se a transação tem recorrência E data futura, impedindo edição de ocorrências futuras.
+
+**Solução:** Adicionado check de `currentEditMode` (ou `g.pendingEditMode`) para pular essa validação quando está editando uma ocorrência específica via modal de escopo.
+
+**Locais corrigidos em `transactionModal.js`:**
+- Linha ~476-482: Bloco de edição
+- Linha ~891-895: Bloco de adição
+
 ## Notas Técnicas
 - A validação ainda mantém o check para modo `'single'/'future'` para garantir que a data não seja mudada **para uma data diferente** da ocorrência selecionada (linha 411)
-- Apenas removemos a validação redundante que checava contra o `master.opDate` quando em modo de edição de ocorrência específica
+- As validações de "data futura + recorrência" agora respeitam `pendingEditMode`:
+  - Se `pendingEditMode` está setado (single/future/all), pula validação
+  - Se `pendingEditMode` é null/undefined, aplica validação normalmente
+- Isso permite que usuários editem ocorrências futuras de transações recorrentes sem erro
