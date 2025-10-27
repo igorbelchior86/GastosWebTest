@@ -491,7 +491,17 @@ export function initAccordion(config) {
    */
   function buildRunningBalanceMap() {
     const { minDate, maxDate } = calculateDateRange();
-    const txCount = (getTransactions ? getTransactions() : transactions).length;
+    // Prefer wrapped getTransactions with materializations if available
+    const resolveGetTransactions = () => {
+      try {
+        if (typeof window !== 'undefined' && window.__gastos && typeof window.__gastos.getTransactionsWithMaterializations === 'function') {
+          return window.__gastos.getTransactionsWithMaterializations;
+        }
+      } catch (_) {}
+      return getTransactions || (() => transactions);
+    };
+    const effectiveGetTransactions = resolveGetTransactions();
+    const txCount = (effectiveGetTransactions ? effectiveGetTransactions() : transactions).length;
     console.log(`📊 Balance: Computing for ${txCount} transaction(s), range ${minDate} to ${maxDate}`);
     // Build a quick lookup of budget trigger transactions to avoid
     // double-counting: the trigger reserves value via reservedAdjustment
@@ -526,7 +536,7 @@ export function initAccordion(config) {
     const startDateObj = parseISO(effectiveMinDate);
     const endDateObj = parseISO(maxDate);
     
-    const txs = getTransactions ? getTransactions() : transactions;
+    const txs = effectiveGetTransactions ? effectiveGetTransactions() : transactions;
     for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
       const iso = formatToISO(current);
       

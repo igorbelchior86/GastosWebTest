@@ -1679,6 +1679,8 @@ try {
   if (window.__gastos) {
     window.__gastos.txByDate = txByDate;
     window.__gastos.calculateDateRange = calculateDateRange;
+    // Expose wrapped getTransactions with materializations
+    window.__gastos.getTransactionsWithMaterializations = getTransactionsWithMaterializations;
   }
 } catch (_) {}
 
