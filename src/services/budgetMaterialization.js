@@ -86,7 +86,8 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
   const newTransactions = [];
 
   budgets.forEach((budget) => {
-    if (!budget || budget.status !== 'active' || budget.budgetType !== 'recurring') {
+    // Support BOTH 'recurring' and 'ad-hoc' budget types
+    if (!budget || budget.status !== 'active' || (budget.budgetType !== 'recurring' && budget.budgetType !== 'ad-hoc')) {
       return;
     }
 
