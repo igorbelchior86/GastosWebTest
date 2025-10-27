@@ -23,6 +23,8 @@ export function resetTxModal() {
     // Reset form fields
     if (val) val.value = '';
     if (desc) desc.value = '';
+    const date = document.getElementById('opDate');
+    if (date) date.value = new Date().toISOString().split('T')[0]; // Reset to today
     if (method && method.options.length > 0) method.selectedIndex = 0;
     if (recurrence) recurrence.value = '';
 
