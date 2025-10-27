@@ -361,19 +361,12 @@ export function initAccordion(config) {
 
     // Match Panorama card logic exactly: compute period spending on UI,
     // ignoring only the trigger (reserva) by id; end is inclusive.
-    // IMPORTANT: For recurring budgets with children (materialized by txByDate),
-    // prefer dayTransactions which includes these children. Fall back to allTxs for non-recurring budgets.
     const allTxs = (typeof getTransactions === 'function' ? getTransactions() : transactions) || [];
     const trigId = budget && budget.triggerTxId != null ? String(budget.triggerTxId) : null;
     const startIso = normalizeBudgetDate(budget.startDate);
     const endIso   = normalizeBudgetDate(budget.endDate);
     
-    // For synthetic/recurring budgets, use dayTransactions if available; otherwise fall back to allTxs
-    const sourceTxs = (budget.isSynthetic || budget.budgetType === 'recurring') && Array.isArray(dayTransactions) 
-      ? dayTransactions 
-      : allTxs;
-    
-    const spentValue = (sourceTxs || []).reduce((sum, tx) => {
+    const spentValue = (allTxs || []).reduce((sum, tx) => {
       if (!tx || tx.budgetTag !== budget.tag) return sum;
       if (trigId && String(tx.id) === trigId) return sum; // não contar a reserva
       if (tx.planned === true) return sum;
