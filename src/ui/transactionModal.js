@@ -475,7 +475,7 @@ export async function addTx() {
       const recurrenceActive = isRecurrenceActive(newRecurrence);
       // Only validate future date with recurrence if NOT in edit-mode for an existing recurring transaction
       // When editing via single/future/all mode, the user is editing a specific occurrence, not the master
-      if (recurrenceActive && isFutureDate(newOpDate) && !currentEditMode) {
+      if (recurrenceActive && isFutureDate(newOpDate) && !g.pendingEditMode) {
         const msg = !isRecurrenceActive(t.recurrence)
           ? 'Um orçamento com data futura não pode ser recorrente. Escolha apenas uma das opções.'
           : 'A data selecionada é incompatível com recorrências. Use a data de hoje ou desative a recorrência.';
