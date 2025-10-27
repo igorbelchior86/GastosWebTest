@@ -233,7 +233,8 @@ export function initAccordion(config) {
         if (occursOn(master, prev)) continue; // not start of cycle
         const next = findNextOccurrence(master, iso) || iso;
         const tag = master.budgetTag;
-        const initial = computeInitialValueForRange(txs, tag, iso, next);
+        // Use master's initialValue directly (it's a recurring budget, so each cycle has the same limit)
+        const initial = Number(master.initialValue || 0);
         const spent = computeSpentForRange(txs, tag, iso, next);
         const synthetic = {
           id: `${master.id || tag}_fb_${iso}`,
