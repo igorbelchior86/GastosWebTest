@@ -552,7 +552,7 @@ export function initAccordion(config) {
       const derivedTriggerIds = new Set();
       try {
         const prevIso = (() => { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
-        (txs || []).forEach((t) => {
+        (txList || []).forEach((t) => {
           if (!t || !t.recurrence || !t.budgetTag) return;
           try {
             if (occursOn(t, iso) && !occursOn(t, prevIso) && t.id != null) {
@@ -582,14 +582,14 @@ export function initAccordion(config) {
         invoicesByCard[cardName].push(tx);
       };
       // Non‑recurring card transactions: due on their postDate
-      txs.forEach(t => {
+      txList.forEach(t => {
         if (t.method === 'Dinheiro' || t.recurrence) return;
         if (t.postDate === iso) addToGroup(t.method, t);
       });
       // Recurring card transactions: search up to 60 days back for occurrences due on this date
       const scanStart = new Date(iso);
       scanStart.setDate(scanStart.getDate() - 60);
-      txs.filter(t => t.recurrence && t.method !== 'Dinheiro').forEach(master => {
+      txList.filter(t => t.recurrence && t.method !== 'Dinheiro').forEach(master => {
         for (let d2 = new Date(scanStart); d2 <= new Date(iso); d2.setDate(d2.getDate() + 1)) {
           const occIso = d2.toISOString().slice(0, 10);
           if (!occursOn(master, occIso)) continue;
@@ -603,7 +603,7 @@ export function initAccordion(config) {
       Object.keys(invoicesByCard).forEach(cardName => {
         invoiceTotals[cardName] = invoicesByCard[cardName].reduce((s, t) => s + t.val, 0);
       });
-      const sumAdjustFor = (cardName, dueISO) => txs
+      const sumAdjustFor = (cardName, dueISO) => txList
         .filter(t => t.invoiceAdjust && t.invoiceAdjust.card === cardName && t.invoiceAdjust.dueISO === dueISO)
         .reduce((s, t) => s + (Number(t.invoiceAdjust.amount) || 0), 0);
       let cardImpact = 0;
