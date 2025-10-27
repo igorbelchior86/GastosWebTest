@@ -1,5 +1,6 @@
 import { loadBudgets, saveBudgets } from '../services/budgetStorage.js';
 import { getReservedTotalForDate as calcReservedTotal } from '../services/budgetCalculations.js';
+import { formatToISO } from './date.js';
 
 // Compute per-day projected and available balances under the "profeta" model.
 // Rules:
@@ -75,10 +76,15 @@ export function computeDailyBalances(transactions = [], startBalance = 0, startD
       const maxISO = normISO(range?.maxDate);
       if (minISO && maxISO) {
         // Walk the date range and project/realize deltas based on the "profeta" model
-        const d = new Date(minISO);
-        const end = new Date(maxISO);
-        for (let cur = new Date(d); cur <= end; cur.setDate(cur.getDate() + 1)) {
-          const iso = cur.toISOString().slice(0, 10);
+        // Parse date components directly to avoid UTC/timezone issues
+        const [minY, minM, minD] = minISO.split('-').map(Number);
+        const [maxY, maxM, maxD] = maxISO.split('-').map(Number);
+        const startDate = new Date(minY, minM - 1, minD);
+        const endDate = new Date(maxY, maxM - 1, maxD);
+        
+        for (let cur = new Date(startDate); cur <= endDate; cur.setDate(cur.getDate() + 1)) {
+          // Use formatToISO to convert to ISO string in local timezone, not UTC
+          const iso = formatToISO(cur);
           const dayList = g.txByDate(iso) || [];
           for (const t of dayList) {
             if (!t) continue;
@@ -143,8 +149,15 @@ export function computeDailyBalances(transactions = [], startBalance = 0, startD
       const maxISO = normISO(r?.maxDate);
       if (minISO && maxISO) {
         const days = [];
-        for (let cur = new Date(minISO); cur <= new Date(maxISO); cur.setDate(cur.getDate() + 1)) {
-          days.push(cur.toISOString().slice(0, 10));
+        // Parse date components directly to avoid UTC/timezone issues
+        const [minY, minM, minD] = minISO.split('-').map(Number);
+        const [maxY, maxM, maxD] = maxISO.split('-').map(Number);
+        const startDate = new Date(minY, minM - 1, minD);
+        const endDate = new Date(maxY, maxM - 1, maxD);
+        
+        for (let cur = new Date(startDate); cur <= endDate; cur.setDate(cur.getDate() + 1)) {
+          // Use formatToISO to convert to ISO string in local timezone, not UTC
+          days.push(formatToISO(cur));
         }
         allDays = days;
       }

@@ -1,0 +1,30 @@
+name: RN CI
+
+on:
+  push:
+    paths:
+      - 'RN/**'
+  pull_request:
+    paths:
+      - 'RN/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RN
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install dev dependencies (eslint)
+        run: npm ci --package-lock-only || true
+      - name: Run lint
+        run: npm run lint
+      - name: Run tests
+        run: npm test --silent

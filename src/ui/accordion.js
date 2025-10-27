@@ -507,12 +507,19 @@ export function initAccordion(config) {
     const anchorISO = hasAnchor ? String(state.startDate) : null;
     // If anchor is before minDate, start from anchor to include retroactive transactions
     const effectiveMinDate = (hasAnchor && anchorISO && anchorISO < minDate) ? anchorISO : minDate;
-    const startDateObj = new Date(effectiveMinDate);
-    const endDateObj = new Date(maxDate);
+    
+    // Parse date components directly to avoid UTC/timezone issues
+    const parseISO = (iso) => {
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+    
+    const startDateObj = parseISO(effectiveMinDate);
+    const endDateObj = parseISO(maxDate);
     
     const txs = getTransactions ? getTransactions() : transactions;
     for (let current = new Date(startDateObj); current <= endDateObj; current.setDate(current.getDate() + 1)) {
-      const iso = current.toISOString().slice(0, 10);
+      const iso = formatToISO(current);
       
       // Days BEFORE startDate should show zero balance
       if (hasAnchor && iso < anchorISO) {
