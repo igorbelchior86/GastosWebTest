@@ -233,8 +233,8 @@ export function initAccordion(config) {
         if (occursOn(master, prev)) continue; // not start of cycle
         const next = findNextOccurrence(master, iso) || iso;
         const tag = master.budgetTag;
-        // Use master's initialValue directly (it's a recurring budget, so each cycle has the same limit)
-        const initial = Number(master.initialValue || 0);
+        // For recurring budgets, initialValue is the absolute value of the master transaction
+        const initial = Math.abs(Number(master.val) || 0);
         const spent = computeSpentForRange(txs, tag, iso, next);
         const synthetic = {
           id: `${master.id || tag}_fb_${iso}`,
@@ -367,11 +367,6 @@ export function initAccordion(config) {
     const trigId = budget && budget.triggerTxId != null ? String(budget.triggerTxId) : null;
     const startIso = normalizeBudgetDate(budget.startDate);
     const endIso   = normalizeBudgetDate(budget.endDate);
-    
-    // For synthetic/recurring budgets, use dayTransactions if available; otherwise fall back to allTxs
-    const sourceTxs = (budget.isSynthetic || budget.budgetType === 'recurring') && Array.isArray(dayTransactions) 
-      ? dayTransactions 
-      : allTxs;
     
     const spentValue = (sourceTxs || []).reduce((sum, tx) => {
       if (!tx || tx.budgetTag !== budget.tag) return sum;
