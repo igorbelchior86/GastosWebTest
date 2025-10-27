@@ -1684,7 +1684,7 @@ try {
 
 const accordionApi = initAccordion({
   acc: document.getElementById('accordion'),
-  getTransactions,
+  getTransactions: getTransactionsWithMaterializations,
   transactions,
   cards,
   getCards,
