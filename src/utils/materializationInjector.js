@@ -25,9 +25,19 @@ export function injectBudgetMaterializationTransactions(transactions = [], today
   try {
     const materializations = generateBudgetMaterializationTransactions(transactions, todayISO);
     if (!materializations || materializations.length === 0) {
+      try {
+        const dbg = !!(window && window.__gastos && window.__gastos.debugBudgetMaterialization);
+        if (dbg) console.log('[MaterializationInjector] No materializations generated');
+      } catch (_) {}
       return transactions;
     }
-    console.log('[MaterializationInjector] Injecting', materializations.length, 'materialization TXs');
+    try {
+      const dbg = !!(window && window.__gastos && window.__gastos.debugBudgetMaterialization);
+      if (dbg) console.log('[MaterializationInjector] Injecting', materializations.length, 'materialization TXs', materializations);
+      else console.log('[MaterializationInjector] Injecting', materializations.length, 'materialization TXs');
+    } catch (_) {
+      console.log('[MaterializationInjector] Injecting', materializations.length, 'materialization TXs');
+    }
     // Return combined list: real transactions + materializations
     return [...(transactions || []), ...materializations];
   } catch (err) {

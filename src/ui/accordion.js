@@ -1225,7 +1225,6 @@ export function initAccordion(config) {
     const endTime = performance.now();
     const renderTime = endTime - startTime;
     const monthCount = accEl.querySelectorAll('details.month').length;
-    console.log(`🎨 UI: Rendered ${monthCount} month(s) in ${renderTime.toFixed(2)}ms`);
   }
   
   // Lazy loading setup - listens for month expansion

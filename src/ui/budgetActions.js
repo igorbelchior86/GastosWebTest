@@ -1,4 +1,4 @@
-import { removeAdHocBudget, closeRecurringBudget, endRecurrence } from '../services/budgetEditor.js';
+import { removeAdHocBudget, removeBudget } from '../services/budgetEditor.js';
 import { askConfirmDelete } from './modalHelpers.js';
 
 function ensureStyles(){
@@ -58,44 +58,18 @@ export function attachBudgetActions(cardEl, budget, ctx = {}){
     setTransactions: (list) => { try { window.__gastos?.setTransactions?.(list); } catch(_){} },
   };
 
-  if (budget.budgetType === 'ad-hoc'){
-    addItem('Editar', async () => {
-      const mod = await import('./budgetEditModal.js');
-      mod.openEditBudgetModal(budget, { afterChange });
-    });
-    addItem('Excluir', async () => {
-      try {
-        const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
-        if (!ok) return;
-      } catch (_) { /* fallback to proceed */ }
+  // Expose only a single action: Excluir (for both ad-hoc and recurring)
+  addItem('Excluir', async () => {
+    try {
+      const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
+      if (!ok) return;
+    } catch (_) { /* proceed even if confirm UI fails */ }
+    if (budget.budgetType === 'ad-hoc') {
       await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
-    });
-    addItem('Histórico', async () => {
-      try { window.__gastos?.showBudgetHistory?.(budget.tag); } catch(_){}
-    });
-  } else if (budget.budgetType === 'recurring'){
-    addItem('Editar valor do ciclo', async () => {
-      const mod = await import('./budgetEditModal.js');
-      mod.openEditRecurringValueModal(budget);
-    });
-    addItem('Fechar ciclo', async () => {
-      try {
-        const ok = await askConfirmDelete(`fechar o ciclo do orçamento "${budget.tag}"`);
-        if (!ok) return;
-      } catch (_) {}
-      await closeRecurringBudget(budget);
-    });
-    addItem('Encerrar recorrência', async () => {
-      try {
-        const ok = await askConfirmDelete(`encerrar a recorrência do orçamento "${budget.tag}"`);
-        if (!ok) return;
-      } catch (_) {}
-      await endRecurrence(budget, commonCtx);
-    });
-    addItem('Histórico', async () => {
-      try { window.__gastos?.showBudgetHistory?.(budget.tag); } catch(_){}
-    });
-  }
+    } else {
+      await removeBudget(budget);
+    }
+  });
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -141,34 +115,20 @@ export function attachBudgetSwipe(cardEl, budget, ctx = {}){
     setTransactions: (l) => { try { window.__gastos?.setTransactions?.(l); } catch(_){} },
   };
 
-  if (budget.budgetType === 'ad-hoc'){
-    actions.appendChild(mkBtn('icon-edit', async () => {
-      const mod = await import('./budgetEditModal.js');
-      mod.openEditBudgetModal(budget, { afterChange: refresh });
-    }, 'Editar orçamento'));
-    actions.appendChild(mkBtn('icon-delete', async () => {
-      try {
-        const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
-        if (!ok) return;
-      } catch (_) {}
-      const { removeAdHocBudget } = await import('../services/budgetEditor.js');
-      await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
-      refresh();
-    }, 'Excluir orçamento'));
-  } else if (budget.budgetType === 'recurring'){
-    actions.appendChild(mkBtn('icon-edit', async () => {
-      const mod = await import('./budgetEditModal.js');
-      mod.openEditRecurringValueModal(budget);
-    }, 'Editar valor do ciclo'));
-    actions.appendChild(mkBtn('icon-delete', async () => {
-      try {
-        const ok = await askConfirmDelete(`encerrar a recorrência do orçamento "${budget.tag}"`);
-        if (!ok) return;
-      } catch (_) {}
-      const { endRecurrence } = await import('../services/budgetEditor.js');
-      await endRecurrence(budget, commonCtx); refresh();
-    }, 'Encerrar recorrência'));
-  }
+  // Single swipe action: Excluir (for both types)
+  actions.appendChild(mkBtn('icon-delete', async () => {
+    try {
+      const ok = await askConfirmDelete(`orçamento "${budget.tag}"`);
+      if (!ok) return;
+    } catch (_) {}
+    const mod = await import('../services/budgetEditor.js');
+    if (budget.budgetType === 'ad-hoc') {
+      await mod.removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
+    } else {
+      await mod.removeBudget(budget);
+    }
+    refresh();
+  }, 'Excluir orçamento'));
 
   // Build structure: wrap -> cardEl + actions
   parent && parent.insertBefore(wrap, cardEl);

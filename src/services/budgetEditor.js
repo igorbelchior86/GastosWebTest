@@ -17,12 +17,35 @@ function inRange(isoDate, startISO, endISO){
   return true;
 }
 
+function sameKey(a, b){
+  if (!a || !b) return false;
+  const tagA = String(a.tag||'').trim();
+  const tagB = String(b.tag||'').trim();
+  const typeA = String(a.budgetType||'');
+  const typeB = String(b.budgetType||'');
+  const sA = iso(a.startDate); const eA = iso(a.endDate);
+  const sB = iso(b.startDate); const eB = iso(b.endDate);
+  return tagA === tagB && typeA === typeB && sA === sB && eA === eB;
+}
+
+export function removeBudget(budget){
+  if (!budget) return { removed:false };
+  const list = loadBudgets();
+  const next = list.filter(b => {
+    if (!b) return false; // prune nulls defensively
+    if (b.id && budget.id && String(b.id) === String(budget.id)) return false;
+    if (sameKey(b, budget)) return false;
+    return true;
+  });
+  saveBudgets(next);
+  return { removed: list.length !== next.length };
+}
+
 export function removeAdHocBudget(budget, options = {}){
   const { unlinkOps = false, getTransactions, setTransactions } = options;
-  if (!budget || budget.budgetType !== 'ad-hoc') return { removed:false };
-  const list = loadBudgets();
-  const next = list.filter(b => b && b.id !== budget.id);
-  saveBudgets(next);
+  if (!budget) return { removed:false };
+  // Remove by id/semantic key for resilience
+  const { removed } = removeBudget(budget);
 
   // Optionally unlink transactions inside the window and remove the trigger planned TX
   if (unlinkOps && typeof getTransactions === 'function' && typeof setTransactions === 'function'){
@@ -55,7 +78,7 @@ export function removeAdHocBudget(budget, options = {}){
     setTransactions(pruned);
     try { fbSave('tx', pruned); } catch(_) {}
   }
-  return { removed:true };
+  return { removed };
 }
 
 export function closeRecurringBudget(budget){

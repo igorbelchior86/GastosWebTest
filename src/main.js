@@ -1656,9 +1656,7 @@ function renderTransactionGroups(groups){accordionApi.renderAccordion();}
 const getTransactionsWithMaterializations = () => {
   try {
     const txs = typeof getTransactions === 'function' ? getTransactions() : transactions;
-    console.log('[getTransactionsWithMaterializations] Input TXs:', txs?.length || 0);
     const result = injectBudgetMaterializationTransactions(txs);
-    console.log('[getTransactionsWithMaterializations] Output TXs:', result?.length || 0);
     return result;
   } catch (err) {
     console.error('[getTransactionsWithMaterializations] Error:', err);

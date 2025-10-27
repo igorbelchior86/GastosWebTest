@@ -17,6 +17,7 @@
  */
 
 import { normalizeISODate, generateBudgetId } from '../utils/budgetUtils.js';
+import { todayISO as localTodayISO } from '../utils/date.js';
 import { generateId } from '../utils/data.js';
 import { loadBudgets } from './budgetStorage.js';
 import { spentNoPeriodo } from './budgetCalculations.js';
@@ -81,13 +82,19 @@ function createReserveTransaction(budget, cycleStart, isReturn = false) {
  * @returns {Array} New transactions to add to the transaction list
  */
 export function generateBudgetMaterializationTransactions(transactions = [], todayISO = null) {
-  const today = normalizeISODate(todayISO) || new Date().toISOString().slice(0, 10);
+  // Use local‑timezone "today" to avoid UTC off‑by‑one skipping the cycle start
+  const today = normalizeISODate(todayISO) || localTodayISO();
   const budgets = loadBudgets() || [];
   const newTransactions = [];
+  const dbg = (() => { try { return !!(window && window.__gastos && window.__gastos.debugBudgetMaterialization); } catch (_) { return false; } })();
+  if (dbg) {
+    try { console.groupCollapsed('[BudgetMaterialization] Generate start'); console.log('today', today, 'budgets', budgets.length); } catch (_) {}
+  }
 
   budgets.forEach((budget) => {
     // Support BOTH 'recurring' and 'ad-hoc' budget types
     if (!budget || budget.status !== 'active' || (budget.budgetType !== 'recurring' && budget.budgetType !== 'ad-hoc')) {
+      if (dbg) console.log('skip: inactive/unsupported', budget && budget.tag, budget && budget.status, budget && budget.budgetType);
       return;
     }
 
@@ -98,6 +105,7 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
     // Check if we've already materialized this budget cycle
     const cacheKey = `${budget.id}|${cycleStart}`;
     if (materializedCache.has(cacheKey)) {
+      if (dbg) console.log('skip: cache-hit', budget.tag, cacheKey);
       return;
     }
 
@@ -105,10 +113,13 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
     if (today >= cycleStart) {
       // Create reserve transaction for this cycle
       const reserveTx = createReserveTransaction(budget, cycleStart, false);
-      if (reserveTx && !transactions.some((t) => t && t.id === reserveTx.id)) {
-        console.log('[BudgetMaterialization] Creating reserve TX:', reserveTx);
+      const exists = reserveTx && transactions.some((t) => t && t.id === reserveTx.id);
+      if (reserveTx && !exists) {
+        if (dbg) console.log('[BudgetMaterialization] Creating reserve TX:', reserveTx);
         newTransactions.push(reserveTx);
         materializedCache.add(cacheKey);
+      } else if (dbg) {
+        console.log('skip: reserve exists', budget.tag, reserveTx && reserveTx.id);
       }
     }
 
@@ -118,7 +129,7 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
       if (!materializedCache.has(returnCacheKey)) {
         const returnTx = createReserveTransaction(budget, cycleEnd, true);
         if (returnTx && !transactions.some((t) => t && t.id === returnTx.id)) {
-          console.log('[BudgetMaterialization] Creating return TX:', returnTx);
+          if (dbg) console.log('[BudgetMaterialization] Creating return TX:', returnTx);
           newTransactions.push(returnTx);
           materializedCache.add(returnCacheKey);
         }
@@ -127,8 +138,12 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
   });
 
   if (newTransactions.length > 0) {
-    console.log('[BudgetMaterialization] Total materialized TXs:', newTransactions.length);
+    try {
+      if (dbg) console.log('[BudgetMaterialization] Total materialized TXs:', newTransactions.length, newTransactions);
+      else console.log('[BudgetMaterialization] Total materialized TXs:', newTransactions.length);
+    } catch (_) {}
   }
+  if (dbg) { try { console.groupEnd(); } catch (_) {} }
   return newTransactions;
 }
 

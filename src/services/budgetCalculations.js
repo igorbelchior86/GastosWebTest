@@ -127,50 +127,76 @@ function findCycleStartFor(master, targetISO) {
   } catch (_) { return null; }
 }
 
-export function getReservedTotalForDate(dateISO, transactions) {
+export function getReservedTotalForDate(dateISO, transactions, opts = {}) {
   const target = normalizeISODate(dateISO);
   if (!target) return 0;
   const budgets = loadBudgets();
-  const shouldDebug = (() => { try { return !!(window && window.__gastos && window.__gastos.debugBudgetReserve); } catch (_) { return false; } })();
-  const dbg = shouldDebug ? { date: target, persisted: [], synthetic: [], total: 0 } : null;
-  // Helper: compute reserved value AS OF target date for a given window
-  const computeReservedAsOf = (tag, startIso, endIso, initialValue, opts = {}) => {
+  const freezeAtISO = opts && opts.freezeAtISO ? normalizeISODate(opts.freezeAtISO) : null;
+  const shouldDebug = (typeof window !== 'undefined') && !!(window.__gastos && window.__gastos.debugBudgetReserve);
+  const dbg = shouldDebug ? { date: target, persisted: [], synthetic: [], total: 0, skipped: [], materializedStarts: [] } : null;
+  const allTxs = Array.isArray(transactions) ? transactions : [];
+  
+  // Detect budgets that are already materialized as transactions for this cycle.
+  // If a budget cycle has a synthetic "reserve" transaction injected (budget materialization),
+  // we must NOT subtract its reservation again, otherwise the balance is double‑deducted.
+  // Key format: `${tag}|${start}` where start is the reserve opDate (cycle start).
+  const materializedStarts = new Set();
+  allTxs.forEach((t) => {
+    if (!t || !t.isBudgetMaterialization) return;
+    if (!t.budgetReserveFor) return; // only mark reserve entries; return entries do not matter for reservation calc
+    const tag = t.budgetTag || null;
+    const startIso = normalizeISODate(t.opDate || t.postDate);
+    if (!tag || !startIso) return;
+    materializedStarts.add(`${tag}|${startIso}`);
+  });
+  if (shouldDebug && dbg) {
+    dbg.materializedStarts = Array.from(materializedStarts.values());
+  }
+  // Helper: compute reserved value AS OF an arbitrary date (defaults to target)
+  const computeReservedAsOf = (tag, startIso, endIso, initialValue, localOpts = {}) => {
     const start = normalizeISODate(startIso);
     const end = normalizeISODate(endIso);
-    const cutoff = (!end || target < end) ? target : end; // spend up to the earlier of target or end
+    const asOf = (freezeAtISO && target > freezeAtISO) ? freezeAtISO : target;
+    const cutoff = (!end || asOf < end) ? asOf : end;
     const spent = spentNoPeriodo(transactions, tag, start, cutoff, {
-      excludeTxId: opts.excludeTxId || null,
-      excludeISO: opts.excludeISO || null,
+      excludeTxId: localOpts.excludeTxId || null,
+      excludeISO: localOpts.excludeISO || null,
     });
     const initial = Number(initialValue) || 0;
     return Math.max(initial - spent, 0);
   };
 
   // Sum persisted budgets (ad-hoc AND recurring) whose window includes target.
-  // We track counted starts to avoid double counting later when walking masters.
+  // Track counted starts to avoid double counting when also walking recurring masters.
   const countedStarts = new Set(); // key = `${tag}|${start}`
-  
-  // Collect recurring master transactions to skip their budget reservations
-  const txs = Array.isArray(transactions) ? transactions : [];
-  const recurringMastersByTag = new Map();
-  txs.forEach((t) => {
-    if (!t || !t.recurrence || !t.budgetTag) return;
-    const tag = t.budgetTag;
-    if (!recurringMastersByTag.has(tag)) recurringMastersByTag.set(tag, t);
-  });
   
   let total = budgets.reduce((acc, budget) => {
     if (!budget || budget.status !== 'active') return acc;
-    
-    // SKIP recurring budgets that have recurring transactions
-    // (transactions are materialized and already counted in balance)
-    if (budget.budgetType === 'recurring' && recurringMastersByTag.has(budget.tag)) {
-      return acc;
-    }
-    
+
+    // SKIP budgets whose cycle is already materialized as transactions
+    // (transactions are counted directly in balances; subtracting reservations would double count)
     const start = normalizeISODate(budget.startDate);
     const end = normalizeISODate(budget.endDate);
-    if (!isWithinRange(target, start, end)) return acc;
+    if (start && materializedStarts.has(`${budget.tag}|${start}`)) {
+      if (shouldDebug) dbg.skipped.push({ reason: 'materialized', tag: budget.tag, start, end });
+      return acc;
+    }
+    // When freezing returns at a date (today), include cycles that have started
+    // even if target is past the cycle end, as long as the cycle hasn't ended
+    // relative to the freeze reference.
+    if (freezeAtISO && target > freezeAtISO) {
+      const startedByTarget = !!(start && start <= target);
+      const notEndedByFreeze = !!(!end || end > freezeAtISO);
+      if (!startedByTarget || !notEndedByFreeze) {
+        if (shouldDebug) dbg.skipped.push({ reason: 'frozen-out-of-range', tag: budget.tag, start, end, target, freezeAtISO });
+        return acc;
+      }
+    } else {
+      if (!isWithinRange(target, start, end)) {
+        if (shouldDebug) dbg.skipped.push({ reason: 'out-of-range', tag: budget.tag, start, end, target });
+        return acc;
+      }
+    }
     const reservedAsOf = computeReservedAsOf(budget.tag, start, end, budget.initialValue, {
       excludeTxId: budget.triggerTxId != null ? String(budget.triggerTxId) : null,
       excludeISO: budget.triggerTxIso || null,
@@ -183,21 +209,53 @@ export function getReservedTotalForDate(dateISO, transactions) {
     return acc + reservedAsOf;
   }, 0);
 
-  // NOTE: Synthetic recurring budget reservations are NOT included here.
-  // Recurring transactions with budgetTag are materialized via txByDate() in computeDailyBalances,
-  // so they're already counted as real transactions in the balance. Including them as reservations
-  // would double-count them.
+  // Include synthetic reservations for recurring masters (future/past cycles) so
+  // that recurring budgets behave like recurring transactions across the whole
+  // projected range. Skip cycles that already have a persisted budget record or
+  // that were materialized as transactions to avoid double counting.
+  try {
+    allTxs.forEach((master) => {
+      if (!master || !master.recurrence || !master.budgetTag) return;
+      const tag = master.budgetTag;
+      const rec = String(master.recurrence || '').trim();
+      const startOfTarget = findCycleStartFor(master, target);
+      if (!startOfTarget) return;
+      // Walk cycles from target's cycle backwards, accumulating until the freeze boundary.
+      let cursor = startOfTarget;
+      const lowerBound = (freezeAtISO && target > freezeAtISO) ? freezeAtISO : target;
+      while (cursor && cursor > lowerBound) {
+        const start = cursor;
+        const end = nextFrom(start, rec) || start;
+        const k = `${tag}|${start}`;
+        if (!countedStarts.has(k) && !materializedStarts.has(k)) {
+          let initial = computeInitialForRange(allTxs, tag, start, end);
+          if (initial <= 0) {
+            const v = Number(master.val);
+            if (Number.isFinite(v)) initial = Math.abs(v);
+          }
+          const reservedAsOf = computeReservedAsOf(tag, start, end, initial);
+          if (shouldDebug && dbg) dbg.synthetic.push({ tag, start, end, initial, reservedAsOf, rec });
+          total += reservedAsOf;
+        }
+        // step to previous cycle
+        const prev = prevFrom(start, rec);
+        if (!prev || prev === start) break;
+        cursor = prev;
+      }
+    });
+  } catch (_) {}
 
-  if (shouldDebug) {
-    try {
-      dbg.total = total;
-      // eslint-disable-next-line no-console
-      console.groupCollapsed(`[reserve] ${target} total=${total}`);
-      // eslint-disable-next-line no-console
-      console.table({ total });
-      if (dbg.persisted.length) { console.log('persisted', dbg.persisted); }
-      console.groupEnd();
-    } catch (_) {}
+  if (shouldDebug && dbg) {
+    dbg.total = total;
+    const hasGroup = (typeof console !== 'undefined') && typeof console.groupCollapsed === 'function';
+    if (hasGroup) console.groupCollapsed(`[reserve] ${target} total=${total}`);
+    if (typeof console !== 'undefined') {
+      console.log('materializedStarts', dbg.materializedStarts);
+      if (dbg.skipped.length) console.log('skipped', dbg.skipped);
+      if (dbg.persisted.length) console.log('persisted', dbg.persisted);
+      if (dbg.synthetic.length) console.log('synthetic', dbg.synthetic);
+    }
+    if (hasGroup) console.groupEnd();
   }
   return total;
 }
