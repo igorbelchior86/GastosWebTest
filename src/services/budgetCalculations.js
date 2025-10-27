@@ -149,8 +149,25 @@ export function getReservedTotalForDate(dateISO, transactions) {
   // Sum persisted budgets (ad-hoc AND recurring) whose window includes target.
   // We track counted starts to avoid double counting later when walking masters.
   const countedStarts = new Set(); // key = `${tag}|${start}`
+  
+  // Collect recurring master transactions to skip their budget reservations
+  const txs = Array.isArray(transactions) ? transactions : [];
+  const recurringMastersByTag = new Map();
+  txs.forEach((t) => {
+    if (!t || !t.recurrence || !t.budgetTag) return;
+    const tag = t.budgetTag;
+    if (!recurringMastersByTag.has(tag)) recurringMastersByTag.set(tag, t);
+  });
+  
   let total = budgets.reduce((acc, budget) => {
     if (!budget || budget.status !== 'active') return acc;
+    
+    // SKIP recurring budgets that have recurring transactions
+    // (transactions are materialized and already counted in balance)
+    if (budget.budgetType === 'recurring' && recurringMastersByTag.has(budget.tag)) {
+      return acc;
+    }
+    
     const start = normalizeISODate(budget.startDate);
     const end = normalizeISODate(budget.endDate);
     if (!isWithinRange(target, start, end)) return acc;
@@ -166,64 +183,10 @@ export function getReservedTotalForDate(dateISO, transactions) {
     return acc + reservedAsOf;
   }, 0);
 
-  // Include synthetic reservation for recurring masters occurring on `target`
-  try {
-    const txs = Array.isArray(transactions) ? transactions : [];
-    // Unique master by tag (prefer the earliest opDate for stability)
-    const mastersByTag = new Map();
-    (txs || []).forEach((t) => {
-      if (!t || !t.recurrence || !t.budgetTag) return;
-      const tag = t.budgetTag;
-      const prev = mastersByTag.get(tag);
-      if (!prev || normalizeISODate(t.opDate) < normalizeISODate(prev.opDate)) mastersByTag.set(tag, t);
-    });
-    const masters = Array.from(mastersByTag.values());
-    // Avoid double counting: track which cycle starts already
-    // exist as persisted budgets for each tag.
-    const persistedStartsByTag = new Map();
-    (budgets || []).forEach((b) => {
-      if (!b || b.status !== 'active' || !b.tag) return;
-      const s = normalizeISODate(b.startDate);
-      if (!s) return;
-      if (!persistedStartsByTag.has(b.tag)) persistedStartsByTag.set(b.tag, new Set());
-      persistedStartsByTag.get(b.tag).add(s);
-    });
-    masters.forEach((m) => {
-      const tag = m.budgetTag;
-      if (!tag) return;
-      const persistedStarts = persistedStartsByTag.get(tag);
-      // Accumulate ALL cycles that have started up to target (step function):
-      // ... start_k ≤ target. This matches the requirement of deducting on
-      // every cycle start day and never “giving back” on end.
-      let start = findCycleStartFor(m, target);
-      if (!start) start = normalizeISODate(m.opDate);
-      const visited = new Set();
-      const safety = 520; // up to 10 years of weekly cycles
-      for (let i = 0; i < safety && start && normalizeISODate(start) >= normalizeISODate(m.opDate); i++) {
-        if (normalizeISODate(start) > target) break;
-        const key = `${tag}|${start}`;
-        if (visited.has(key)) break; visited.add(key);
-        if (!(persistedStarts && persistedStarts.has(start))) {
-          const next = nextFrom(start, m.recurrence) || start;
-          const initial = computeInitialForRange(txs, tag, start, next) || Math.abs(Number(m.val) || 0);
-          // Spend only up to the earlier of target or cycle end
-          const reserved = computeReservedAsOf(tag, start, next, initial, { excludeTxId: m.id != null ? String(m.id) : null, excludeISO: start });
-          if (shouldDebug) { dbg.synthetic.push({ tag, start, end: next, initial, reservedAsOf: reserved }); }
-          total += reserved;
-        } else {
-          // Persisted exists for this cycle. We already counted it above.
-          // Guard against double counting when a master exists.
-          const key = `${tag}|${start}`;
-          if (shouldDebug && countedStarts.has(key)) {
-            dbg.persisted.push({ tag, start, from: 'persisted:skipped-dup' });
-          }
-          // no-op
-        }
-        // move to previous cycle
-        start = prevFrom(start, m.recurrence);
-      }
-    });
-  } catch (_) {}
+  // NOTE: Synthetic recurring budget reservations are NOT included here.
+  // Recurring transactions with budgetTag are materialized via txByDate() in computeDailyBalances,
+  // so they're already counted as real transactions in the balance. Including them as reservations
+  // would double-count them.
 
   if (shouldDebug) {
     try {
@@ -233,7 +196,6 @@ export function getReservedTotalForDate(dateISO, transactions) {
       // eslint-disable-next-line no-console
       console.table({ total });
       if (dbg.persisted.length) { console.log('persisted', dbg.persisted); }
-      if (dbg.synthetic.length) { console.log('synthetic', dbg.synthetic); }
       console.groupEnd();
     } catch (_) {}
   }

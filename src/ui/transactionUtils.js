@@ -81,9 +81,8 @@ export function initTxUtils(config) {
       }
     });
     // Recurring rules: materialize occurrences on this date
-    // SKIP recurring transactions with budgetTag - they appear as budget reservations, not as transactions
     txs
-      .filter(t => t.recurrence && !t.budgetTag)
+      .filter(t => t.recurrence)
       .forEach(master => {
         if (typeof occursOn === 'function' ? !occursOn(master, iso) : false) return;
         const em = resolveCard(master.method) || master.method;
