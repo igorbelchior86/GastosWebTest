@@ -106,6 +106,7 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
       // Create reserve transaction for this cycle
       const reserveTx = createReserveTransaction(budget, cycleStart, false);
       if (reserveTx && !transactions.some((t) => t && t.id === reserveTx.id)) {
+        console.log('[BudgetMaterialization] Creating reserve TX:', reserveTx);
         newTransactions.push(reserveTx);
         materializedCache.add(cacheKey);
       }
@@ -117,6 +118,7 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
       if (!materializedCache.has(returnCacheKey)) {
         const returnTx = createReserveTransaction(budget, cycleEnd, true);
         if (returnTx && !transactions.some((t) => t && t.id === returnTx.id)) {
+          console.log('[BudgetMaterialization] Creating return TX:', returnTx);
           newTransactions.push(returnTx);
           materializedCache.add(returnCacheKey);
         }
@@ -124,6 +126,9 @@ export function generateBudgetMaterializationTransactions(transactions = [], tod
     }
   });
 
+  if (newTransactions.length > 0) {
+    console.log('[BudgetMaterialization] Total materialized TXs:', newTransactions.length);
+  }
   return newTransactions;
 }
 

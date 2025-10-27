@@ -27,6 +27,7 @@ export function injectBudgetMaterializationTransactions(transactions = [], today
     if (!materializations || materializations.length === 0) {
       return transactions;
     }
+    console.log('[MaterializationInjector] Injecting', materializations.length, 'materialization TXs');
     // Return combined list: real transactions + materializations
     return [...(transactions || []), ...materializations];
   } catch (err) {
