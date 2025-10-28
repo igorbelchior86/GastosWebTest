@@ -9,6 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="color-scheme" content="dark light">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -28,6 +29,14 @@
   <script>
     (function() {
       // Inline theme applier to prevent flash on page load
+      function updateMetaThemeColor(resolved) {
+        try {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (!meta) return;
+          var color = resolved === 'light' ? '#f7f7f7' : '#1e1e1e';
+          meta.setAttribute('content', color);
+        } catch (_) {}
+      }
       function getSystemPref() {
         try {
           return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
@@ -39,7 +48,7 @@
       }
       
       function applyTheme(pref) {
-        let resolved = pref === 'system' ? getSystemPref() : pref;
+        var resolved = pref === 'system' ? getSystemPref() : pref;
         const root = document.documentElement;
         if (resolved === 'light') {
           root.classList.add('light');
@@ -48,20 +57,34 @@
           root.classList.remove('light');
           root.setAttribute('data-theme', 'dark');
         }
+        updateMetaThemeColor(resolved);
       }
       
-      // Read saved preference from localStorage and apply immediately
-      const saved = localStorage.getItem('ui:theme') || localStorage.getItem('ui:preferences:v2');
-      if (saved) {
+      function getSavedPref() {
+        var saved = null;
+        try { saved = localStorage.getItem('ui:theme'); } catch (_) {}
+        if (saved) return saved;
         try {
-          const prefs = JSON.parse(saved);
-          applyTheme(prefs.theme || 'system');
-        } catch (e) {
-          applyTheme(saved);
-        }
-      } else {
-        applyTheme('system');
+          var raw = localStorage.getItem('ui:preferences:v2');
+          if (raw) {
+            try { var prefs = JSON.parse(raw); return prefs && prefs.theme ? prefs.theme : 'system'; } catch (_) {}
+          }
+        } catch (_) {}
+        return 'system';
       }
+
+      // Initial application
+      applyTheme(getSavedPref());
+
+      // iOS: re-apply on return to foreground to avoid brief theme mismatch
+      try {
+        document.addEventListener('visibilitychange', function() {
+          if (!document.hidden) applyTheme(getSavedPref());
+        }, { passive: true });
+        window.addEventListener('pageshow', function() {
+          applyTheme(getSavedPref());
+        }, { passive: true });
+      } catch (_) {}
     })();
   </script>
 </head>

@@ -1,4 +1,4 @@
-import { removeAdHocBudget, removeBudget } from '../services/budgetEditor.js';
+import { removeAdHocBudget, removeBudget, removeRecurringBudget } from '../services/budgetEditor.js';
 import { askConfirmDelete } from './modalHelpers.js';
 
 function ensureStyles(){
@@ -67,7 +67,8 @@ export function attachBudgetActions(cardEl, budget, ctx = {}){
     if (budget.budgetType === 'ad-hoc') {
       await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
     } else {
-      await removeBudget(budget);
+      // Recorrente: remover e desvincular master para evitar cartões sintéticos
+      await removeRecurringBudget(budget, { ...commonCtx });
     }
   });
 
@@ -125,7 +126,7 @@ export function attachBudgetSwipe(cardEl, budget, ctx = {}){
     if (budget.budgetType === 'ad-hoc') {
       await mod.removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
     } else {
-      await mod.removeBudget(budget);
+      await mod.removeRecurringBudget(budget, { ...commonCtx });
     }
     refresh();
   }, 'Excluir orçamento'));
