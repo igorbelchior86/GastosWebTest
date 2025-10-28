@@ -840,11 +840,21 @@ export function initAccordion(config) {
       mSum.className = 'month-divider';
       // Obter o último dia do mês
       const monthEndISO = new Date(viewYear, mIdx + 1, 0).toISOString().slice(0, 10);
-      
-      // Simplesmente pegar o saldo do último dia do mês que já está calculado corretamente
-      const monthEndBalance = balanceMap.has(monthEndISO)
-        ? balanceMap.get(monthEndISO)
-        : getBalanceBefore(monthEndISO);
+
+      // Preferir o mapa de saldos diário já calculado (inclui reservas de orçamento)
+      // e exposto globalmente por main.js. Fallback para o balanceMap local.
+      let monthEndBalance;
+      try {
+        const db = (window.__gastos && window.__gastos.dailyBalances) || null;
+        if (db && db[monthEndISO] && Number.isFinite(Number(db[monthEndISO].projetado))) {
+          monthEndBalance = Number(db[monthEndISO].projetado);
+        }
+      } catch (_) {}
+      if (monthEndBalance == null) {
+        monthEndBalance = balanceMap.has(monthEndISO)
+          ? balanceMap.get(monthEndISO)
+          : getBalanceBefore(monthEndISO);
+      }
       
       let metaLabel = '';
       let metaValue = '';

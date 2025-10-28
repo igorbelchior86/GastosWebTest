@@ -2425,6 +2425,11 @@ html[data-theme="light"] .planned-list  li + li .op-line {
   border-top-color: rgba(0,0,0,0.06);
 }
 
+/* Inside invoice groups we render explicit separators (invoice-divider).
+   Suppress the generic list border to avoid a faded duplicate line above items. */
+.invoice .executed-list li + li .op-line { border-top: none !important; padding-top: 6px; }
+html[data-theme="light"] .invoice .executed-list li + li .op-line { border-top: none !important; }
+
 /* Valor negativo/positivo sem gradiente dentro das seções */
 .executed-cash .op-right .value.negative,
 .planned-list  .op-right .value.negative { 

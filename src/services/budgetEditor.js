@@ -47,13 +47,12 @@ export function removeAdHocBudget(budget, options = {}){
   // Remove by id/semantic key for resilience
   const { removed } = removeBudget(budget);
 
-  // Optionally unlink transactions inside the window and remove the trigger TX (it is not real)
+  // Optionally unlink transactions inside the window and remove the trigger planned TX
   if (unlinkOps && typeof getTransactions === 'function' && typeof setTransactions === 'function'){
     const txs = getTransactions() || [];
     const s = iso(budget.startDate);
     const e = iso(budget.endDate);
     const tag = String(budget.tag || '').trim();
-    // First, unlink transactions inside the window
     const updated = txs.map(t => {
       try {
         if (!t || t.budgetTag !== tag) return t;
@@ -64,12 +63,12 @@ export function removeAdHocBudget(budget, options = {}){
         return nt;
       } catch(_) { return t; }
     });
-    // Then, remove the trigger transaction unconditionally (it represents only the reservation)
-    const pruned = updated.filter(t => {
+    // Remove the trigger transaction unconditionally (it is not a real transaction)
+    let pruned = updated.filter(t => {
       try {
         if (!t) return true;
         if (budget.triggerTxId && String(t.id) === String(budget.triggerTxId)) return false;
-        // Fallback match by trigger ISO + tag when id is unavailable
+        // Fallback match by (trigger date + tag)
         const trigISO = iso(budget.triggerTxIso);
         if (trigISO) {
           const d = iso(t.opDate || t.postDate);
@@ -78,8 +77,63 @@ export function removeAdHocBudget(budget, options = {}){
         return true;
       } catch(_) { return true; }
     });
+    // Remove budget materialization transactions (reserve/return) tied to this budget
+    pruned = pruned.filter(t => {
+      try {
+        if (!t || !t.isBudgetMaterialization) return true;
+        const isReserve = t.budgetReserveFor && String(t.budgetReserveFor) === String(budget.id);
+        const isReturn  = t.budgetReturnFor  && String(t.budgetReturnFor)  === String(budget.id);
+        return !(isReserve || isReturn);
+      } catch(_) { return true; }
+    });
     setTransactions(pruned);
     try { fbSave('tx', pruned); } catch(_) {}
+  }
+  return { removed };
+}
+
+/**
+ * Remove a recurring budget: delete the budget record, the recurrence master/trigger,
+ * and any synthetic materialization transactions associated with this budget.
+ */
+export function removeRecurringBudget(budget, options = {}) {
+  if (!budget || budget.budgetType !== 'recurring') return { removed: false };
+  const { getTransactions, setTransactions } = options || {};
+  const { removed } = removeBudget(budget);
+  if (typeof getTransactions !== 'function' || typeof setTransactions !== 'function') {
+    return { removed };
+  }
+  const txs = getTransactions() || [];
+  const tag = String(budget.tag || '').trim();
+  const trigISO = iso(budget.triggerTxIso);
+  let changed = false;
+  let updated = txs.filter(t => {
+    try {
+      if (!t) return false;
+      // Remove exact trigger by id
+      if (budget.triggerTxId && String(t.id) === String(budget.triggerTxId)) { changed = true; return false; }
+      // Remove recurring master for same tag starting on trigger date
+      const isMaster = !!(t.recurrence && String(t.recurrence).trim());
+      if (isMaster && t.budgetTag === tag) {
+        const tISO = iso(t.opDate || t.postDate);
+        if (trigISO && tISO === trigISO) { changed = true; return false; }
+      }
+      return true;
+    } catch (_) { return true; }
+  });
+  // Remove materialization transactions (reserve/return) for this budget
+  updated = updated.filter(t => {
+    try {
+      if (!t || !t.isBudgetMaterialization) return true;
+      const isReserve = t.budgetReserveFor && String(t.budgetReserveFor) === String(budget.id);
+      const isReturn  = t.budgetReturnFor  && String(t.budgetReturnFor)  === String(budget.id);
+      if (isReserve || isReturn) { changed = true; return false; }
+      return true;
+    } catch (_) { return true; }
+  });
+  if (changed) {
+    setTransactions(updated);
+    try { fbSave('tx', updated); } catch(_) {}
   }
   return { removed };
 }
@@ -192,45 +246,4 @@ export function updateAdHocBudget(budget, changes = {}, options = {}){
     try { fbSave('tx', updated); } catch(_) {}
   }
   return { updated:true, budget: next };
-}
-
-/**
- * Remove a recurring budget and unlink the recurrence master from the budget system.
- * This ensures all budget cards (including synthetic future cycles) disappear and
- * the balance stops reserving amounts for this tag.
- *
- * @param {object} budget Recurring budget to remove (expects budgetType === 'recurring')
- * @param {object} options { getTransactions?, setTransactions? } to persist unlinking the master
- */
-export function removeRecurringBudget(budget, options = {}) {
-  if (!budget || budget.budgetType !== 'recurring') return { removed: false };
-  const { getTransactions, setTransactions } = options || {};
-  // 1) Remove the persisted budget record
-  const { removed } = removeBudget(budget);
-  // 2) Remove the trigger transaction (recurring master) so no synthetic budgets are generated
-  if (typeof getTransactions === 'function' && typeof setTransactions === 'function') {
-    try {
-      const tag = String(budget.tag || '').trim();
-      const txs = getTransactions() || [];
-      let changed = false;
-      const updated = txs.filter((t) => {
-        if (!t) return false;
-        // Remove the exact trigger transaction by id when available
-        if (budget.triggerTxId && String(t.id) === String(budget.triggerTxId)) { changed = true; return false; }
-        // Fallback: remove a recurring master with same tag that starts on triggerTxIso
-        const isMaster = !!(t.recurrence && String(t.recurrence).trim());
-        if (isMaster && t.budgetTag === tag) {
-          const trigISO = iso(budget.triggerTxIso);
-          const tISO = iso(t.opDate || t.postDate);
-          if (trigISO && tISO === trigISO) { changed = true; return false; }
-        }
-        return true;
-      });
-      if (changed) {
-        setTransactions(updated);
-        try { fbSave('tx', updated); } catch (_) {}
-      }
-    } catch (_) { /* ignore unlink errors */ }
-  }
-  return { removed };
 }

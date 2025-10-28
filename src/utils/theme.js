@@ -26,11 +26,6 @@ export function applyThemePreference(pref) {
     root.classList.remove('light');
     root.setAttribute('data-theme', 'dark');
   }
-  // Keep the PWA status bar consistent with the active theme
-  try {
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', resolved === 'light' ? '#f7f7f7' : '#1e1e1e');
-  } catch (_) {}
 }
 
 export function initThemeFromStorage() {

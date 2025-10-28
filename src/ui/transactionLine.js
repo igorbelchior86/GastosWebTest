@@ -126,6 +126,33 @@ export function initTransactionLine(deps) {
       ts.textContent = `${dd} de ${cap}`;
     })();
 
+    // Helper: if card transaction, append a small invoice indicator (card + due date)
+    const maybeAppendInvoiceIndicator = (container) => {
+      try {
+        if (!container) return;
+        const isCash = String(tx.method || 'Dinheiro') === 'Dinheiro';
+        const dueISO = tx && tx.postDate;
+        if (isCash || !dueISO) return;
+        // Format due date
+        const [yy, mm, dd] = String(dueISO).split('-').map(Number);
+        const dueObj = (isFinite(yy) && isFinite(mm) && isFinite(dd)) ? new Date(yy, mm - 1, dd) : null;
+        let dueLabel = dueISO;
+        if (dueObj) {
+          let m2 = dueObj.toLocaleDateString('pt-BR', { month: 'short' }) || '';
+          m2 = m2.replace('.', '');
+          const cap2 = m2 ? (m2.charAt(0).toUpperCase() + m2.slice(1)) : '';
+          const d2 = String(dueObj.getDate()).padStart(2, '0');
+          dueLabel = `${d2} de ${cap2}`;
+        }
+        const badge = document.createElement('span');
+        badge.className = 'invoice-link-badge';
+        const cardLabel = (tx.method && tx.method !== 'Dinheiro') ? String(tx.method) : 'Cartão';
+        badge.textContent = `${cardLabel} • fatura ${dueLabel}`;
+        badge.title = 'Fatura de cartão para esta compra';
+        container.appendChild(badge);
+      } catch (_) {}
+    };
+
     if (disableSwipe === true) {
       // Planned modal: no swipe actions
       if (tx.planned) {
@@ -160,6 +187,7 @@ export function initTransactionLine(deps) {
         const subRow = document.createElement('div');
         subRow.className = 'sub-row';
         subRow.appendChild(ts);
+        maybeAppendInvoiceIndicator(subRow);
         if (tx.budgetTag) {
           const chip = document.createElement('span');
           chip.className = 'tag-chip';
@@ -256,6 +284,7 @@ export function initTransactionLine(deps) {
       const subRow2 = document.createElement('div');
       subRow2.className = 'sub-row';
       subRow2.appendChild(ts);
+      maybeAppendInvoiceIndicator(subRow2);
       if (tx && tx.budgetTag) {
         const chip2 = document.createElement('span');
         chip2.className = 'tag-chip';
@@ -345,6 +374,10 @@ export function initTransactionLine(deps) {
 
       .sub-row .badge-deferred{ display:inline-flex; align-items:center; height:20px; padding:0 10px; border-radius:999px; background:#3a3a3c; color:#B3B3B3; font-size:12px; font-weight:600; }
       html[data-theme="light"] .sub-row .badge-deferred{ background:#e5e7eb; color:#4b5563; }
+
+      /* Small badge indicating which invoice (card + due date) this purchase belongs to */
+      .sub-row .invoice-link-badge{ display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; background:rgba(0,0,0,0.18); color:#c9c9c9; font-size:12px; font-weight:600; border:1px solid rgba(255,255,255,0.08); }
+      html[data-theme="light"] .sub-row .invoice-link-badge{ background:#f3f4f6; color:#374151; border:1px solid rgba(0,0,0,0.08); }
     `;
     document.head.appendChild(st);
   } catch (_) {}

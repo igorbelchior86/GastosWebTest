@@ -214,6 +214,28 @@ export function getReservedTotalForDate(dateISO, transactions, opts = {}) {
   // projected range. Skip cycles that already have a persisted budget record or
   // that were materialized as transactions to avoid double counting.
   try {
+    // Determine conservative lower bounds per tag to avoid retroactive synthesis
+    const earliestStartByTag = new Map();
+    try {
+      (loadBudgets() || []).forEach((b) => {
+        if (!b || b.status !== 'active' || !b.tag) return;
+        const s = normalizeISODate(b.startDate);
+        if (!s) return;
+        const prev = earliestStartByTag.get(b.tag);
+        if (!prev || s < prev) earliestStartByTag.set(b.tag, s);
+      });
+    } catch (_) {}
+    const masterStartByTag = new Map();
+    try {
+      (allTxs || []).forEach((t) => {
+        if (!t || !t.recurrence || !t.budgetTag) return;
+        const tStart = normalizeISODate(t.opDate);
+        if (!tStart) return;
+        const prev = masterStartByTag.get(t.budgetTag);
+        if (!prev || tStart < prev) masterStartByTag.set(t.budgetTag, tStart);
+      });
+    } catch (_) {}
+
     allTxs.forEach((master) => {
       if (!master || !master.recurrence || !master.budgetTag) return;
       const tag = master.budgetTag;
@@ -222,7 +244,14 @@ export function getReservedTotalForDate(dateISO, transactions, opts = {}) {
       if (!startOfTarget) return;
       // Walk cycles from target's cycle backwards, accumulating until the freeze boundary.
       let cursor = startOfTarget;
-      const lowerBound = (freezeAtISO && target > freezeAtISO) ? freezeAtISO : target;
+      // Base lower bound: do not walk past the evaluation cutoff (today for future dates)
+      let lowerBound = (freezeAtISO && target > freezeAtISO) ? freezeAtISO : target;
+      // Tighten bound to the earliest persisted active budget start for this tag
+      const b1 = earliestStartByTag.get(tag);
+      if (b1 && b1 > lowerBound) lowerBound = b1;
+      // Tighten further using the master first configured opDate
+      const b2 = masterStartByTag.get(tag);
+      if (b2 && b2 > lowerBound) lowerBound = b2;
       while (cursor && cursor > lowerBound) {
         const start = cursor;
         const end = nextFrom(start, rec) || start;

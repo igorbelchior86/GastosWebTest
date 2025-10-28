@@ -67,7 +67,6 @@ export function attachBudgetActions(cardEl, budget, ctx = {}){
     if (budget.budgetType === 'ad-hoc') {
       await removeAdHocBudget(budget, { unlinkOps: true, ...commonCtx });
     } else {
-      // Recorrente: remover e desvincular master para evitar cartões sintéticos
       await removeRecurringBudget(budget, { ...commonCtx });
     }
   });

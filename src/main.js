@@ -1608,45 +1608,6 @@ document.addEventListener('click',e=>{
 });
 
 function renderTable(){
-  // Preserve scroll position around the day currently in view
-  let restoreScroll = null;
-  try {
-    const wrap = wrapperEl;
-    if (wrap) {
-      const header = document.querySelector('.app-header');
-      const headerHeight = header ? (header.offsetHeight || 0) : 0;
-      const sticky = document.querySelector('.sticky-month');
-      const stickyHeight = sticky ? (sticky.offsetHeight || stickyHeightGuess || 0) : (stickyHeightGuess || 0);
-      const gap = 8;
-      const targetFromTop = headerHeight + stickyHeight + gap;
-      const days = Array.from(document.querySelectorAll('details.day'));
-      if (days.length) {
-        // Pick the day whose top is closest to the target anchor line
-        let best = null;
-        let bestDelta = Infinity;
-        days.forEach((el) => {
-          const r = el.getBoundingClientRect();
-          const delta = Math.abs(r.top - targetFromTop);
-          if (delta < bestDelta) { bestDelta = delta; best = el; }
-        });
-        const key = best && best.dataset ? best.dataset.key : null;
-        const beforeTop = best ? best.getBoundingClientRect().top : null;
-        if (key && beforeTop != null) {
-          restoreScroll = () => {
-            try {
-              const after = document.querySelector(`details.day[data-key="${key}"]`);
-              if (!after) return;
-              const afterTop = after.getBoundingClientRect().top;
-              const adjust = afterTop - beforeTop;
-              if (Math.abs(adjust) > 1 && wrapperEl) {
-                wrapperEl.scrollTop += adjust;
-              }
-            } catch (_) {}
-          };
-        }
-      }
-    }
-  } catch (_) { /* ignore preserve errors */ }
   const hydrating=isHydrating();
   // Ensure dual daily balances (projected vs available) are computed
   // before rendering so the day-headers can use them instead of the
@@ -1675,13 +1636,6 @@ function renderTable(){
   
   const groups=groupTransactionsByMonth();
   renderTransactionGroups(groups);
-  // Restore scroll so the focused day stays put
-  try {
-    if (typeof restoreScroll === 'function') {
-      // wait a frame for layout to settle
-      requestAnimationFrame(() => { try { restoreScroll(); } catch (_) {} });
-    }
-  } catch (_) {}
   
   setTimeout(()=>{
     try{
