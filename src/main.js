@@ -424,7 +424,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.5.0(c02)';
+const APP_VERSION = 'v1.5.0(c04)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1608,9 +1608,47 @@ document.addEventListener('click',e=>{
 });
 
 function renderTable(){
-  // Preserve wrapper scroll position to avoid iOS PWA jumping to month start
+  // Preserve position robustly: anchor nearest day to the sticky header line
   let prevScrollTop = null;
-  try { if (wrapperEl && typeof wrapperEl.scrollTop === 'number') prevScrollTop = wrapperEl.scrollTop; } catch (_) {}
+  let restoreScrollByAnchor = null;
+  try {
+    if (wrapperEl && typeof wrapperEl.scrollTop === 'number') prevScrollTop = wrapperEl.scrollTop;
+    const wrap = wrapperEl;
+    if (wrap) {
+      const header = document.querySelector('.app-header');
+      const headerHeight = header ? (header.offsetHeight || 0) : 0;
+      const sticky = document.querySelector('.sticky-month');
+      let stickyHeight = 0;
+      if (sticky) {
+        const measured = sticky.offsetHeight || stickyHeightGuess || 0;
+        if (measured > 0) stickyHeight = measured;
+      }
+      const gap = 8;
+      const anchorY = headerHeight + stickyHeight + gap; // target line inside viewport
+      const days = Array.from(document.querySelectorAll('details.day'));
+      if (days.length) {
+        let best = null; let bestDelta = Infinity;
+        days.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.top - anchorY);
+          if (d < bestDelta) { bestDelta = d; best = el; }
+        });
+        const key = best && best.dataset ? best.dataset.key : null;
+        const beforeTop = best ? best.getBoundingClientRect().top : null;
+        if (key && beforeTop != null) {
+          restoreScrollByAnchor = () => {
+            try {
+              const after = document.querySelector(`details.day[data-key="${key}"]`);
+              if (!after) return;
+              const afterTop = after.getBoundingClientRect().top;
+              const adjust = afterTop - beforeTop;
+              if (Math.abs(adjust) > 1 && wrapperEl) wrapperEl.scrollTop += adjust;
+            } catch (_) {}
+          };
+        }
+      }
+    }
+  } catch (_) {}
   const hydrating=isHydrating();
   // Ensure dual daily balances (projected vs available) are computed
   // before rendering so the day-headers can use them instead of the
@@ -1644,7 +1682,9 @@ function renderTable(){
     try{
       if(typeof recalculateHeaderOffset==='function') recalculateHeaderOffset();
     } catch(_) {}
-    // Restore previous scroll exactly (helps iOS 17/26 PWA not jump to top)
+    // First try anchor-based restoration to keep the same day under the header
+    try { if (typeof restoreScrollByAnchor === 'function') restoreScrollByAnchor(); } catch (_) {}
+    // Fallback: restore previous scroll exactly (helps iOS 17/26 PWA)
     try {
       if (wrapperEl != null && prevScrollTop != null && Math.abs((wrapperEl.scrollTop||0) - prevScrollTop) > 1) {
         wrapperEl.scrollTop = prevScrollTop;

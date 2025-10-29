@@ -496,6 +496,22 @@ export async function addTx() {
       const currentEditMode = g.pendingEditMode;
       const currentEditTxIso = g.pendingEditTxIso;
 
+      // Helper available to all edit modes: read paid/planned toggle
+      const readMarkAsPaid = () => {
+        try {
+          const group = document.querySelector('.paid-toggle');
+          const active = group ? group.querySelector('.seg-option.active') : null;
+          // Prefer current occurrence ISO when available; fallback to newOpDate
+          const refISO = currentEditTxIso || newOpDate;
+          // Default heuristic: past/today => paid
+          const defaultPaid = !(refISO && refISO > todayFn());
+          return active ? (active.dataset.paid === '1') : defaultPaid;
+        } catch (_) {
+          const refISO = currentEditTxIso || newOpDate;
+          return !(refISO && refISO > todayFn());
+        }
+      };
+
       if (!isRecurrenceActive(t.recurrence) && recurrenceActive && newBudgetTag && hasActiveRecurringBudgetForTag(newBudgetTag)) {
         if (blockMessage(`Já existe um orçamento recorrente ativo para ${newBudgetTag}.`)) {
           return;
@@ -532,14 +548,6 @@ export async function addTx() {
             !tx.recurrence
           );
           
-          // helper: read paid-toggle state
-          const readMarkAsPaid = () => {
-            try {
-              const group = document.querySelector('.paid-toggle');
-              const active = group ? group.querySelector('.seg-option.active') : null;
-              return active ? (active.dataset.paid === '1') : (currentEditTxIso <= todayFn());
-            } catch (_) { return (currentEditTxIso <= todayFn()); }
-          };
           if (existingDetached) {
             // Update existing detached transaction
             existingDetached.desc = newDesc;
