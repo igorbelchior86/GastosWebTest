@@ -424,7 +424,37 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.5.0(a01)';
+const APP_VERSION = 'v1.5.0(c02)';
+
+// Keep CSS query param (?v=...) in sync with app version to bust caches automatically
+(function syncStylesVersionFromApp(){
+  try {
+    const verToken = (() => {
+      const m = String(APP_VERSION || '').match(/\(([a-z]\d{2})\)/i);
+      if (m && m[1]) return m[1];
+      return 'dev';
+    })();
+    const ensureVer = (href) => {
+      try {
+        const url = new URL(href, window.location.origin);
+        if (url.searchParams.get('v') === verToken) return href;
+        url.searchParams.set('v', verToken);
+        return url.pathname + '?' + url.searchParams.toString();
+      } catch (_) {
+        // Fallback simple string replace
+        const base = href.split('?')[0];
+        return `${base}?v=${verToken}`;
+      }
+    };
+    const links = Array.from(document.querySelectorAll('link[rel="stylesheet"][href]'))
+      .filter(l => /public\/(style|login)\.css/.test(l.getAttribute('href')||''));
+    links.forEach(el => {
+      const cur = el.getAttribute('href') || '';
+      const next = ensureVer(cur);
+      if (next !== cur) el.setAttribute('href', next);
+    });
+  } catch (_) { /* ignore version sync errors */ }
+})();
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1608,6 +1638,9 @@ document.addEventListener('click',e=>{
 });
 
 function renderTable(){
+  // Preserve wrapper scroll position to avoid iOS PWA jumping to month start
+  let prevScrollTop = null;
+  try { if (wrapperEl && typeof wrapperEl.scrollTop === 'number') prevScrollTop = wrapperEl.scrollTop; } catch (_) {}
   const hydrating=isHydrating();
   // Ensure dual daily balances (projected vs available) are computed
   // before rendering so the day-headers can use them instead of the
@@ -1641,6 +1674,12 @@ function renderTable(){
     try{
       if(typeof recalculateHeaderOffset==='function') recalculateHeaderOffset();
     } catch(_) {}
+    // Restore previous scroll exactly (helps iOS 17/26 PWA not jump to top)
+    try {
+      if (wrapperEl != null && prevScrollTop != null && Math.abs((wrapperEl.scrollTop||0) - prevScrollTop) > 1) {
+        wrapperEl.scrollTop = prevScrollTop;
+      }
+    } catch (_) {}
   }, 100);
 }
 

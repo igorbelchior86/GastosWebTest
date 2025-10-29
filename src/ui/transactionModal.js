@@ -532,6 +532,14 @@ export async function addTx() {
             !tx.recurrence
           );
           
+          // helper: read paid-toggle state
+          const readMarkAsPaid = () => {
+            try {
+              const group = document.querySelector('.paid-toggle');
+              const active = group ? group.querySelector('.seg-option.active') : null;
+              return active ? (active.dataset.paid === '1') : (currentEditTxIso <= todayFn());
+            } catch (_) { return (currentEditTxIso <= todayFn()); }
+          };
           if (existingDetached) {
             // Update existing detached transaction
             existingDetached.desc = newDesc;
@@ -539,7 +547,7 @@ export async function addTx() {
             existingDetached.method = newMethod;
             existingDetached.opDate = newOpDate;
             existingDetached.postDate = computePostDate(newOpDate, newMethod);
-            existingDetached.planned = newOpDate > todayFn();
+            existingDetached.planned = !readMarkAsPaid();
             existingDetached.modifiedAt = new Date().toISOString();
             existingDetached.budgetTag = newBudgetTag;
             tryUpsertBudget(existingDetached, {
@@ -559,7 +567,7 @@ export async function addTx() {
               postDate: computePostDate(newOpDate, newMethod),
               recurrence: '',
               installments: 1,
-              planned: newOpDate > todayFn(),
+              planned: !readMarkAsPaid(),
               ts: new Date().toISOString(),
               modifiedAt: new Date().toISOString(),
               budgetTag: newBudgetTag
@@ -595,7 +603,7 @@ export async function addTx() {
             postDate: computePostDate(currentEditTxIso, newMethod),
             recurrence: recurrenceValue,
             installments: installmentsValue,
-            planned: currentEditTxIso > todayFn(),
+            planned: !readMarkAsPaid(),
             ts: new Date().toISOString(),
             modifiedAt: new Date().toISOString(),
             budgetTag: newBudgetTag
@@ -660,6 +668,11 @@ export async function addTx() {
           break;
         }
       }
+      // Force state update so UI observers pick up changes to master/occurrences
+      try {
+        const snap = (getTxs && Array.isArray(getTxs())) ? getTxs().slice() : [];
+        if (typeof setTxs === 'function') setTxs(snap);
+      } catch (_) {}
       // Reset editing state - update BOTH local variables AND global state
       refreshBudgetsCache(getTxs());
       pendingEditMode    = null;
@@ -672,9 +685,13 @@ export async function addTx() {
       g.isEditing        = null;
       if (addBtn) addBtn.textContent = 'Adicionar';
       if (txModalTitle) txModalTitle.textContent = 'Lançar operação';
-      saveFn('tx', getTxs());
+      try {
+        const snap = (getTxs && Array.isArray(getTxs())) ? getTxs().slice() : [];
+        saveFn('tx', snap);
+      } catch (_) { try { saveFn('tx', getTxs()); } catch(_) {} }
       toggleModalFn();
-      // No need to manually render - Firebase listener will trigger renderTable automatically
+      // Immediately refresh UI to reflect changes (especially on iOS PWA without realtime)
+      try { if (typeof renderTable === 'function') renderTable(); } catch (_) {}
       // Custom edit confirmation toast
       const formattedVal = fmtCurrency(parseCurrency(val && val.value));
       const recValue = recurrence ? recurrence.value : '';
