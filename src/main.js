@@ -426,36 +426,6 @@ function resolvePathForUser(user){
 
 const APP_VERSION = 'v1.5.0(c02)';
 
-// Keep CSS query param (?v=...) in sync with app version to bust caches automatically
-(function syncStylesVersionFromApp(){
-  try {
-    const verToken = (() => {
-      const m = String(APP_VERSION || '').match(/\(([a-z]\d{2})\)/i);
-      if (m && m[1]) return m[1];
-      return 'dev';
-    })();
-    const ensureVer = (href) => {
-      try {
-        const url = new URL(href, window.location.origin);
-        if (url.searchParams.get('v') === verToken) return href;
-        url.searchParams.set('v', verToken);
-        return url.pathname + '?' + url.searchParams.toString();
-      } catch (_) {
-        // Fallback simple string replace
-        const base = href.split('?')[0];
-        return `${base}?v=${verToken}`;
-      }
-    };
-    const links = Array.from(document.querySelectorAll('link[rel="stylesheet"][href]'))
-      .filter(l => /public\/(style|login)\.css/.test(l.getAttribute('href')||''));
-    links.forEach(el => {
-      const cur = el.getAttribute('href') || '';
-      const next = ensureVer(cur);
-      if (next !== cur) el.setAttribute('href', next);
-    });
-  } catch (_) { /* ignore version sync errors */ }
-})();
-
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 function logMetric(name, payload) {
