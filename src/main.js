@@ -424,7 +424,7 @@ function resolvePathForUser(user){
   return personalPath;
 }
 
-const APP_VERSION = 'v1.5.0(c04)';
+const APP_VERSION = 'v1.5.0(c05)';
 
 const METRICS_ENABLED = true;
 const _bootT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1611,6 +1611,8 @@ function renderTable(){
   // Preserve position robustly: anchor nearest day to the sticky header line
   let prevScrollTop = null;
   let restoreScrollByAnchor = null;
+  // Lock auto-scrollers during re-render to avoid external jumps (iOS PWA)
+  try { if (window.__gastos) window.__gastos.__lockAutoScroll = true; } catch (_) {}
   try {
     if (wrapperEl && typeof wrapperEl.scrollTop === 'number') prevScrollTop = wrapperEl.scrollTop;
     const wrap = wrapperEl;
@@ -1690,6 +1692,8 @@ function renderTable(){
         wrapperEl.scrollTop = prevScrollTop;
       }
     } catch (_) {}
+    // Release auto-scroll lock shortly after layout settles
+    setTimeout(() => { try { if (window.__gastos) window.__gastos.__lockAutoScroll = false; } catch (_) {} }, 80);
   }, 100);
 }
 

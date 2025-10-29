@@ -759,6 +759,7 @@ export function createAnimateWrapperScroll(context) {
   return function animateWrapperScroll(targetTop) {
     const { wrapperEl } = context;
     if (!wrapperEl) return;
+    try { if (window.__gastos && window.__gastos.__lockAutoScroll) return; } catch (_) {}
     if (context.wrapperScrollAnimation) return;
     const startTop = wrapperEl.scrollTop || 0;
     const distance = targetTop - startTop;

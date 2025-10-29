@@ -8,6 +8,8 @@
  */
 export function scrollTodayIntoView() {
   const g = typeof window !== 'undefined' ? window.__gastos || {} : {};
+  // Guard: if auto-scroll is locked (e.g. during re-render), skip
+  try { if (g.__lockAutoScroll) return; } catch (_) {}
   const todayISO = g.todayISO || (() => {
     // fallback: ISO date for today
     const d = new Date();
@@ -74,6 +76,7 @@ export function scrollTodayIntoView() {
       return;
     }
     if (wrapperScrollAnimation) return;
+    try { if (g.__lockAutoScroll) return; } catch (_) {}
     requestAnimationFrame(() => {
       try {
         const header = document.querySelector('.app-header');
